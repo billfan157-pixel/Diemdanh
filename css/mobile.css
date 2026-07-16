@@ -27,13 +27,15 @@
     --m-accent-soft: #eff6ff;
   }
 
-  /* Cỡ gốc lớn: 1rem ≈ 18px trên phone */
+  /*
+   * Khóa double-tap / pinch zoom (CSS).
+   * touch-action: manipulation = cho phép scroll, TẮT double-tap zoom.
+   */
   html {
     font-size: 18px !important;
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
-    /* Chỉ scroll/pan — không pinch/double-tap zoom */
-    touch-action: pan-x pan-y;
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+    touch-action: manipulation !important;
   }
 
   body {
@@ -41,36 +43,24 @@
     line-height: 1.5 !important;
     overscroll-behavior-y: contain;
     -webkit-tap-highlight-color: transparent;
-    touch-action: pan-x pan-y;
+    touch-action: manipulation !important;
   }
   body.m-drawer-open {
     overflow: hidden;
   }
 
-  /* Mọi phần tử tương tác: không zoom khi chạm */
-  button,
-  a,
+  /* Áp lên mọi node — quan trọng với iOS Safari */
+  html *,
+  html *::before,
+  html *::after {
+    touch-action: manipulation !important;
+  }
+
+  /* iOS zoom khi focus input nếu font < 16px — luôn ≥ 16px */
   input,
   select,
-  textarea,
-  label,
-  .btn,
-  .chip-btn,
-  .view-btn,
-  .term-btn,
-  .m-nav-item,
-  .m-icon-btn,
-  .m-topbar-btn,
-  .m-fab,
-  .m-sheet-btn,
-  .se-cell,
-  .class-item,
-  .chip,
-  summary,
-  .app,
-  .main,
-  .modal-overlay {
-    touch-action: manipulation;
+  textarea {
+    font-size: max(16px, 1em) !important;
   }
 
   .app {

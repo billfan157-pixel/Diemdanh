@@ -2,87 +2,17 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no" />
   <meta name="theme-color" content="#2563eb" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sổ Điểm GL" />
   <title>Sổ Điểm Giáo Lý</title>
+  <!-- Khóa zoom TRƯỚC khi load CSS/body (iOS bỏ qua meta một mình) -->
+  <script src="js/no-zoom.js?v=8"></script>
   <link rel="stylesheet" href="css/styles.css" />
-  <!-- v=7: lock zoom on mobile -->
-  <link rel="stylesheet" href="css/mobile.css?v=7" />
-  <script>
-    /* Chặn zoom (pinch / double-tap / gesture) — giống app native */
-    (function () {
-      function lockViewport() {
-        var m = document.querySelector('meta[name="viewport"]');
-        if (m) {
-          m.setAttribute(
-            "content",
-            "width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-          );
-        }
-      }
-      lockViewport();
-      document.addEventListener(
-        "gesturestart",
-        function (e) {
-          e.preventDefault();
-        },
-        { passive: false }
-      );
-      document.addEventListener(
-        "gesturechange",
-        function (e) {
-          e.preventDefault();
-        },
-        { passive: false }
-      );
-      document.addEventListener(
-        "gestureend",
-        function (e) {
-          e.preventDefault();
-        },
-        { passive: false }
-      );
-      document.addEventListener(
-        "touchmove",
-        function (e) {
-          if (e.touches && e.touches.length > 1) e.preventDefault();
-        },
-        { passive: false }
-      );
-      var lastTouchEnd = 0;
-      var lastTouchTarget = null;
-      document.addEventListener(
-        "touchend",
-        function (e) {
-          var now = Date.now();
-          // Chỉ chặn double-tap cùng một chỗ (tránh zoom), không chặn chạm nhanh 2 nút khác
-          if (
-            now - lastTouchEnd <= 320 &&
-            lastTouchTarget === e.target
-          ) {
-            e.preventDefault();
-          }
-          lastTouchEnd = now;
-          lastTouchTarget = e.target;
-        },
-        { passive: false }
-      );
-      document.addEventListener(
-        "wheel",
-        function (e) {
-          if (e.ctrlKey) e.preventDefault();
-        },
-        { passive: false }
-      );
-      document.addEventListener("dblclick", function (e) {
-        e.preventDefault();
-      });
-    })();
-  </script>
+  <link rel="stylesheet" href="css/mobile.css?v=8" />
   <!-- Thư viện local — hoạt động cả offline / file:// -->
   <script src="js/vendor/xlsx.full.min.js"></script>
   <script src="js/vendor/jszip.min.js"></script>
