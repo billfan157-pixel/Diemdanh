@@ -26,44 +26,72 @@
   GL.updateViewSwitcherUI = function updateViewSwitcherUI() {
     var isYear = GL.activeTerm === "year";
     var moreModes = ["rank", "stats", "print"];
+    // Cả năm: chuẩn hóa view (cards/table → year board)
+    if (
+      isYear &&
+      (GL.viewMode === "cards" ||
+        GL.viewMode === "table" ||
+        GL.viewMode === "missing")
+    ) {
+      GL.viewMode = "year";
+      try {
+        localStorage.setItem(GL.VIEW_KEY, "year");
+      } catch (e) {
+        /* ignore */
+      }
+    }
     document.querySelectorAll(".view-btn").forEach(function (btn) {
       if (btn.getAttribute("data-view-more") === "1" || btn.id === "viewMoreBtn") {
-        // Nút Thêm: mobile luôn hiện; active nếu đang ở rank/stats/print
+        btn.style.display = "";
         btn.classList.toggle("active", moreModes.indexOf(GL.viewMode) >= 0);
-        if (isYear) {
-          // năm: cards/table ẩn, Thêm vẫn hữu ích
-          btn.style.display = "";
-        }
         return;
       }
       var v = btn.getAttribute("data-view");
-      // Ở chế độ cả năm: ẩn nhập điểm / bảng
       if (isYear) {
-        var allow =
-          v === "rank" || v === "stats" || v === "print" || v === "journal";
-        // desktop tabs rank/stats/print; mobile ẩn desktop tabs
-        if (btn.classList.contains("view-btn-desktop")) {
-          btn.style.display = allow ? "" : "none";
-        } else {
-          btn.style.display = allow || v === "journal" ? "" : "none";
-          if (v === "cards" || v === "table") btn.style.display = "none";
+        // Cả năm: Tổng kết · Theo dõi · Thêm (+ desktop Hạng/TK/In)
+        if (v === "year") {
+          btn.style.display = "";
+          btn.classList.toggle("active", GL.viewMode === "year" || GL.viewMode === "rank");
+          return;
         }
-        btn.classList.toggle("active", v === GL.viewMode);
-        if (!allow) btn.classList.remove("active");
+        if (v === "cards" || v === "table") {
+          btn.style.display = "none";
+          btn.classList.remove("active");
+          return;
+        }
+        if (v === "journal") {
+          btn.style.display = "";
+          btn.classList.toggle("active", GL.viewMode === "journal");
+          return;
+        }
+        if (btn.classList.contains("view-btn-desktop")) {
+          var allowD = v === "rank" || v === "stats" || v === "print";
+          btn.style.display = allowD ? "" : "none";
+          btn.classList.toggle("active", v === GL.viewMode);
+          return;
+        }
+        btn.style.display = "none";
+        btn.classList.remove("active");
       } else {
-        if (btn.classList.contains("view-btn-desktop")) {
-          // desktop: hiện; mobile CSS ẩn
-          btn.style.display = "";
-        } else {
-          btn.style.display = "";
+        if (v === "year") {
+          btn.style.display = "none";
+          btn.classList.remove("active");
+          return;
         }
+        btn.style.display = "";
         btn.classList.toggle("active", v === GL.viewMode);
       }
     });
     var hint = document.getElementById("viewHint");
     if (hint) {
-      if (isYear && (GL.viewMode === "year" || GL.viewMode === "cards" || GL.viewMode === "table")) {
-        hint.innerHTML = GL.VIEW_HINTS.year;
+      if (
+        isYear &&
+        (GL.viewMode === "year" ||
+          GL.viewMode === "cards" ||
+          GL.viewMode === "table" ||
+          GL.viewMode === "rank")
+      ) {
+        hint.innerHTML = GL.VIEW_HINTS.year || "";
       } else {
         hint.innerHTML = GL.VIEW_HINTS[GL.viewMode] || "";
       }
@@ -71,9 +99,14 @@
 
     var toolbar = document.getElementById("listToolbar");
     if (toolbar) {
-      toolbar.style.display =
-        GL.viewMode === "stats" || isYear ? (isYear ? "flex" : "none") : "flex";
-      // năm: vẫn hiện tìm + xuất, ẩn xóa hết? keep all
+      // Cả năm: vẫn cho tìm HV; ẩn khi stats
+      if (isYear) {
+        toolbar.style.display =
+          GL.viewMode === "stats" ? "none" : "flex";
+      } else {
+        toolbar.style.display =
+          GL.viewMode === "stats" ? "none" : "flex";
+      }
     }
   };
 
@@ -301,10 +334,32 @@
     if (elGood) elGood.textContent = String(good);
     if (elYear) elYear.textContent = GL.fmt(yearAvg, 2);
     if (elAvgLabel) {
-      if (term === "year") elAvgLabel.textContent = "TB lớp (cả năm)";
+      if (term === "year") elAvgLabel.textContent = "TB cả năm";
       else
         elAvgLabel.textContent =
           "TB lớp (" + (term === "hk2" ? "HK2" : "HK1") + ")";
+    }
+    // Strip mobile: khi Cả năm, ô "TB cả năm" trùng → hiện số HV đủ 2 HK
+    var yearStat = document.getElementById("statYearAvg");
+    var yearStatLabel =
+      yearStat && yearStat.parentElement
+        ? yearStat.parentElement.querySelector(".stat-label")
+        : null;
+    if (yearStat && yearStatLabel) {
+      if (term === "year") {
+        var bothHk = cls.students.filter(function (s) {
+          return (
+            GL.studentTB(s, cls.weights, "hk1") != null &&
+            GL.studentTB(s, cls.weights, "hk2") != null
+          );
+        }).length;
+        yearStat.textContent = String(bothHk);
+        yearStatLabel.textContent = "Đủ 2 HK";
+        yearStat.style.color = "";
+      } else {
+        yearStatLabel.textContent = "TB cả năm";
+        yearStat.style.color = "var(--purple)";
+      }
     }
   };
 
@@ -554,6 +609,8 @@
         (key === "scores" && which === "class") ||
         (key === "me" && which === "me");
       btn.classList.toggle("active", on);
+      if (on) btn.setAttribute("aria-current", "page");
+      else btn.removeAttribute("aria-current");
     });
 
     if (fab) {
@@ -668,7 +725,22 @@
     }
   };
 
-  GL.render = function render() {
+  var _renderPending = false;
+  var lastHome = null;
+  var lastViewMode = null;
+  var lastScrollY = 0;
+
+  var _actualRender = function () {
+    var home = GL.homeView || "dashboard";
+    var mode = GL.viewMode;
+    
+    // Lưu scroll position nếu vẫn ở view cũ
+    if (home === lastHome && mode === lastViewMode) {
+      lastScrollY = window.scrollY || document.documentElement.scrollTop;
+    } else {
+      lastScrollY = 0;
+    }
+
     GL.renderClassList();
     var cls = GL.activeClass();
     var noView = document.getElementById("noClassView");
@@ -676,7 +748,6 @@
     var dashView = document.getElementById("dashboardView");
     var classesView = document.getElementById("classesView");
     var meView = document.getElementById("meView");
-    var home = GL.homeView || "dashboard";
 
     function showOnly(which) {
       if (dashView) dashView.classList.toggle("hidden", which !== "dash");
@@ -701,6 +772,8 @@
       if (typeof GL.updateBackupReminderUI === "function") {
         GL.updateBackupReminderUI();
       }
+      lastHome = home;
+      lastViewMode = mode;
       return;
     }
 
@@ -713,6 +786,8 @@
       if (typeof GL.updateMobileChrome === "function") {
         GL.updateMobileChrome("me", cls);
       }
+      lastHome = home;
+      lastViewMode = mode;
       return;
     }
 
@@ -728,6 +803,8 @@
       if (typeof GL.updateBackupReminderUI === "function") {
         GL.updateBackupReminderUI();
       }
+      lastHome = home;
+      lastViewMode = mode;
       return;
     }
 
@@ -740,6 +817,8 @@
         if (typeof GL.updateMobileChrome === "function") {
           GL.updateMobileChrome("classes", null);
         }
+        lastHome = "classes";
+        lastViewMode = mode;
         return;
       }
       showOnly("dash");
@@ -753,6 +832,8 @@
       if (typeof GL.updateBackupReminderUI === "function") {
         GL.updateBackupReminderUI();
       }
+      lastHome = home;
+      lastViewMode = mode;
       return;
     }
 
@@ -784,5 +865,22 @@
     if (typeof GL.updateBackupReminderUI === "function") {
       GL.updateBackupReminderUI();
     }
+
+    lastHome = home;
+    lastViewMode = mode;
+
+    // Restore scroll position
+    if (lastScrollY > 0) {
+      window.scrollTo(0, lastScrollY);
+    }
+  };
+
+  GL.render = function render() {
+    if (_renderPending) return;
+    _renderPending = true;
+    requestAnimationFrame(function () {
+      _renderPending = false;
+      _actualRender();
+    });
   };
 })(window.GL = window.GL || {});

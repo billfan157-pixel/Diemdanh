@@ -39,14 +39,29 @@ URL: `https://gqmbhvgyoenweiepvrvk.supabase.co`
 ```
 tinh-diem/
 ├── index.html
-├── css/
-│   ├── styles.css
-│   └── mobile.css      # Giao diện mobile app
-├── js/
-│   ├── config.js, utils.js, calc.js, state.js, auth.js
-│   ├── views.js, render.js, import-export.js, app.js
-│   ├── invite.js, journal.js, dashboard.js, parish.js, …
+├── assets/
+│   ├── css/
+│   │   ├── main.css
+│   │   └── mobile.css
 │   └── vendor/         # xlsx, jszip (offline)
+├── src/
+│   ├── platform/       # code chạy rất sớm, trước layout/CSS
+│   ├── config/         # hằng số, cấu hình Supabase public
+│   ├── core/           # state, auth, tính điểm, helper chung
+│   ├── services/
+│   │   ├── export/     # tạo workbook và UI xuất file
+│   │   ├── import/     # chuẩn hóa, preview và đọc file nhập
+│   │   └── ...         # cloud sync, backup
+│   ├── features/       # dashboard, báo cáo, journal, parish, invite
+│   └── ui/
+│       ├── templates/  # login, app shell, feedback, modal
+│       ├── events/     # binding theo luồng nghiệp vụ UI
+│       ├── mount-templates.js
+│       └── ...         # render view + bootstrap gắn event
+├── docs/
+│   └── ARCHITECTURE.md
+├── supabase/
+│   └── schema.sql
 └── backups/            # file sao lưu thật — không commit
 ```
 
@@ -56,4 +71,6 @@ tinh-diem/
 
 ## Namespace
 
-Mọi module gắn vào `window.GL`. Thứ tự `<script>` trong `index.html` phải giữ nguyên.
+Mọi module gắn vào `window.GL`. Template UI được mount trước, sau đó thứ tự `<script>` phải giữ nguyên: `config` → `core` → `services` → `features` → `ui` → `app`.
+
+Xem thêm [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) trước khi thêm module mới.

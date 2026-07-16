@@ -634,28 +634,431 @@
       color: #7c3aed !important;
     }
 
+    /* ===== Year board (Cả năm) ===== */
+    .year-board {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* Hero — mobile-first; desktop ẩn */
+    .year-hero {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 14px;
+      background: linear-gradient(145deg, #f5f3ff 0%, #fff 55%);
+      border: 1px solid #ddd6fe;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+    .year-hero-score {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .year-hero-n {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      min-width: 3.2em;
+    }
+    .year-hero-label {
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: #5b21b6;
+    }
+    .year-hero-sub {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-top: 3px;
+      font-size: 0.78rem;
+      font-weight: 650;
+      color: var(--muted);
+    }
+    .year-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .year-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+    }
+    .year-chip strong {
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    .year-chip-ok {
+      background: #ecfdf5;
+      border-color: #a7f3d0;
+      color: #047857;
+    }
+    .year-chip-warn {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #b45309;
+    }
+    .year-chip-bad {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #b91c1c;
+    }
+    .year-chip-muted {
+      background: #f8fafc;
+      color: #64748b;
+    }
+
     .year-summary-bar {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: 1.3fr repeat(4, 1fr);
       gap: 8px;
       margin-bottom: 12px;
     }
 
-    @media (max-width: 720px) {
-      .year-summary-bar {
-        grid-template-columns: repeat(2, 1fr);
-      }
+    .year-sum-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 8px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .year-sum-card .n {
+      font-size: 1.25rem;
+      font-weight: 800;
+      line-height: 1.15;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .year-sum-card .n.ok { color: var(--accent); }
+    .year-sum-card .n.warn { color: var(--gold); }
+    .year-sum-card .n.bad { color: var(--danger); }
+    .year-sum-card .l {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    .year-sum-main {
+      background: linear-gradient(160deg, #f5f3ff, #fff);
+      border-color: #ddd6fe;
+    }
+    .year-sum-main .n {
+      color: #7c3aed;
+      font-size: 1.45rem;
     }
 
+    .year-formula-details {
+      margin-bottom: 12px;
+      background: #f5f3ff;
+      border: 1px solid #ddd6fe;
+      border-radius: 12px;
+      color: #5b21b6;
+      overflow: hidden;
+    }
+    .year-formula-details > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      font-weight: 750;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .year-formula-details > summary::-webkit-details-marker {
+      display: none;
+    }
+    .year-formula-details > summary::before {
+      content: "▸";
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+    .year-formula-details[open] > summary::before {
+      content: "▾";
+    }
+    .year-formula-body {
+      margin: 0;
+      padding: 0 12px 10px;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      color: #6d28d9;
+    }
+    /* legacy class nếu còn sót */
     .year-formula {
       margin-bottom: 12px !important;
       background: #f5f3ff !important;
       border-color: #ddd6fe !important;
       color: #5b21b6 !important;
+      font-size: 0.88rem !important;
+      line-height: 1.45 !important;
+      padding: 10px 12px !important;
+      border-radius: 12px !important;
+    }
+
+    .year-list-head {
+      display: none;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 4px 0 8px;
+      padding: 0 2px;
+    }
+    .year-list-head strong {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+    .year-list-head span {
+      font-size: 0.78rem;
+      font-weight: 650;
+      color: var(--muted);
     }
 
     .year-board .year-table th {
       background: #f5f3ff;
+    }
+
+    /* Thẻ cả năm — mobile chính; desktop ẩn */
+    .year-cards {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .year-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+    }
+    .year-card--gold {
+      border-color: #fcd34d;
+      background: linear-gradient(180deg, #fffbeb 0%, #fff 48%);
+    }
+    .year-card--silver {
+      border-color: #cbd5e1;
+      background: linear-gradient(180deg, #f8fafc 0%, #fff 48%);
+    }
+    .year-card--bronze {
+      border-color: #fdba74;
+      background: linear-gradient(180deg, #fff7ed 0%, #fff 48%);
+    }
+    .year-card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .year-card-rank {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: #f5f3ff;
+      color: #6d28d9;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.88rem;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .year-card-rank.is-medal {
+      background: transparent;
+      font-size: 1.35rem;
+    }
+    .year-card-who {
+      flex: 1;
+      min-width: 0;
+    }
+    .year-card-name {
+      font-weight: 800;
+      font-size: 1.02rem;
+      line-height: 1.25;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+    }
+    .year-card-name .yc-ten-thanh {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #1e3a8a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .year-card-name .yc-ho-ten {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .year-card-stt {
+      font-size: 0.72rem;
+      font-weight: 650;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    .year-card-year {
+      text-align: right;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      max-width: 42%;
+    }
+    .year-card-ty {
+      font-size: 1.5rem;
+      font-weight: 800;
+      line-height: 1.05;
+      font-variant-numeric: tabular-nums;
+    }
+    .year-card-year .rank-pill {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 750;
+      padding: 2px 7px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .year-card-terms {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .year-term {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      align-items: flex-start;
+      min-width: 0;
+    }
+    .year-term.is-empty {
+      background: #fff;
+      border-style: dashed;
+      opacity: 0.85;
+    }
+    .year-term-l {
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .year-term-l em {
+      font-style: normal;
+      font-weight: 700;
+      opacity: 0.75;
+    }
+    .year-term-v {
+      font-size: 1.15rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+    .year-term .rank-pill {
+      font-size: 0.65rem;
+      font-weight: 750;
+      padding: 2px 6px;
+      border-radius: 999px;
+      white-space: nowrap;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .year-term-empty {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #94a3b8;
+      line-height: 1.2;
+    }
+    .year-card-note {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--text2);
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 7px 10px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .year-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .year-actions .btn {
+      flex: 1 1 140px;
+    }
+
+    @media (max-width: 900px) {
+      .year-hero {
+        display: flex;
+      }
+      .year-summary-desktop {
+        display: none !important;
+      }
+      .year-list-head {
+        display: flex;
+      }
+      .year-cards {
+        display: flex;
+      }
+      .year-table-wrap {
+        display: none !important;
+      }
+      .year-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .year-actions .btn {
+        width: 100%;
+        min-height: 48px;
+        flex: none;
+      }
+    }
+
+    @media (min-width: 901px) {
+      .year-hero {
+        display: none !important;
+      }
+      .year-list-head {
+        display: none !important;
+      }
+      .year-cards {
+        display: none !important;
+      }
+      .year-table-wrap {
+        display: block;
+      }
+      .year-summary-desktop {
+        display: grid;
+      }
     }
 
     .term-note {
@@ -2408,6 +2811,16 @@
     }
 
     /* Ranks */
+    .rank-pill {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 750;
+      padding: 2px 8px;
+      border-radius: 999px;
+      line-height: 1.3;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
     .rank-xs { background: #dcfce7; color: #15803d; }
     .rank-g  { background: #dbeafe; color: #1d4ed8; }
     .rank-k  { background: #ede9fe; color: #6d28d9; }

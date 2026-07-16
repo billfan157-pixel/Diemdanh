@@ -71,14 +71,18 @@
     opts
   );
 
-  // Double-tap zoom — chặn mọi tap thứ 2 trong 400ms (toàn trang)
+  // Double-tap zoom — chặn tap thứ 2 trong 200ms trên các phần tử phi tương tác
   var lastTouchEnd = 0;
   document.addEventListener(
     "touchend",
     function (e) {
       var now = Date.now();
-      if (now - lastTouchEnd <= 400) {
-        prevent(e);
+      if (now - lastTouchEnd <= 200) {
+        var target = e.target;
+        var isInteractive = target && target.closest && target.closest('button, input, select, textarea, a, [role="button"], .view-btn, .chip, .class-item, .m-nav-item, .m-topbar-btn');
+        if (!isInteractive) {
+          prevent(e);
+        }
       }
       lastTouchEnd = now;
     },
