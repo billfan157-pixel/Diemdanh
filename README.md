@@ -4,12 +4,20 @@ App web tính điểm giáo lý theo lớp — chạy trên trình duyệt (máy
 
 **Mở local:** double-click `index.html` hoặc serve thư mục này.
 
-## Dùng trên điện thoại / chia sẻ
+## Repo
 
-1. Đưa code lên GitHub (repo public).
-2. Bật **GitHub Pages**: *Settings → Pages → Source: Deploy from branch → `main` / `/ (root)`*.
-3. Link dùng: `https://<user>.github.io/<ten-repo>/`
-4. Trên điện thoại: mở link → **Thêm vào Màn hình chính**.
+https://github.com/billfan157-pixel/Diemdanh
+
+## Dùng trên điện thoại / chia sẻ (GitHub Pages)
+
+1. Vào repo → **Settings** → **Pages**.
+2. **Source:** Deploy from a branch.
+3. Branch: **`main`** · folder: **`/ (root)`** → **Save**.
+4. Đợi 1–2 phút, mở link:
+
+   **https://billfan157-pixel.github.io/Diemdanh/**
+
+5. Trên điện thoại: mở link → **Thêm vào Màn hình chính**.
 
 > Dữ liệu điểm lưu **trên từng máy** (localStorage). Sao lưu JSON định kỳ nếu dùng nhiều thiết bị.
 
