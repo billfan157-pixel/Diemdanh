@@ -766,178 +766,119 @@
   .m-bottom-nav-inner {
     pointer-events: auto;
     height: var(--m-bot);
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: flex;
     align-items: center;
+    justify-content: center;
     max-width: 420px;
     margin: 0 auto;
-    padding: 6px 8px;
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--m-line);
-    border-radius: 20px;
-    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+    padding: 0 6px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    border-radius: 22px;
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1), 0 1px 4px rgba(15, 23, 42, 0.04);
   }
   .m-nav-item {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 3px;
+    flex: 1;
     height: 100%;
+    min-width: 0;
     border: 0;
     background: transparent;
-    border-radius: 14px;
+    border-radius: 16px;
     color: #94a3b8;
     font-family: inherit;
-    padding: 4px;
+    padding: 6px 4px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.25s ease, background 0.25s ease;
   }
   .m-nav-item:active {
-    background: #f8fafc;
+    background: #f1f5f9;
   }
   .m-nav-item.active {
     color: var(--m-blue);
   }
-  .m-nav-lab {
-    font-size: 0.72rem !important;
-    font-weight: 750 !important;
-    line-height: 1.1;
-  }
-  .m-nav-glyph {
-    width: 24px;
-    height: 22px;
+  .m-nav-icon {
     display: block;
-    position: relative;
+    width: 24px;
+    height: 24px;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
-  .m-nav-glyph-home {
-    border: 2px solid currentColor;
-    border-bottom: 0;
-    border-radius: 3px 3px 1px 1px;
-    height: 14px;
-    margin-top: 6px;
-    box-sizing: border-box;
+  .m-nav-item.active .m-nav-icon {
+    transform: scale(1.1);
   }
-  .m-nav-glyph-home::before {
-    content: "";
+  .m-nav-item:active .m-nav-icon {
+    transform: scale(0.85);
+    transition-duration: 0.08s;
+  }
+  .m-nav-item::after {
+    content: '';
     position: absolute;
+    bottom: 5px;
     left: 50%;
-    top: -8px;
-    width: 14px;
-    height: 14px;
-    border-left: 2px solid currentColor;
-    border-top: 2px solid currentColor;
-    transform: translateX(-50%) rotate(45deg);
-    box-sizing: border-box;
-  }
-  .m-nav-glyph-class {
-    border: 2px solid currentColor;
-    border-radius: 3px;
-    height: 18px;
-    margin-top: 2px;
-    box-sizing: border-box;
-  }
-  .m-nav-glyph-class::before,
-  .m-nav-glyph-class::after {
-    content: "";
-    position: absolute;
-    left: 3px;
-    right: 3px;
-    height: 2px;
-    background: currentColor;
-    border-radius: 1px;
-  }
-  .m-nav-glyph-class::before {
-    top: 4px;
-  }
-  .m-nav-glyph-class::after {
-    top: 9px;
-  }
-  .m-nav-glyph-score {
-    width: 16px;
-    height: 16px;
-    border: 2px solid #fff;
-    border-radius: 4px;
-    margin: 0;
-    box-sizing: border-box;
-  }
-  .m-nav-glyph-score::before {
-    content: "";
-    position: absolute;
-    left: 2px;
-    right: 2px;
-    top: 50%;
-    height: 2px;
-    background: #fff;
-    transform: translateY(-50%);
-  }
-  .m-nav-glyph-score::after {
-    content: "";
-    position: absolute;
-    top: 2px;
-    bottom: 2px;
-    left: 50%;
-    width: 2px;
-    background: #fff;
-    transform: translateX(-50%);
-  }
-  .m-nav-glyph-more {
-    width: 20px;
-    height: 6px;
-    margin-top: 8px;
-  }
-  .m-nav-glyph-more::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle, currentColor 2px, transparent 2.5px)
-        0 50% / 7px 6px no-repeat,
-      radial-gradient(circle, currentColor 2px, transparent 2.5px) 50% 50% / 7px
-        6px no-repeat,
-      radial-gradient(circle, currentColor 2px, transparent 2.5px) 100% 50% / 7px
-        6px no-repeat;
-  }
-  /* Icon Cá nhân (người) */
-  .m-nav-glyph-me {
-    width: 20px;
-    height: 20px;
-    margin-top: 2px;
-    border: 2px solid currentColor;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
-    box-sizing: border-box;
+    background: var(--m-blue);
+    transform: translateX(-50%) scale(0);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+    opacity: 0;
   }
-  .m-nav-glyph-me::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: -7px;
-    width: 16px;
-    height: 8px;
-    border: 2px solid currentColor;
-    border-bottom: 0;
-    border-radius: 10px 10px 0 0;
-    transform: translateX(-50%);
-    box-sizing: border-box;
+  .m-nav-item.active::after {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
   }
+  .m-nav-lab {
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    line-height: 1.1;
+    letter-spacing: 0;
+    transition: font-weight 0.2s ease;
+    color: inherit;
+  }
+  .m-nav-item.active .m-nav-lab {
+    font-weight: 800 !important;
+  }
+
+  /* Primary "Điểm" button */
   .m-nav-item-primary {
-    gap: 1px;
+    gap: 2px;
   }
   .m-nav-primary-ring {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     border-radius: 14px;
-    background: linear-gradient(145deg, #3b82f6, var(--m-blue-d));
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    background: var(--m-blue);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-top: -6px;
+    color: #fff;
+    margin-top: -7px;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
   }
   .m-nav-item-primary.active .m-nav-primary-ring {
-    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+    transform: scale(1.08);
   }
-  .m-nav-ico {
-    font-size: 1.2rem;
+  .m-nav-item-primary:active .m-nav-primary-ring {
+    transform: scale(0.9);
+    transition-duration: 0.08s;
+  }
+  .m-nav-item-primary .m-nav-icon {
+    color: #fff;
+    width: 22px;
+    height: 22px;
+  }
+  .m-nav-item-primary::after {
+    display: none;
   }
 
   /* FAB tròn */
@@ -1391,20 +1332,12 @@
   }
 
   .m-bottom-nav-inner {
-    border-radius: 16px;
-    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
-  }
-  .m-nav-item {
-    min-width: 0;
-    border-radius: 11px;
+    border-radius: 18px;
+    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1);
   }
   .m-nav-item.active:not(.m-nav-item-primary) {
-    background: #eff6ff;
+    background: rgba(37, 99, 235, 0.08);
   }
-  .m-nav-lab {
-    letter-spacing: 0;
-  }
-  .m-nav-primary-ring,
   .m-fab {
     background: var(--m-blue);
   }

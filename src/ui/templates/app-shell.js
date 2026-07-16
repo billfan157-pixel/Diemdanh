@@ -451,21 +451,34 @@
     <nav class="m-bottom-nav" id="mBottomNav" aria-label="Điều hướng chính">
       <div class="m-bottom-nav-inner">
         <button type="button" class="m-nav-item active" data-m-nav="home">
-          <span class="m-nav-glyph m-nav-glyph-home" aria-hidden="true"></span>
+          <svg class="m-nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
           <span class="m-nav-lab">Tổng quan</span>
         </button>
         <button type="button" class="m-nav-item" data-m-nav="classes">
-          <span class="m-nav-glyph m-nav-glyph-class" aria-hidden="true"></span>
+          <svg class="m-nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+            <path d="M8 7h8M8 11h6"/>
+          </svg>
           <span class="m-nav-lab">Lớp</span>
         </button>
         <button type="button" class="m-nav-item m-nav-item-primary" data-m-nav="scores">
           <span class="m-nav-primary-ring" aria-hidden="true">
-            <span class="m-nav-glyph m-nav-glyph-score"></span>
+            <svg class="m-nav-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 11l3 3L22 4"/>
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+              <path d="M15 4h3a2 2 0 012 2v1"/>
+            </svg>
           </span>
           <span class="m-nav-lab">Điểm</span>
         </button>
         <button type="button" class="m-nav-item" data-m-nav="me">
-          <span class="m-nav-glyph m-nav-glyph-me" aria-hidden="true"></span>
+          <svg class="m-nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
           <span class="m-nav-lab">Cá nhân</span>
         </button>
       </div>
