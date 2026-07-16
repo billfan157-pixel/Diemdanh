@@ -2602,7 +2602,20 @@
           return;
         }
         closeChangePinModal();
-        GL.toast("Đã đổi PIN thành công. Dùng PIN mới khi đăng nhập sau.");
+        GL.toast("Đã đổi PIN thành công. Lần sau đăng nhập bằng PIN mới.");
+        // Đẩy cloud ngay để máy khác / điện thoại không còn PIN cũ
+        if (typeof GL.cloudPush === "function" && GL.isSupabaseConfigured()) {
+          GL.cloudPush({ force: true, silent: true }).then(function (r) {
+            if (r && r.ok) {
+              /* ok */
+            } else if (r && r.error) {
+              GL.toast(
+                "PIN đã đổi trên máy này; chưa đẩy cloud: " + r.error,
+                "warn"
+              );
+            }
+          });
+        }
       });
       // Enter trong ô PIN
       ["pinOld", "pinNew", "pinNew2"].forEach(function (id) {
@@ -2674,6 +2687,9 @@
         }
         closeForcePinModal();
         GL.toast("Đã đổi PIN. Hãy ghi nhớ PIN mới.");
+        if (typeof GL.cloudPush === "function" && GL.isSupabaseConfigured()) {
+          GL.cloudPush({ force: true, silent: true });
+        }
         if (typeof GL.updateBackupReminderUI === "function") {
           GL.updateBackupReminderUI();
         }

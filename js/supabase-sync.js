@@ -141,14 +141,60 @@
           GL.syncUndoBaseline(true);
         }
       }
-      // Không ghi đè auth local nếu cloud không có user
+      // Gộp auth: giữ PIN local mới hơn (pinChangedAt), không đè mù
       if (
         row.auth &&
         typeof row.auth === "object" &&
         Array.isArray(row.auth.users) &&
         (row.auth.users.length > 0 || opts.forceAuth)
       ) {
-        GL.authStore = row.auth;
+        var localUsers =
+          (GL.authStore && GL.authStore.users) || [];
+        var remoteUsers = row.auth.users || [];
+        var byId = {};
+        localUsers.forEach(function (u) {
+          if (u && u.id) byId[u.id] = Object.assign({}, u);
+        });
+        remoteUsers.forEach(function (ru) {
+          if (!ru || !ru.id) return;
+          var lu = byId[ru.id];
+          if (!lu) {
+            byId[ru.id] = Object.assign({}, ru);
+            return;
+          }
+          var lt = lu.pinChangedAt ? Date.parse(lu.pinChangedAt) || 0 : 0;
+          var rt = ru.pinChangedAt ? Date.parse(ru.pinChangedAt) || 0 : 0;
+          // Giữ user remote nhưng PIN lấy bản mới hơn
+          var merged = Object.assign({}, lu, ru);
+          if (lt > rt) {
+            merged.pinHash = lu.pinHash;
+            merged.pinPlain = lu.pinPlain;
+            merged.pinChangedAt = lu.pinChangedAt;
+          } else if (rt > lt) {
+            merged.pinHash = ru.pinHash;
+            merged.pinPlain = ru.pinPlain;
+            merged.pinChangedAt = ru.pinChangedAt;
+          } else {
+            // cùng mốc / không có — nếu local có plain+hash khớp thì giữ local
+            if (lu.pinPlain && lu.pinHash) {
+              merged.pinHash = lu.pinHash;
+              merged.pinPlain = lu.pinPlain;
+            }
+          }
+          // Sửa hash nếu lệch plain
+          if (
+            typeof GL.pinMatchesUser === "function" &&
+            merged.pinPlain
+          ) {
+            GL.pinMatchesUser(merged, merged.pinPlain);
+          }
+          byId[ru.id] = merged;
+        });
+        GL.authStore = Object.assign({}, row.auth, {
+          users: Object.keys(byId).map(function (k) {
+            return byId[k];
+          }),
+        });
         localStorage.setItem(GL.AUTH_KEY, JSON.stringify(GL.authStore));
       }
       if (row.print && typeof row.print === "object") {

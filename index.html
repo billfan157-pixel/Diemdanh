@@ -875,12 +875,12 @@
       </div>
       <div class="modal-body">
         <p class="app-notice-warn" id="forcePinUser" style="margin-top:0"></p>
-        <label class="field-label" for="forcePinOld">PIN hiện tại</label>
-        <input id="forcePinOld" type="password" autocomplete="current-password" placeholder="Thường là 1234" />
-        <label class="field-label" for="forcePinNew" style="margin-top:10px">PIN mới (≥ 4 ký tự, không dùng 1234)</label>
-        <input id="forcePinNew" type="password" autocomplete="new-password" />
-        <label class="field-label" for="forcePinNew2" style="margin-top:10px">Nhập lại PIN mới</label>
-        <input id="forcePinNew2" type="password" autocomplete="new-password" />
+        <label class="field-label" for="forcePinOld">1. PIN hiện tại (vd. 1234)</label>
+        <input id="forcePinOld" type="password" name="gl-force-pin-old" autocomplete="off" inputmode="numeric" placeholder="PIN đang dùng" />
+        <label class="field-label" for="forcePinNew" style="margin-top:10px">2. PIN mới (≥ 4 ký tự, không dùng 1234)</label>
+        <input id="forcePinNew" type="password" name="gl-force-pin-new" autocomplete="off" inputmode="numeric" />
+        <label class="field-label" for="forcePinNew2" style="margin-top:10px">3. Nhập lại PIN mới</label>
+        <input id="forcePinNew2" type="password" name="gl-force-pin-new2" autocomplete="off" inputmode="numeric" />
         <p class="login-error hidden" id="forcePinError" style="margin-top:10px"></p>
       </div>
       <div class="modal-foot">
@@ -1191,12 +1191,16 @@
       </div>
       <div class="modal-body">
         <p class="hint" id="changePinUser" style="margin-top:0"></p>
-        <label class="field-label" for="pinOld">PIN hiện tại</label>
-        <input id="pinOld" type="password" autocomplete="current-password" placeholder="••••" />
-        <label class="field-label" for="pinNew" style="margin-top:10px">PIN mới</label>
-        <input id="pinNew" type="password" autocomplete="new-password" placeholder="Tối thiểu 4 ký tự" />
-        <label class="field-label" for="pinNew2" style="margin-top:10px">Nhập lại PIN mới</label>
-        <input id="pinNew2" type="password" autocomplete="new-password" placeholder="Nhập lại" />
+        <p class="hint" style="margin:0 0 10px">
+          <strong>PIN hiện tại</strong> = PIN bạn vừa dùng để đăng nhập.<br />
+          <strong>PIN mới</strong> = mã mới (2 lần), khác PIN hiện tại.
+        </p>
+        <label class="field-label" for="pinOld">1. PIN hiện tại (đang dùng)</label>
+        <input id="pinOld" type="password" name="gl-pin-current" autocomplete="off" inputmode="numeric" placeholder="PIN lúc đăng nhập" />
+        <label class="field-label" for="pinNew" style="margin-top:10px">2. PIN mới</label>
+        <input id="pinNew" type="password" name="gl-pin-new" autocomplete="off" inputmode="numeric" placeholder="Tối thiểu 4 ký tự" />
+        <label class="field-label" for="pinNew2" style="margin-top:10px">3. Nhập lại PIN mới</label>
+        <input id="pinNew2" type="password" name="gl-pin-new2" autocomplete="off" inputmode="numeric" placeholder="Gõ lại PIN mới" />
         <p class="login-error hidden" id="changePinError" style="margin-top:10px"></p>
       </div>
       <div class="modal-foot">

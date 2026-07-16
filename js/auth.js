@@ -14,6 +14,39 @@
     return (h >>> 0).toString(16);
   }
 
+  /** Chuẩn hóa PIN khi so sánh / lưu (bỏ khoảng trắng 2 đầu) */
+  function normalizePin(pin) {
+    return String(pin == null ? "" : pin).trim();
+  }
+
+  /**
+   * Kiểm tra PIN có khớp user không.
+   * Ưu tiên pinHash; fallback pinPlain (dữ liệu sync / bản cũ).
+   * Nếu plain đúng mà hash lệch → tự sửa hash.
+   */
+  function pinMatchesUser(user, pin) {
+    if (!user) return false;
+    pin = normalizePin(pin);
+    if (!pin) return false;
+    var hash = simpleHash(pin);
+    if (user.pinHash && String(user.pinHash) === hash) {
+      // Đồng bộ plain nếu thiếu
+      if (user.pinPlain == null || String(user.pinPlain) === "") {
+        user.pinPlain = pin;
+      }
+      return true;
+    }
+    if (user.pinPlain != null && String(user.pinPlain) === pin) {
+      // Hash lệch / hỏng — sửa lại theo plain
+      user.pinHash = hash;
+      return true;
+    }
+    return false;
+  }
+
+  GL.normalizePin = normalizePin;
+  GL.pinMatchesUser = pinMatchesUser;
+
   function defaultAuth() {
     var adminId = "admin-" + Date.now().toString(36);
     return {
@@ -171,7 +204,7 @@
     username = String(username || "")
       .trim()
       .toLowerCase();
-    pin = String(pin || "");
+    pin = normalizePin(pin);
     var user = GL.authStore.users.find(function (u) {
       return (
         u.active !== false &&
@@ -179,14 +212,13 @@
       );
     });
     if (!user) return { ok: false, error: "Sai tài khoản hoặc PIN." };
-    if (user.pinHash !== simpleHash(pin)) {
+    if (!pinMatchesUser(user, pin)) {
       return { ok: false, error: "Sai tài khoản hoặc PIN." };
     }
-    // Tài khoản cũ: lưu PIN dạng xem (admin) sau lần đăng nhập đúng đầu tiên
-    if (!user.pinPlain) {
-      user.pinPlain = pin;
-      GL.saveAuthStore();
-    }
+    // Đảm bảo hash + plain khớp sau đăng nhập
+    user.pinHash = simpleHash(pin);
+    user.pinPlain = pin;
+    GL.saveAuthStore();
     sessionStorage.setItem(GL.SESSION_KEY, user.id);
     if (remember) localStorage.setItem(GL.SESSION_KEY, user.id);
     else localStorage.removeItem(GL.SESSION_KEY);
@@ -335,28 +367,43 @@
    * @param {string} confirmPin
    */
   GL.changeOwnPin = function changeOwnPin(oldPin, newPin, confirmPin) {
-    var u = GL.currentUser();
-    if (!u) return { ok: false, error: "Chưa đăng nhập." };
-    oldPin = String(oldPin || "");
-    newPin = String(newPin || "");
-    confirmPin = String(confirmPin || "");
-    if (!oldPin) return { ok: false, error: "Nhập PIN hiện tại." };
-    if (u.pinHash !== simpleHash(oldPin)) {
-      return { ok: false, error: "PIN hiện tại không đúng." };
+    var sessionUser = GL.currentUser();
+    if (!sessionUser) return { ok: false, error: "Chưa đăng nhập." };
+    // Luôn lấy bản trong authStore (tránh object session cũ / lệch sau sync)
+    var user = GL.authStore.users.find(function (x) {
+      return x.id === sessionUser.id;
+    });
+    if (!user) return { ok: false, error: "Không tìm thấy tài khoản." };
+
+    oldPin = normalizePin(oldPin);
+    newPin = normalizePin(newPin);
+    confirmPin = normalizePin(confirmPin);
+
+    if (!oldPin) return { ok: false, error: "Nhập PIN hiện tại (PIN đang dùng để đăng nhập)." };
+    if (!pinMatchesUser(user, oldPin)) {
+      // Gợi ý rõ nếu user nhầm điền PIN mới vào ô cũ
+      if (newPin && pinMatchesUser(user, newPin)) {
+        return {
+          ok: false,
+          error:
+            "Ô «PIN hiện tại» đang giống PIN mới. Hãy ghi PIN đang đăng nhập vào ô trên, PIN mới vào 2 ô dưới.",
+        };
+      }
+      return {
+        ok: false,
+        error:
+          "PIN hiện tại không đúng. Dùng đúng PIN lúc đăng nhập (không phải PIN mới).",
+      };
     }
     if (newPin.length < 4) {
       return { ok: false, error: "PIN mới tối thiểu 4 ký tự." };
     }
     if (newPin !== confirmPin) {
-      return { ok: false, error: "Xác nhận PIN mới không khớp." };
+      return { ok: false, error: "Hai ô PIN mới không khớp nhau." };
     }
     if (newPin === oldPin) {
       return { ok: false, error: "PIN mới phải khác PIN hiện tại." };
     }
-    var user = GL.authStore.users.find(function (x) {
-      return x.id === u.id;
-    });
-    if (!user) return { ok: false, error: "Không tìm thấy tài khoản." };
     // Không cho đặt lại PIN yếu
     var weak = GL.DEFAULT_WEAK_PINS || ["1234"];
     if (weak.indexOf(newPin) >= 0) {
