@@ -369,80 +369,106 @@
     var stats = document.getElementById("dashStats");
     if (stats) {
       stats.innerHTML =
-        '<div class="dash-stat"><div class="dash-stat-n">' +
+        '<div class="dash-stat dash-stat-primary"><div class="dash-stat-n">' +
         data.totalClasses +
         '</div><div class="dash-stat-l">Lớp</div></div>' +
-        '<div class="dash-stat"><div class="dash-stat-n">' +
+        '<div class="dash-stat dash-stat-primary"><div class="dash-stat-n">' +
         data.totalStudents +
         '</div><div class="dash-stat-l">Học viên</div></div>' +
-        '<div class="dash-stat"><div class="dash-stat-n gold">' +
+        '<div class="dash-stat dash-stat-primary"><div class="dash-stat-n gold">' +
         GL.fmt(data.parishAvg, 2) +
-        '</div><div class="dash-stat-l">TB (' +
+        '</div><div class="dash-stat-l">TB ' +
         GL.escapeHtml(data.termLabel) +
-        ")</div></div>" +
-        '<div class="dash-stat"><div class="dash-stat-n green">' +
+        "</div></div>" +
+        '<div class="dash-stat dash-stat-primary"><div class="dash-stat-n green">' +
         data.good +
-        '</div><div class="dash-stat-l">Giỏi trở lên</div></div>' +
+        '</div><div class="dash-stat-l">Giỏi+</div></div>' +
         '<div class="dash-stat"><div class="dash-stat-n danger">' +
         data.weak +
-        '</div><div class="dash-stat-l">Yếu (TB&lt;5)</div></div>' +
+        '</div><div class="dash-stat-l">Yếu</div></div>' +
         '<div class="dash-stat"><div class="dash-stat-n warn">' +
         data.missingPct +
-        '%</div><div class="dash-stat-l">Thiếu điểm (' +
+        '%</div><div class="dash-stat-l">Thiếu (' +
         data.missingCount +
         ")</div></div>" +
         '<div class="dash-stat"><div class="dash-stat-n danger">' +
         (data.attentionHigh || 0) +
-        '</div><div class="dash-stat-l">🔴 Cần quan tâm</div></div>' +
-        '<div class="dash-stat"><div class="dash-stat-n" style="color:var(--gold)">' +
+        '</div><div class="dash-stat-l">Cần QT</div></div>' +
+        '<div class="dash-stat"><div class="dash-stat-n gold">' +
         (data.attentionMid || 0) +
-        '</div><div class="dash-stat-l">🟡 Theo dõi</div></div>';
+        '</div><div class="dash-stat-l">Theo dõi</div></div>';
     }
 
-    // Cần quan tâm (nhật ký + điểm)
+    function dashPersonRow(opts) {
+      opts = opts || {};
+      return (
+        '<button type="button" class="dash-row" data-open-class="' +
+        GL.escapeHtml(opts.classId || "") +
+        '"><span class="dash-row-badge ' +
+        (opts.badgeClass || "") +
+        '">' +
+        (opts.badge || "•") +
+        '</span><span class="dash-row-main"><span class="dash-row-name">' +
+        GL.escapeHtml(opts.name || "—") +
+        '</span><span class="dash-row-sub">' +
+        GL.escapeHtml(opts.sub || "") +
+        (opts.detail
+          ? ' · <em class="dash-row-detail">' +
+            GL.escapeHtml(opts.detail) +
+            "</em>"
+          : "") +
+        "</span></span>" +
+        (opts.score != null
+          ? '<span class="dash-row-score ' +
+            (opts.scoreClass || "") +
+            '">' +
+            opts.score +
+            "</span>"
+          : "") +
+        '<span class="dash-row-chev" aria-hidden="true">›</span></button>'
+      );
+    }
+
+    function dashEmpty(msg) {
+      return (
+        '<div class="dash-empty"><span class="dash-empty-ico">✓</span><p>' +
+        GL.escapeHtml(msg) +
+        "</p></div>"
+      );
+    }
+
+    // Cần quan tâm
     var attEl = document.getElementById("dashAttentionList");
     if (attEl) {
       var attRows = (data.attention || []).slice(0, 12);
       if (!attRows.length) {
-        attEl.innerHTML =
-          '<p class="hint" style="margin:0">Không có HV cần quan tâm (theo điểm + nhật ký).</p>';
+        attEl.innerHTML = dashEmpty("Không có HV cần quan tâm");
       } else {
         attEl.innerHTML =
-          '<ol class="dash-ol">' +
+          '<div class="dash-rows">' +
           attRows
             .map(function (r) {
-              var badge =
-                r.level === "high"
-                  ? '<span class="att-badge att-high">🔴</span> '
-                  : '<span class="att-badge att-mid">🟡</span> ';
-              return (
-                "<li>" +
-                badge +
-                '<button type="button" class="dash-link" data-open-class="' +
-                GL.escapeHtml(r.classId) +
-                '">' +
-                GL.escapeHtml(r.name) +
-                "</button>" +
-                ' <span class="dash-meta">' +
-                GL.escapeHtml(r.className) +
-                "</span>" +
-                (r.tb != null
-                  ? " — TB " + GL.fmt(r.tb, 2)
-                  : "") +
-                (r.reasons && r.reasons.length
-                  ? " · <em>" +
-                    GL.escapeHtml(r.reasons.slice(0, 2).join("; ")) +
-                    "</em>"
-                  : "") +
-                "</li>"
-              );
+              return dashPersonRow({
+                classId: r.classId,
+                name: r.name,
+                sub:
+                  r.className +
+                  (r.tb != null ? " · TB " + GL.fmt(r.tb, 2) : ""),
+                detail:
+                  r.reasons && r.reasons.length
+                    ? r.reasons.slice(0, 2).join("; ")
+                    : "",
+                badge: r.level === "high" ? "!" : "·",
+                badgeClass:
+                  r.level === "high" ? "dash-badge-high" : "dash-badge-mid",
+              });
             })
             .join("") +
-          "</ol>" +
+          "</div>" +
           (data.attention.length > 12
-            ? '<p class="hint">… và ' +
+            ? '<p class="dash-more">+ ' +
               (data.attention.length - 12) +
-              " em nữa. Mở lớp → tab Theo dõi.</p>"
+              " em nữa · mở lớp → Theo dõi</p>"
             : "");
       }
     }
@@ -451,29 +477,24 @@
     var weakEl = document.getElementById("dashWeakList");
     if (weakEl) {
       if (!data.topWeak.length) {
-        weakEl.innerHTML =
-          '<p class="hint" style="margin:0">Không có HV yếu (TB &lt; 5) trong phạm vi này.</p>';
+        weakEl.innerHTML = dashEmpty("Không có HV yếu (TB < 5)");
       } else {
         weakEl.innerHTML =
-          '<ol class="dash-ol">' +
+          '<div class="dash-rows">' +
           data.topWeak
-            .map(function (r, i) {
-              return (
-                "<li>" +
-                '<button type="button" class="dash-link" data-open-class="' +
-                GL.escapeHtml(r.classId) +
-                '">' +
-                GL.escapeHtml(r.name) +
-                "</button>" +
-                ' <span class="dash-meta">' +
-                GL.escapeHtml(r.className) +
-                '</span> — <strong class="score-y">' +
-                GL.fmt(r.tb, 2) +
-                "</strong></li>"
-              );
+            .map(function (r) {
+              return dashPersonRow({
+                classId: r.classId,
+                name: r.name,
+                sub: r.className,
+                score: GL.fmt(r.tb, 2),
+                scoreClass: "score-y",
+                badge: "↓",
+                badgeClass: "dash-badge-weak",
+              });
             })
             .join("") +
-          "</ol>";
+          "</div>";
       }
     }
 
@@ -482,34 +503,28 @@
     if (missEl) {
       var mrows = data.missing.rows || [];
       if (!mrows.length) {
-        missEl.innerHTML =
-          '<p class="hint" style="margin:0">✓ Không có HV thiếu điểm / thiếu kỳ.</p>';
+        missEl.innerHTML = dashEmpty("Không có HV thiếu điểm");
       } else {
         missEl.innerHTML =
-          '<ol class="dash-ol">' +
+          '<div class="dash-rows">' +
           mrows
-            .slice(0, 15)
+            .slice(0, 12)
             .map(function (r) {
-              return (
-                "<li>" +
-                '<button type="button" class="dash-link" data-open-class="' +
-                GL.escapeHtml(r.classId) +
-                '">' +
-                GL.escapeHtml(r.name) +
-                "</button>" +
-                ' <span class="dash-meta">' +
-                GL.escapeHtml(r.className) +
-                "</span> — thiếu: <em>" +
-                GL.escapeHtml(r.missingLabel) +
-                "</em></li>"
-              );
+              return dashPersonRow({
+                classId: r.classId,
+                name: r.name,
+                sub: r.className,
+                detail: "Thiếu: " + (r.missingLabel || "—"),
+                badge: "?",
+                badgeClass: "dash-badge-miss",
+              });
             })
             .join("") +
-          "</ol>" +
-          (data.missingCount > 15
-            ? '<p class="hint">… và ' +
-              (data.missingCount - 15) +
-              ' em nữa. <button type="button" class="btn btn-ghost" id="dashOpenMissingFull" style="padding:2px 8px;font-size:0.78rem">Xem tất cả</button></p>'
+          "</div>" +
+          (data.missingCount > 12
+            ? '<p class="dash-more">+ ' +
+              (data.missingCount - 12) +
+              ' em · <button type="button" class="dash-more-btn" id="dashOpenMissingFull">Xem tất cả</button></p>'
             : "");
       }
     }
@@ -527,9 +542,9 @@
             c.key +
             '" title="HV thiếu ' +
             GL.escapeHtml(c.label) +
-            '">' +
+            '"><span class="dash-col-chip-k">' +
             GL.escapeHtml(c.short) +
-            ": <strong>" +
+            "</span><strong>" +
             n +
             "</strong></button>"
           );
@@ -537,10 +552,43 @@
         .join("");
     } else if (byColEl) {
       byColEl.innerHTML =
-        '<span class="hint">Chế độ cả năm: thiếu = chưa có TB HK1 hoặc HK2.</span>';
+        '<p class="hint dash-year-hint">Cả năm: thiếu = chưa có TB HK1 hoặc HK2.</p>';
     }
 
-    // Bảng lớp
+    // Cards lớp (mobile)
+    var classListEl = document.getElementById("dashClassList");
+    if (classListEl) {
+      if (!data.classes.length) {
+        classListEl.innerHTML =
+          '<div class="dash-empty"><p>Không có lớp. Đổi năm học hoặc tạo lớp mới.</p></div>';
+      } else {
+        classListEl.innerHTML = data.classes
+          .map(function (c, i) {
+            return (
+              '<button type="button" class="dash-class-card" data-open-class="' +
+              GL.escapeHtml(c.classId) +
+              '"><span class="dash-class-ord">' +
+              (i + 1) +
+              '</span><span class="dash-class-main"><span class="dash-class-name">' +
+              GL.escapeHtml(c.name) +
+              '</span><span class="dash-class-year">' +
+              GL.escapeHtml(c.year || "Chưa ghi năm") +
+              '</span></span><span class="dash-class-metrics"><span><b>' +
+              c.total +
+              "</b> HV</span><span>TB <b>" +
+              GL.fmt(c.avg, 2) +
+              "</b></span>" +
+              (c.missing
+                ? '<span class="dash-class-miss">Thiếu ' + c.missing + "</span>"
+                : "") +
+              '</span><span class="dash-row-chev" aria-hidden="true">›</span></button>'
+            );
+          })
+          .join("");
+      }
+    }
+
+    // Bảng lớp (desktop)
     var tbody = document.getElementById("dashClassTbody");
     if (tbody) {
       if (!data.classes.length) {

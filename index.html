@@ -187,30 +187,30 @@
 
       <!-- Dashboard tổng quan (mặc định khi mở app) -->
       <div id="dashboardView" class="dashboard-view hidden">
-        <div class="page-header dash-header">
-          <div class="page-title">
-            <h2>📊 Tổng quan năm học</h2>
-            <p id="dashSubtitle">Số lớp · TB · thiếu điểm · top yếu</p>
+        <div class="dash-hero">
+          <div class="dash-hero-text">
+            <h2 class="dash-hero-title">Tổng quan</h2>
+            <p class="dash-hero-sub" id="dashSubtitle">Số lớp · TB · thiếu điểm</p>
           </div>
-          <div class="dash-toolbar">
-            <div class="filter-field">
+          <div class="dash-filters">
+            <div class="dash-filter">
               <label for="dashYearFilter">Năm học</label>
               <select id="dashYearFilter">
-                <option value="">Tất cả năm học</option>
+                <option value="">Tất cả</option>
               </select>
             </div>
-            <div class="filter-field">
-              <label for="dashTerm">Kỳ điểm</label>
+            <div class="dash-filter">
+              <label for="dashTerm">Kỳ</label>
               <select id="dashTerm">
-                <option value="hk1">Học kỳ 1</option>
-                <option value="hk2">Học kỳ 2</option>
+                <option value="hk1">HK1</option>
+                <option value="hk2">HK2</option>
                 <option value="year">Cả năm</option>
               </select>
             </div>
-            <div class="dash-toolbar-actions admin-only">
-              <button type="button" class="btn btn-ghost" id="dashMissingBtn" title="Danh sách HV thiếu điểm">⚠️ Thiếu điểm</button>
-              <button type="button" class="btn btn-success" id="dashExportMultiBtn" title="Xuất mọi lớp năm học ra 1 Excel">📤 Xuất nhiều lớp</button>
-            </div>
+          </div>
+          <div class="dash-hero-actions admin-only">
+            <button type="button" class="btn btn-ghost dash-action-btn" id="dashMissingBtn" title="Danh sách HV thiếu điểm">⚠️ Thiếu điểm</button>
+            <button type="button" class="btn btn-success dash-action-btn" id="dashExportMultiBtn" title="Xuất mọi lớp năm học ra 1 Excel">📤 Xuất Excel</button>
           </div>
         </div>
 
@@ -218,33 +218,48 @@
 
         <div class="dash-grid">
           <section class="card dash-card">
-            <div class="card-head">
-              <h3><span class="emoji">🎯</span> Cần quan tâm</h3>
-              <span class="card-sub">Điểm + nhật ký theo dõi</span>
+            <div class="dash-card-head">
+              <div class="dash-card-ico dash-card-ico-red">🎯</div>
+              <div>
+                <h3>Cần quan tâm</h3>
+                <p>Điểm + nhật ký theo dõi</p>
+              </div>
             </div>
             <div class="dash-card-body" id="dashAttentionList"></div>
           </section>
           <section class="card dash-card">
-            <div class="card-head">
-              <h3><span class="emoji">📉</span> Top yếu (TB &lt; 5)</h3>
+            <div class="dash-card-head">
+              <div class="dash-card-ico dash-card-ico-orange">📉</div>
+              <div>
+                <h3>Top yếu</h3>
+                <p>TB &lt; 5</p>
+              </div>
             </div>
             <div class="dash-card-body" id="dashWeakList"></div>
           </section>
           <section class="card dash-card">
-            <div class="card-head">
-              <h3><span class="emoji">⚠️</span> Nhắc thiếu điểm</h3>
+            <div class="dash-card-head">
+              <div class="dash-card-ico dash-card-ico-amber">⚠️</div>
+              <div>
+                <h3>Thiếu điểm</h3>
+                <p>Chưa nhập đủ cột</p>
+              </div>
             </div>
             <div class="dash-col-chips" id="dashMissingByCol"></div>
             <div class="dash-card-body" id="dashMissingList"></div>
           </section>
         </div>
 
-        <section class="card" style="margin-top:14px">
-          <div class="card-head">
-            <h3><span class="emoji">📚</span> Theo lớp</h3>
-            <span class="card-sub">Bấm dòng để mở bảng điểm lớp</span>
+        <section class="card dash-classes-card">
+          <div class="dash-card-head">
+            <div class="dash-card-ico dash-card-ico-blue">📚</div>
+            <div>
+              <h3>Theo lớp</h3>
+              <p>Chạm để mở bảng điểm</p>
+            </div>
           </div>
-          <div class="modal-table-wrap" style="margin:0 0 8px;max-height:min(40vh,360px)">
+          <div class="dash-class-list" id="dashClassList"></div>
+          <div class="modal-table-wrap dash-class-table-wrap">
             <table class="import-preview-table" id="dashClassTable">
               <thead>
                 <tr>
