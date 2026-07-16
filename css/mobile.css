@@ -28,6 +28,8 @@
     font-size: 18px !important;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* Tắt double-tap zoom (giống app, không như web) */
+    touch-action: manipulation;
   }
 
   body {
@@ -35,9 +37,33 @@
     line-height: 1.5 !important;
     overscroll-behavior-y: contain;
     -webkit-tap-highlight-color: transparent;
+    /* manipulation = scroll OK, không zoom khi chạm 2 lần */
+    touch-action: manipulation;
   }
   body.m-drawer-open {
     overflow: hidden;
+  }
+
+  /* Mọi nút / ô bấm: không double-tap zoom */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  label,
+  .btn,
+  .chip-btn,
+  .view-btn,
+  .term-btn,
+  .m-nav-item,
+  .m-icon-btn,
+  .m-fab,
+  .m-sheet-btn,
+  .se-cell,
+  .class-item,
+  .chip,
+  summary {
+    touch-action: manipulation;
   }
 
   .app {
