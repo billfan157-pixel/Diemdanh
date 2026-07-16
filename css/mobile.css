@@ -631,34 +631,14 @@
     color: var(--m-blue) !important;
   }
 
-  /* Dashboard */
+  /* Dashboard — layout chi tiết ở styles.css (≤900px) */
   #dashboardView {
-    padding: 12px var(--m-pad) 20px !important;
-  }
-  #dashboardView .page-title h2,
-  .dash-header h2 {
-    font-size: 1.25rem !important;
-  }
-  .dash-stats,
-  #dashboardView .stats {
-    grid-template-columns: 1fr 1fr !important;
-    gap: 8px !important;
-  }
-  .dash-stat,
-  #dashboardView .stat {
-    padding: 14px 12px !important;
-    border-radius: 14px !important;
-    background: #fff !important;
-  }
-  .dash-stat-n,
-  #dashboardView .stat-value {
-    font-size: 1.35rem !important;
+    padding: 10px var(--m-pad) 16px !important;
   }
   #dashboardView .card {
     border-radius: 16px !important;
     border: 1px solid var(--m-line) !important;
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
-    margin-bottom: 12px;
   }
 
   /* Login */
