@@ -326,8 +326,7 @@
         sidebar.classList.toggle("open", !!open);
         if (scrim) {
           scrim.classList.toggle("is-open", !!open);
-          if (open) scrim.removeAttribute("hidden");
-          else scrim.setAttribute("hidden", "");
+          scrim.classList.toggle("hidden", !open);
         }
         toggleBodyScrollLock(!!open);
       }

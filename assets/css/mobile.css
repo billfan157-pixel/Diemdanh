@@ -1403,10 +1403,18 @@
   .m-sheet-overlay,
   .sidebar-scrim,
   .m-drawer-close,
-  .m-class-controls {
+  .m-class-controls,
+  .m-stat-strip,
+  .class-controls,
+  .toolbar,
+  .m-seg-scroll,
+  .m-seg.term-switcher {
     display: none !important;
   }
   .app {
     padding: 0 !important;
+  }
+  .m-bottom-nav-inner {
+    display: none !important;
   }
 }

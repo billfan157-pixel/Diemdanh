@@ -3,11 +3,13 @@
       --bg2: #e8eef8;
       --surface: #ffffff;
       --surface2: #f8fafc;
+      --surface3: #f1f5f9;
       --border: #d8e0ec;
       --border-strong: #c0cce0;
       --text: #1a2332;
       --text2: #3d4f66;
-      --muted: #6b7c93;
+      --muted: var(--muted);
+      --muted-2: var(--muted-2);
       --accent: #2563eb;
       --accent-soft: #eff6ff;
       --accent2: #4f46e5;
@@ -422,7 +424,7 @@
     }
 
     .btn-secondary:hover:not(:disabled) {
-      border-color: #94a3b8;
+      border-color: var(--muted-2);
       background: var(--surface2);
     }
 
@@ -700,7 +702,7 @@
       font-weight: 700;
       background: #f1f5f9;
       color: #475569;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--surface3);
     }
     .year-chip strong {
       font-weight: 800;
@@ -723,7 +725,7 @@
     }
     .year-chip-muted {
       background: #f8fafc;
-      color: #64748b;
+      color: var(--muted);
     }
 
     .year-summary-bar {
@@ -857,7 +859,7 @@
       background: linear-gradient(180deg, #fffbeb 0%, #fff 48%);
     }
     .year-card--silver {
-      border-color: #cbd5e1;
+      border-color: var(--border-strong);
       background: linear-gradient(180deg, #f8fafc 0%, #fff 48%);
     }
     .year-card--bronze {
@@ -997,7 +999,7 @@
     .year-term-empty {
       font-size: 0.85rem;
       font-weight: 700;
-      color: #94a3b8;
+      color: var(--muted-2);
       line-height: 1.2;
     }
     .year-card-note {
@@ -1518,7 +1520,7 @@
     }
 
     .note-input::placeholder {
-      color: #94a3b8;
+      color: var(--muted-2);
     }
 
     /* Thông tin học viên */
@@ -1705,7 +1707,7 @@
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
-    input::placeholder { color: #94a3b8; }
+    input::placeholder { color: var(--muted-2); }
 
     .toolbar {
       display: flex;
@@ -1920,7 +1922,7 @@
     }
 
     .podium-card.silver {
-      border-color: #cbd5e1;
+      border-color: var(--border-strong);
       order: 1;
       transform: translateY(8px);
     }
@@ -2109,7 +2111,7 @@
 
     .bar-track {
       height: 10px;
-      background: #e2e8f0;
+      background: var(--surface3);
       border-radius: 999px;
       overflow: hidden;
     }
@@ -2412,7 +2414,7 @@
     /* Ô điểm — rộng hơn vì full hàng */
     .se-cell {
       background: #f8fafc;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--surface3);
       border-radius: 10px;
       padding: 8px 8px 9px;
       min-width: 0;
@@ -2444,7 +2446,7 @@
     .se-cell-label {
       font-size: 0.68rem;
       font-weight: 800;
-      color: #64748b;
+      color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.02em;
     }
@@ -2457,7 +2459,7 @@
     }
     .se-cell-val.is-avg { color: #7c3aed; }
     .se-cell-val.is-miss {
-      color: #94a3b8;
+      color: var(--muted-2);
       font-weight: 600;
       font-size: 0.85rem;
     }
@@ -2529,7 +2531,7 @@
       border-color: #3b82f6;
     }
     .add-score input::placeholder {
-      color: #cbd5e1;
+      color: var(--border-strong);
       font-weight: 600;
     }
 
@@ -2568,11 +2570,11 @@
       max-width: 148px;
       padding: 8px 10px 9px;
       border-radius: 12px;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--surface3);
       background: linear-gradient(160deg, #f8fafc 0%, #fff 70%);
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
       border-left-width: 3px;
-      border-left-color: #94a3b8;
+      border-left-color: var(--muted-2);
     }
 
     .se-tb--xs .se-tb-card {
@@ -2601,9 +2603,9 @@
       border-color: #fecaca;
     }
     .se-tb--none .se-tb-card {
-      border-left-color: #cbd5e1;
+      border-left-color: var(--border-strong);
       background: linear-gradient(160deg, #f8fafc 0%, #fff 75%);
-      border-color: #e2e8f0;
+      border-color: var(--surface3);
     }
 
     .se-tb-main {
@@ -2618,7 +2620,7 @@
       font-weight: 800;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: #94a3b8;
+      color: var(--muted-2);
       line-height: 1;
     }
 
@@ -2657,7 +2659,7 @@
       height: 4px;
       min-width: 36px;
       border-radius: 999px;
-      background: #e2e8f0;
+      background: var(--surface3);
       overflow: hidden;
     }
 
@@ -2665,7 +2667,7 @@
       display: block;
       height: 100%;
       border-radius: inherit;
-      background: #94a3b8;
+      background: var(--muted-2);
       transition: width 0.2s ease;
     }
 
@@ -2680,7 +2682,7 @@
       flex-shrink: 0;
       font-size: 0.62rem;
       font-weight: 700;
-      color: #94a3b8;
+      color: var(--muted-2);
       white-space: nowrap;
       letter-spacing: 0.01em;
     }
@@ -2705,7 +2707,7 @@
       margin-top: 3px;
       font-size: 0.65rem;
       font-weight: 700;
-      color: #94a3b8;
+      color: var(--muted-2);
     }
 
     @media (max-width: 520px) {
@@ -2727,7 +2729,7 @@
 
     .btn-icon {
       background: transparent;
-      color: #94a3b8;
+      color: var(--muted-2);
       width: 30px;
       height: 30px;
       border-radius: 8px;
@@ -2761,7 +2763,7 @@
       padding: 7px 12px;
       font-size: 0.75rem;
       font-weight: 650;
-      color: #64748b;
+      color: var(--muted);
       user-select: none;
     }
     .se-more > summary::-webkit-details-marker { display: none; }
@@ -3376,13 +3378,13 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #94a3b8;
+      background: var(--muted-2);
       flex-shrink: 0;
     }
     .sync-status-box.is-ok .sync-dot { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
     .sync-status-box.is-syncing .sync-dot { background: #3b82f6; animation: syncPulse 1s infinite; }
     .sync-status-box.is-err .sync-dot { background: #ef4444; }
-    .sync-status-box.is-off .sync-dot { background: #94a3b8; }
+    .sync-status-box.is-off .sync-dot { background: var(--muted-2); }
     @keyframes syncPulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.35; }
@@ -3646,7 +3648,7 @@
       font-weight: 600;
     }
     .me-row-chev {
-      color: #cbd5e1;
+      color: var(--border-strong);
       font-size: 1.2rem;
     }
     .me-logout {
@@ -3935,7 +3937,7 @@
       flex-shrink: 0;
     }
     .dash-row-chev {
-      color: #cbd5e1;
+      color: var(--border-strong);
       font-size: 1.25rem;
       font-weight: 400;
       flex-shrink: 0;
@@ -4541,7 +4543,7 @@
       padding: 8px 10px;
     }
     .log-level-pos { border-left-color: var(--success); }
-    .log-level-neu { border-left-color: #94a3b8; }
+    .log-level-neu { border-left-color: var(--muted-2); }
     .log-level-neg { border-left-color: var(--danger); }
     .log-level-info { border-left-color: var(--accent); }
 
@@ -4885,7 +4887,7 @@
 
     .invite-letter {
       background: #fff;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--surface3);
       border-radius: 8px;
       padding: 22px 26px;
       margin: 0 auto 18px;
@@ -4948,7 +4950,7 @@
     .invite-footer {
       text-align: center;
       font-size: 0.78rem;
-      color: #64748b;
+      color: var(--muted);
       margin-top: 16px;
       font-style: italic;
     }
@@ -5134,7 +5136,7 @@
     .parish-rank-bar .prb.k { background: #2563eb; }
     .parish-rank-bar .prb.tb { background: #ca8a04; }
     .parish-rank-bar .prb.y { background: #dc2626; }
-    .parish-rank-bar .prb.none { background: #94a3b8; color: #1e293b; }
+    .parish-rank-bar .prb.none { background: var(--muted-2); color: #1e293b; }
 
     .parish-tabs {
       display: flex;
@@ -5603,7 +5605,7 @@
     }
 
     .import-preview-table .miss-cell {
-      color: #cbd5e1;
+      color: var(--border-strong);
     }
 
     .import-preview-table .action-pill {
@@ -5827,3 +5829,7 @@
       border-radius: 999px;
       margin-left: 6px;
     }
+
+
+
+

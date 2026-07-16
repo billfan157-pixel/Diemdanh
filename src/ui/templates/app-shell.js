@@ -22,7 +22,7 @@
     </header>
 
     <!-- Lớp phủ khi mở drawer mobile -->
-    <div class="sidebar-scrim" id="sidebarScrim" hidden></div>
+    <div class="sidebar-scrim hidden" id="sidebarScrim"></div>
 
     <!-- SIDEBAR: Lớp (desktop cột trái · mobile = drawer) -->
     <aside class="sidebar" id="sidebar">
@@ -110,7 +110,7 @@
     </aside>
 
     <!-- MAIN -->
-    <main class="main">
+    <main class="main" id="mainContent">
       <div id="noClassView" class="no-class hidden">
         <div class="empty-icon">📚</div>
         <h2>Chưa có lớp nào</h2>

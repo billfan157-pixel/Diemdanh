@@ -2,12 +2,13 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, shrink-to-fit=no" />
   <meta name="theme-color" content="#2563eb" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sổ Điểm GL" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co;" />
   <title>Sổ Điểm Giáo Lý</title>
   <!-- Khóa zoom TRƯỚC khi load CSS/body (iOS bỏ qua meta một mình) -->
   <script src="src/platform/no-zoom.js?v=8"></script>
@@ -20,6 +21,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
 </head>
 <body>
+  <a href="#mainContent" class="skip-link" style="position:absolute;top:-100%;left:0;padding:12px 16px;background:#2563eb;color:#fff;z-index:10000;text-decoration:none;font-weight:600">Chuyển đến nội dung chính</a>
+  <noscript><div style="padding:24px;text-align:center;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-family:system-ui,sans-serif"><strong>JavaScript bị tắt</strong><br>Vui lòng bật JavaScript để sử dụng Sổ Điểm Giáo Lý.</div></noscript>
   <div id="appMount"></div>
 
   <script src="src/ui/templates/registry.js"></script>
