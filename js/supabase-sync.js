@@ -93,6 +93,23 @@
     };
   }
 
+  function countClasses(state) {
+    return state && Array.isArray(state.classes) ? state.classes.length : 0;
+  }
+
+  function countUsers(auth) {
+    return auth && Array.isArray(auth.users) ? auth.users.length : 0;
+  }
+
+  function countStudents(state) {
+    if (!state || !Array.isArray(state.classes)) return 0;
+    var n = 0;
+    state.classes.forEach(function (c) {
+      n += (c.students && c.students.length) || 0;
+    });
+    return n;
+  }
+
   function applyCloudRow(row, opts) {
     opts = opts || {};
     if (!row) return false;
@@ -124,27 +141,28 @@
           GL.syncUndoBaseline(true);
         }
       }
-      if (row.auth && typeof row.auth === "object" && Array.isArray(row.auth.users)) {
+      // Không ghi đè auth local nếu cloud không có user
+      if (
+        row.auth &&
+        typeof row.auth === "object" &&
+        Array.isArray(row.auth.users) &&
+        (row.auth.users.length > 0 || opts.forceAuth)
+      ) {
         GL.authStore = row.auth;
-        if (typeof GL.saveAuthStore === "function") {
-          // ghi local, không trigger push lồng
-          localStorage.setItem(GL.AUTH_KEY, JSON.stringify(GL.authStore));
-        }
+        localStorage.setItem(GL.AUTH_KEY, JSON.stringify(GL.authStore));
       }
       if (row.print && typeof row.print === "object") {
-        if (typeof GL.savePrintSettings === "function") {
-          localStorage.setItem(
-            GL.PRINT_KEY,
-            JSON.stringify(
-              Object.assign(
-                typeof GL.defaultPrintSettings === "function"
-                  ? GL.defaultPrintSettings()
-                  : {},
-                row.print
-              )
+        localStorage.setItem(
+          GL.PRINT_KEY,
+          JSON.stringify(
+            Object.assign(
+              typeof GL.defaultPrintSettings === "function"
+                ? GL.defaultPrintSettings()
+                : {},
+              row.print
             )
-          );
-        }
+          )
+        );
       }
       var meta = loadMeta();
       meta.lastRev = row.rev || 0;
@@ -166,6 +184,7 @@
 
   /**
    * Kéo dữ liệu từ cloud.
+   * Không bao giờ ghi đè máy đang có lớp bằng cloud trống.
    * @param {{force?:boolean, silent?:boolean}} opts
    */
   GL.cloudPull = function cloudPull(opts) {
@@ -196,47 +215,139 @@
             return;
           }
           var row = res.data;
+          var localClasses = countClasses(GL.state);
+          var localStudents = countStudents(GL.state);
+          var localHasData = localClasses > 0;
+
           if (!row) {
-            // chưa có row — đẩy local lên
-            setStatus("ok", "Cloud trống — sẽ tải lên");
-            GL.cloudPush({ force: true, silent: true }).then(function (p) {
-              resolve(
-                p.ok
-                  ? { ok: true, empty: true, pushed: true }
-                  : { ok: false, error: p.error || "Không tạo được bản cloud" }
-              );
-            });
+            if (localHasData) {
+              setStatus("ok", "Cloud trống — đang đẩy dữ liệu máy này lên…");
+              return GL.cloudPush({ force: true, silent: true }).then(function (p) {
+                resolve(
+                  p.ok
+                    ? { ok: true, empty: true, pushed: true }
+                    : { ok: false, error: p.error || "Không đẩy được lên cloud" }
+                );
+              });
+            }
+            setStatus("ok", "Cloud trống · máy cũng chưa có lớp");
+            resolve({ ok: true, empty: true });
             return;
           }
+
           var meta = loadMeta();
           var remoteRev = Number(row.rev) || 0;
           var localRev = Number(meta.lastRev) || 0;
-          var localHasData =
-            GL.state &&
-            Array.isArray(GL.state.classes) &&
-            GL.state.classes.length > 0;
+          var remoteClasses = countClasses(row.state);
+          var remoteStudents = countStudents(row.state);
+          var remoteHasData = remoteClasses > 0;
 
-          // Lần đầu máy trống → luôn lấy cloud
-          // Máy có data + remote mới hơn → lấy cloud
-          // force → luôn lấy
-          var shouldApply =
-            opts.force ||
-            !localHasData ||
-            remoteRev > localRev ||
-            !meta.lastPullAt;
+          // Cloud trống nhưng máy có dữ liệu → đẩy lên, KHÔNG kéo đè
+          if (!remoteHasData && localHasData) {
+            setStatus("ok", "Cloud chưa có lớp — đang đẩy từ máy này…");
+            // Cập nhật meta rev để biết cloud, rồi push
+            meta.lastRev = remoteRev;
+            meta.lastPullAt = Date.now();
+            saveMeta(meta);
+            return GL.cloudPush({ force: true, silent: !!opts.silent }).then(
+              function (p) {
+                if (p.ok) {
+                  setStatus("ok", "Đã đẩy " + localClasses + " lớp lên cloud");
+                  if (!opts.silent && typeof GL.toast === "function") {
+                    GL.toast(
+                      "☁️ Đã đẩy " +
+                        localClasses +
+                        " lớp (" +
+                        localStudents +
+                        " HV) lên cloud"
+                    );
+                  }
+                }
+                resolve(
+                  p.ok
+                    ? { ok: true, pushed: true, classes: localClasses }
+                    : { ok: false, error: p.error || "Không đẩy được" }
+                );
+              }
+            );
+          }
+
+          // Cả hai trống
+          if (!remoteHasData && !localHasData) {
+            meta.lastRev = remoteRev;
+            meta.lastPullAt = Date.now();
+            saveMeta(meta);
+            setStatus("ok", "Cloud chưa có dữ liệu lớp");
+            if (!opts.silent && typeof GL.toast === "function") {
+              GL.toast(
+                "Cloud chưa có điểm. Trên máy có dữ liệu: Đồng bộ → Đẩy lên cloud.",
+                "warn"
+              );
+            }
+            resolve({ ok: true, empty: true, rev: remoteRev });
+            return;
+          }
+
+          // Chỉ lấy cloud khi:
+          // - force (nút Tải) và remote có dữ liệu
+          // - máy trống và remote có dữ liệu
+          // - remote mới hơn (rev) và remote có dữ liệu
+          var shouldApply = false;
+          if (opts.force && remoteHasData) shouldApply = true;
+          else if (!localHasData && remoteHasData) shouldApply = true;
+          else if (
+            remoteHasData &&
+            remoteRev > localRev &&
+            (remoteStudents >= localStudents || remoteClasses >= localClasses)
+          ) {
+            shouldApply = true;
+          }
 
           if (!shouldApply) {
-            setStatus("ok", "Đã đồng bộ (rev " + remoteRev + ")");
-            resolve({ ok: true, skipped: true, rev: remoteRev });
+            setStatus(
+              "ok",
+              "Giữ dữ liệu máy · cloud rev " +
+                remoteRev +
+                " · " +
+                remoteClasses +
+                " lớp"
+            );
+            resolve({
+              ok: true,
+              skipped: true,
+              rev: remoteRev,
+              remoteClasses: remoteClasses,
+              localClasses: localClasses,
+            });
             return;
           }
 
           applyCloudRow(row, { render: opts.render !== false });
-          setStatus("ok", "Đã tải từ cloud · rev " + remoteRev);
+          setStatus(
+            "ok",
+            "Đã tải cloud · " +
+              remoteClasses +
+              " lớp · " +
+              remoteStudents +
+              " HV · rev " +
+              remoteRev
+          );
           if (!opts.silent && typeof GL.toast === "function") {
-            GL.toast("☁️ Đã đồng bộ từ cloud");
+            GL.toast(
+              "☁️ Đã tải " +
+                remoteClasses +
+                " lớp (" +
+                remoteStudents +
+                " HV) từ cloud"
+            );
           }
-          resolve({ ok: true, applied: true, rev: remoteRev });
+          resolve({
+            ok: true,
+            applied: true,
+            rev: remoteRev,
+            classes: remoteClasses,
+            students: remoteStudents,
+          });
         })
         .catch(function (err) {
           pulling = false;
@@ -434,6 +545,16 @@
     return GL.cloudPull({ silent: true }).then(function (r) {
       GL.startCloudRealtime();
       if (typeof GL.updateSyncUI === "function") GL.updateSyncUI();
+      // Báo rõ nếu vẫn chưa có lớp (điện thoại trống + cloud trống)
+      var n = countClasses(GL.state);
+      if (n === 0 && typeof GL.toast === "function") {
+        setTimeout(function () {
+          GL.toast(
+            "Chưa có lớp trên máy/cloud. Trên máy tính có điểm: mở «☁️ Đồng bộ» → «⬆ Đẩy lên cloud».",
+            "warn"
+          );
+        }, 600);
+      }
       return r;
     });
   };

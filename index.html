@@ -1164,8 +1164,12 @@
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
           <button type="button" class="btn btn-primary" id="syncSaveKeyBtn">Lưu key</button>
           <button type="button" class="btn btn-ghost" id="syncPullBtn">⬇ Tải từ cloud</button>
-          <button type="button" class="btn btn-ghost" id="syncPushBtn">⬆ Đẩy lên cloud</button>
+          <button type="button" class="btn btn-primary" id="syncPushBtn" title="Bắt buộc làm trên máy đã có điểm trước">⬆ Đẩy lên cloud</button>
         </div>
+        <p class="hint" style="margin:10px 0 0;color:var(--gold)">
+          <strong>Thứ tự đúng:</strong> máy tính (có điểm) → <strong>Đẩy lên</strong> → điện thoại → <strong>Tải về</strong>.
+          Cloud hiện trống thì điện thoại sẽ không có lớp.
+        </p>
         <p class="hint" id="syncModalStatus" style="margin:12px 0 0"></p>
         <p class="login-error hidden" id="syncModalError" style="margin-top:8px"></p>
       </div>

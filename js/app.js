@@ -1778,10 +1778,12 @@
           GL.toast("Lưu anon key trước.", "err");
           return;
         }
-        GL.cloudPull({ force: true }).then(function (r) {
+        GL.cloudPull({ force: true, silent: false }).then(function (r) {
           if (typeof GL.updateSyncUI === "function") GL.updateSyncUI();
           if (!r.ok) GL.toast(r.error || "Không tải được.", "err");
-          else if (typeof GL.render === "function") GL.render();
+          else if (r.empty) {
+            /* toast đã có trong pull */
+          } else if (typeof GL.render === "function") GL.render();
         });
       });
     }
@@ -1792,7 +1794,16 @@
           GL.toast("Lưu anon key trước.", "err");
           return;
         }
-        GL.cloudPush({ force: true }).then(function (r) {
+        var n =
+          GL.state && GL.state.classes ? GL.state.classes.length : 0;
+        if (!n) {
+          GL.toast(
+            "Máy này chưa có lớp để đẩy. Hãy mở app trên máy đã có điểm rồi Đẩy lên cloud.",
+            "err"
+          );
+          return;
+        }
+        GL.cloudPush({ force: true, silent: false }).then(function (r) {
           if (typeof GL.updateSyncUI === "function") GL.updateSyncUI();
           if (!r.ok) GL.toast(r.error || "Không đẩy được.", "err");
         });
