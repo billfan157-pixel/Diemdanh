@@ -1,21 +1,22 @@
 /**
- * Cấu hình Supabase — project vugoskzssqhusnzcbfhmn
- * Anon key: dán trong app (menu Đồng bộ) hoặc set GL.SUPABASE_ANON_KEY_DEFAULT bên dưới.
+ * Cấu hình Supabase — project gqmbhvgyoenweiepvrvk
+ * Anon key mặc định đã gắn (public trên frontend là bình thường với Supabase).
  */
 (function (GL) {
   "use strict";
 
-  GL.SUPABASE_URL = "https://vugoskzssqhusnzcbfhmn.supabase.co";
-  GL.SUPABASE_ANON_KEY_STORAGE = "giao-ly-supabase-anon-v1";
-  GL.SUPABASE_META_KEY = "giao-ly-supabase-meta-v1";
+  GL.SUPABASE_URL = "https://gqmbhvgyoenweiepvrvk.supabase.co";
+  GL.SUPABASE_ANON_KEY_STORAGE = "giao-ly-supabase-anon-v2";
+  GL.SUPABASE_META_KEY = "giao-ly-supabase-meta-v2";
   /** Snapshot id trên bảng app_cloud */
   GL.SUPABASE_ROW_ID = "main";
 
   /**
-   * Tuỳ chọn: dán anon key vào đây (Settings → API → anon public)
-   * để khỏi cấu hình trên từng máy. Key này public trên frontend là bình thường.
+   * anon public key — gắn sẵn để mọi máy dùng chung cloud.
+   * Vẫn có thể ghi đè bằng menu «Đồng bộ cloud».
    */
-  GL.SUPABASE_ANON_KEY_DEFAULT = "";
+  GL.SUPABASE_ANON_KEY_DEFAULT =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxbWJodmd5b2Vud2VpZXB2cnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxOTE0MDIsImV4cCI6MjA5OTc2NzQwMn0._jPtAkpaepFHzGVqpUZEA5wW8B3dJmrzkymlL_CtiE8";
 
   GL.getSupabaseAnonKey = function getSupabaseAnonKey() {
     try {

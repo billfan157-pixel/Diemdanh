@@ -1,6 +1,6 @@
 -- =========================================================
 -- Sổ Điểm Giáo Lý — schema Supabase
--- Project: vugoskzssqhusnzcbfhmn
+-- Project: gqmbhvgyoenweiepvrvk
 -- Chạy toàn bộ file này trong: SQL Editor → New query → Run
 -- =========================================================
 
