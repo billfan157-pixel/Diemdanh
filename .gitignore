@@ -1,0 +1,11 @@
+# Backup files (dữ liệu thật — không đẩy git)
+backups/*.json
+!backups/.gitkeep
+!backups/README.md
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
