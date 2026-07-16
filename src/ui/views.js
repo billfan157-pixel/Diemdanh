@@ -857,13 +857,11 @@
   };
 
   /** Bảng tổng điểm cả năm (+ thẻ mobile) */
-  GL.renderViewYear = function renderViewYear(cls, list) {
+GL.renderViewYear = function renderViewYear(cls, list) {
     var yearData = GL.getYearRanked(cls, list);
     var ranked = yearData.ranked;
     var w1 = yearData.w1;
     var w2 = yearData.w2;
-        return b.ty - a.ty;
-      });
 
     var withY = ranked.filter(function (r) {
       return r.ty != null;

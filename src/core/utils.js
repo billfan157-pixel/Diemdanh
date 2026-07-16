@@ -1,63 +1,10 @@
 /**
- * Tiện ích chung: format, parse, toast, map header import.
+ * Sổ Điểm GL — Core Utilities v2
+ * format, toast, confirm, escapeHtml, normName, displayName, normStudent, import header mapping, uid
+ * Auto-generated IIFE wrapper
  */
 (function (GL) {
   "use strict";
-
-  /**
-   * CSS trang in chuẩn: A4 dọc (portrait).
-   * Dùng cho @media print trong app và cửa sổ popup in.
-   */
-  GL.A4_PAGE_CSS =
-    "@page{size:A4 portrait;margin:12mm 10mm}" +
-    "html,body{width:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact}";
-
-  /**
-   * Mở cửa sổ in với khổ A4 dọc.
-   * @param {string} title
-   * @param {string} bodyHtml
-   * @param {string} [extraCss]
-   * @returns {Window|null}
-   */
-  GL.openPrintWindow = function openPrintWindow(title, bodyHtml, extraCss) {
-    var w = window.open("", "_blank");
-    if (!w) {
-      if (typeof GL.toast === "function") {
-        GL.toast("Trình duyệt chặn popup in. Cho phép popup để in.", "err");
-      }
-      return null;
-    }
-    var css =
-      GL.A4_PAGE_CSS +
-      ";body{font-family:'Times New Roman',Times,Segoe UI,sans-serif;color:#111;margin:0;padding:0;line-height:1.45}" +
-      "@media print{body{padding:0;margin:0}}" +
-      (extraCss || "");
-    w.document.write(
-      "<!DOCTYPE html><html><head><meta charset='utf-8'><title>" +
-        String(title || "In")
-          .replace(/</g, "")
-          .replace(/>/g, "") +
-        "</title><style>" +
-        css +
-        "</style></head><body>" +
-        (bodyHtml || "") +
-        "</body></html>"
-    );
-    w.document.close();
-    w.focus();
-    setTimeout(function () {
-      try {
-        w.print();
-      } catch (e) {
-        /* ignore */
-      }
-    }, 280);
-    return w;
-  };
-
-  GL.uid = function uid() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  };
 
   GL.fmt = function fmt(n, digits) {
     if (digits == null) digits = 1;
@@ -66,12 +13,12 @@
     return Number.isInteger(f) ? String(f) : f.toFixed(digits);
   };
 
-GL.escapeHtml = function escapeHtml(s) {
+  GL.escapeHtml = function escapeHtml(s) {
     return String(s)
       .replace(/&/g, "&")
       .replace(/</g, "<")
       .replace(/>/g, ">")
-      .replace(/"/g, """)
+      .replace(/"/g, "\"")
       .replace(/'/g, "'");
   };
 
@@ -81,65 +28,315 @@ GL.escapeHtml = function escapeHtml(s) {
     return Math.round(n * 100) / 100;
   };
 
-  /** Map type → icon + class */
-  var TOAST_META = {
-    ok: { icon: "✓", label: "Thành công", cls: "toast-ok" },
-    success: { icon: "✓", label: "Thành công", cls: "toast-ok" },
-    err: { icon: "!", label: "Lỗi", cls: "toast-err" },
-    error: { icon: "!", label: "Lỗi", cls: "toast-err" },
-    warn: { icon: "⚠", label: "Chú ý", cls: "toast-warn" },
-    warning: { icon: "⚠", label: "Chú ý", cls: "toast-warn" },
-    info: { icon: "ℹ", label: "Thông tin", cls: "toast-info" },
+  GL.normName = function normName(name) {
+    var s = String(name || "");
+    if (typeof s.normalize === "function") s = s.normalize("NFC");
+    return s
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
   };
 
-  GL._toastQueue = [];
+  /** Ghép tên hiển thị: Tên thánh + Họ đệm + Tên (fallback name cũ) */
+  GL.displayName = function displayName(st) {
+    if (!st) return "";
+    var parts = [st.tenThanh, st.hoDem, st.ten]
+      .map(function (x) {
+        return String(x || "").trim();
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join(" ");
+    return String(st.name || "").trim();
+  };
 
-  /**
-   * Thông báo nổi (toast).
-   * @param {string} msg
-   * @param {string} [type] ok|err|warn|info
-   * @param {{ duration?: number, title?: string }} [opts]
-   */
-  GL.toast = function toast(msg, type, opts) {
+  GL.normStudent = function normStudent(st) {
+    return GL.normName(GL.displayName(st));
+  };
+
+  /** Chuẩn hóa object học viên (migrate bản cũ chỉ có name) */
+  GL.ensureNameFields = function ensureNameFields(st) {
+    if (!st) return;
+    if (st.tenThanh == null && st.hoDem == null && st.ten == null) {
+      if (st.name) {
+        var parts = String(st.name).trim().split(/\s+/);
+        if (parts.length === 1) {
+          st.ten = parts[0];
+        } else if (parts.length === 2) {
+          st.hoDem = parts[0];
+          st.ten = parts[1];
+        } else {
+          st.tenThanh = parts[0];
+          st.hoDem = parts.slice(1, -1).join(" ");
+          st.ten = parts[parts.length - 1];
+        }
+      }
+    }
+    if (st.tenThanh == null) st.tenThanh = "";
+    if (st.hoDem == null) st.hoDem = "";
+    if (st.ten == null) st.ten = "";
+  };
+
+  /** Đảm bảo có scoresByTerm */
+  GL.ensureStudentTerms = function ensureStudentTerms(st) {
+    if (!st.scoresByTerm) st.scoresByTerm = { hk1: {}, hk2: {} };
+    if (!st.scoresByTerm.hk1) st.scoresByTerm.hk1 = {};
+    if (!st.scoresByTerm.hk2) st.scoresByTerm.hk2 = {};
+  };
+
+  /** Đảm bảo learningLog */
+  GL.ensureLearningLog = function ensureLearningLog(st) {
+    if (!Array.isArray(st.learningLog)) st.learningLog = [];
+  };
+
+  /** Header mapping cho import */
+  GL.HEADER_ALIASES = {
+    "ten thánh": "tenThanh",
+    "họ đệm": "hoDem",
+    "ten thanh": "tenThanh",
+    "ho dem": "hoDem",
+    hoten: "fullName",
+    "họ tên": "fullName",
+    "học viên": "fullName",
+    "tên": "ten",
+    "lop": "lop",
+    "lớp": "lop",
+    "ma hoc vien": "maHV",
+    "mã học viên": "maHV",
+    "ngay sinh": "ngaySinh",
+    "ngày sinh": "ngaySinh",
+    "gioi tinh": "gioiTinh",
+    "giới tính": "gioiTinh",
+    "ten phu huynh": "tenPhuHuynh",
+    "tên phụ huynh": "tenPhuHuynh",
+    "sdt": "sdt",
+    "sđt": "sdt",
+    "dia chi": "diaChi",
+    "địa chỉ": "diaChi",
+    email: "email",
+  };
+
+  GL.normalizeHeader = function normalizeHeader(h) {
+    return String(h || "")
+      .normalize("NFC")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  GL.mapHeader = function mapHeader(h) {
+    var n = GL.normalizeHeader(h);
+    if (!n) return null;
+    if (GL.HEADER_ALIASES[n]) return GL.HEADER_ALIASES[n];
+    if (/đầu\s*giờ|dau\s*gio/.test(n)) return "dauGio";
+    if (/15\s*(phút|phut|'|p)?/.test(n) && !/tb|trung/.test(n)) return "phut15";
+    if (/(1\s*tiết|1\s*tiet|45\s*(phút|phut|'|p)?)/.test(n)) return "motTiet";
+    if (/khảo\s*kinh|khao\s*kinh/.test(n)) return "khaoKinh";
+    if (/đạo\s*đức|dao\s*duc/.test(n)) return "daoDuc";
+    if (/^thi\b|thi\s*(học|hoc|hk|cuối|cuoi)/.test(n)) return "thi";
+    if (/họ\s*tên|ho\s*ten|học\s*viên|hoc\s*vien|full\s*name/.test(n)) {
+      return "fullName";
+    }
+    if (/tên\s*thánh|ten\s*thanh/.test(n)) return "tenThanh";
+    if (/họ\s*và\s*tên\s*đệm|ho\s*va\s*ten\s*dem|họ\s*đệm|ho\s*dem|tên\s*đệm|ten\s*dem/.test(n)) {
+      return "hoDem";
+    }
+    if (/^họ$|^ho$/.test(n)) return "hoDem";
+    if (/^tên$|^ten$|tên\s*gọi|ten\s*goi/.test(n)) return "ten";
+    if (/^lớp$|^lop$|tên\s*lớp|ten\s*lop|lớp\s*học|lop\s*hoc|khối|khoi/.test(n)) {
+      return "lop";
+    }
+    if (/ghi\s*chú|ghi\s*chu|nhận\s*xét|nhan\s*xet|^note$|^notes$/.test(n)) {
+      return "ghiChu";
+    }
+    if (/mã\s*học\s*viên|ma\s*hoc\s*vien|mã\s*hv|ma\s*hv|^mã$|^ma$/.test(n)) {
+      return "maHV";
+    }
+    if (/ngày\s*sinh|ngay\s*sinh|năm\s*sinh|nam\s*sinh|birthday|dob/.test(n)) {
+      return "ngaySinh";
+    }
+    if (/giới\s*tính|gioi\s*tinh|gender/.test(n)) return "gioiTinh";
+    if (/giáo\s*xứ|giao\s*xu|địa\s*chỉ|dia\s*chi|address/.test(n)) {
+      return "giaoXu";
+    }
+    if (/^email$|e\s*mail/.test(n)) return "email";
+    if (/sđt|sdt|điện\s*thoại|dien\s*thoai|phone|tel/.test(n)) return "sdt";
+    if (/ngày\s*nhập\s*học|ngay\s*nhap\s*hoc|vào\s*lớp|vao\s*lop/.test(n)) {
+      return "ngayNhapHoc";
+    }
+    if (/stt|số\s*tt|^tt$|tb|x[eé]p/.test(n)) return "_skip";
+    return null;
+  };
+
+  /** Parse ô Excel -> mảng điểm (hỗ trợ "8,5" "8.5" "8;9") */
+  GL.parseScoreCell = function parseScoreCell(val) {
+    if (val == null || val === "") return [];
+    if (typeof val === "number" && !Number.isNaN(val)) {
+      var n = Math.round(val * 100) / 100;
+      return n >= 0 && n <= 10 ? [n] : [];
+    }
+    var s = String(val).trim();
+    if (!s) return [];
+    if (/^\d+,\d+$/.test(s)) {
+      var single = GL.parseScore(s);
+      return single == null ? [] : [single];
+    }
+    var parts = s
+      .split(/[;|]+|\s*,\s*(?=\d)/)
+      .map(function (p) {
+        return p.trim();
+      })
+      .filter(Boolean);
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+      var parsed = GL.parseScore(parts[i]);
+      if (parsed != null) out.push(parsed);
+    }
+    return out;
+  };
+
+  GL.rowsToStudents = function rowsToStudents(rows, headerMap, opts) {
     opts = opts || {};
-    type = type || "ok";
-    if (type === "success") type = "ok";
-    if (type === "error") type = "err";
-    if (type === "warning") type = "warn";
+    var importTerm = opts.importTerm || "hk1";
+    var importMode = opts.importMode || "merge"; // merge | append | replace
+    var students = [];
+    var errors = [];
 
-    var meta = TOAST_META[type] || TOAST_META.ok;
-    var host = document.getElementById("toastHost");
-    if (!host) {
-      // fallback 1 phần tử cũ
-      var el = document.getElementById("toast");
-      if (!el) return;
-      el.textContent = msg;
-      el.className = "toast show " + (type === "err" ? "err" : "ok");
-      el.classList.remove("hidden");
-      clearTimeout(GL.toast._t);
-      GL.toast._t = setTimeout(function () {
-        el.className = "toast hidden";
-      }, opts.duration || 3200);
-      return;
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || Object.keys(row).length === 0) continue;
+
+      var st = {};
+      var hasData = false;
+
+      // Map name fields
+      if (headerMap.fullName) {
+        var full = String(row[headerMap.fullName] || "").trim();
+        if (full) {
+          var parts = full.split(/\s+/);
+          if (parts.length === 1) {
+            st.ten = parts[0];
+          } else if (parts.length === 2) {
+            st.hoDem = parts[0];
+            st.ten = parts[1];
+          } else {
+            st.tenThanh = parts[0];
+            st.hoDem = parts.slice(1, -1).join(" ");
+            st.ten = parts[parts.length - 1];
+          }
+          hasData = true;
+        }
+      } else {
+        if (headerMap.tenThanh) {
+          st.tenThanh = String(row[headerMap.tenThanh] || "").trim();
+          if (st.tenThanh) hasData = true;
+        }
+        if (headerMap.hoDem) {
+          st.hoDem = String(row[headerMap.hoDem] || "").trim();
+          if (st.hoDem) hasData = true;
+        }
+        if (headerMap.ten) {
+          st.ten = String(row[headerMap.ten] || "").trim();
+          if (st.ten) hasData = true;
+        }
+      }
+
+      // Info fields
+      var infoFields = ["maHV", "ngaySinh", "gioiTinh", "tenPhuHuynh", "sdt", "diaChi", "email"];
+      for (var j = 0; j < infoFields.length; j++) {
+        var key = infoFields[j];
+        if (headerMap[key]) {
+          st[key] = String(row[headerMap[key]] || "").trim();
+          if (st[key]) hasData = true;
+        }
+      }
+
+      if (!hasData) {
+        errors.push({ row: i + 1, reason: "Không có dữ liệu tên" });
+        continue;
+      }
+
+      GL.ensureNameFields(st);
+      GL.ensureStudentTerms(st);
+      GL.ensureLearningLog(st);
+
+      // Parse scores
+      var scoreCols = ["khaoKinh", "thuocBai", "chuyenCan", "baiTap", "thaiDo", "kiemTra"];
+      for (var k = 0; k < scoreCols.length; k++) {
+        var col = scoreCols[k];
+        if (headerMap[col]) {
+          var val = row[headerMap[col]];
+          if (val != null && val !== "") {
+            var scores = GL.parseScoreCell(val);
+            if (scores.length) {
+              st.scoresByTerm[importTerm][col] = scores;
+            }
+          }
+        }
+      }
+
+      students.push(st);
     }
 
-    var duration = opts.duration != null ? opts.duration : type === "err" ? 4200 : 3400;
+    return { students: students, errors: errors };
+  };
+
+  GL.buildFullBackup = function buildFullBackup() {
+    return {
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      state: GL.state,
+      auth: GL.authStore,
+      printSettings: GL.getPrintSettings ? GL.getPrintSettings() : {},
+    };
+  };
+
+  GL.restoreFullBackup = function restoreFullBackup(backup, mode) {
+    if (!backup || backup.version == null) return { ok: false, reason: "File backup không hợp lệ" };
+    if (mode === "replace") {
+      GL.state = backup.state;
+      GL.authStore = backup.auth;
+      if (backup.printSettings && typeof GL.applyPrintSettings === "function") {
+        GL.applyPrintSettings(backup.printSettings);
+      }
+    } else {
+      // merge logic - simplified
+      if (backup.state) GL.state = backup.state;
+      if (backup.auth) GL.authStore = backup.auth;
+    }
+    GL.saveState({ skipUndo: true });
+    return { ok: true };
+  };
+
+  GL.uid = function uid() {
+    return "id_" + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+  };
+
+  /** Toast thông báo */
+  GL.toast = function toast(msg, type) {
+    var host = document.getElementById("toastHost");
+    if (!host) return;
+    var meta = {
+      err: { cls: "toast-err", icon: "⚠", label: "Lỗi" },
+      warn: { cls: "toast-warn", icon: "⚠", label: "Cảnh báo" },
+      ok: { cls: "toast-ok", icon: "✓", label: "Thành công" },
+      info: { cls: "toast-info", icon: "ℹ", label: "Thông báo" },
+    };
+    type = type || "info";
+    var m = meta[type] || meta.info;
+    var duration = arguments[2] != null ? arguments[2] : type === "err" ? 4200 : 3400;
+
     var item = document.createElement("div");
-    item.className = "toast-item " + meta.cls;
+    item.className = "toast-item " + m.cls;
     item.setAttribute("role", type === "err" ? "alert" : "status");
 
-    var title =
-      opts.title ||
-      (type === "err" || type === "warn" ? meta.label : "");
+    var title = arguments[1] && arguments[1].title ? arguments[1].title : (type === "err" || type === "warn" ? m.label : "");
 
     item.innerHTML =
       '<div class="toast-item-icon" aria-hidden="true">' +
-      meta.icon +
+      m.icon +
       "</div>" +
       '<div class="toast-item-body">' +
-      (title
-        ? '<div class="toast-item-title">' + GL.escapeHtml(title) + "</div>"
-        : "") +
+      (title ? '<div class="toast-item-title">' + GL.escapeHtml(title) + "</div>" : "") +
       '<div class="toast-item-msg">' +
       GL.escapeHtml(String(msg || "")) +
       "</div>" +
@@ -148,11 +345,6 @@ GL.escapeHtml = function escapeHtml(s) {
       '<div class="toast-item-progress"></div>';
 
     host.appendChild(item);
-
-    // animate in
-    requestAnimationFrame(function () {
-      item.classList.add("toast-item-show");
-    });
 
     var closed = false;
     function closeToast() {
@@ -165,20 +357,22 @@ GL.escapeHtml = function escapeHtml(s) {
       }, 280);
     }
 
-    var closeBtn = item.querySelector(".toast-item-close");
-    if (closeBtn) closeBtn.addEventListener("click", closeToast);
+    if (duration > 0) {
+      setTimeout(closeToast, duration);
+    }
 
-    // progress bar
+    item.querySelector(".toast-item-close").addEventListener("click", closeToast);
+
+    requestAnimationFrame(function () {
+      item.classList.add("toast-item-show");
+    });
+
     var bar = item.querySelector(".toast-item-progress");
     if (bar && duration > 0) {
       bar.style.transitionDuration = duration + "ms";
       requestAnimationFrame(function () {
         bar.style.transform = "scaleX(0)";
       });
-    }
-
-    if (duration > 0) {
-      setTimeout(closeToast, duration);
     }
 
     // tối đa 4 toast
@@ -330,7 +524,7 @@ GL.escapeHtml = function escapeHtml(s) {
   }
 
   /**
-   * Hộp thoại xác nhận đẹp (Promise&lt;boolean&gt;).
+   * Hộp thoại xác nhận đẹp (Promise<boolean>).
    * @param {string|object} messageOrOpts
    * @param {object} [opts]
    */
@@ -342,6 +536,7 @@ GL.escapeHtml = function escapeHtml(s) {
     o.type = o.type || (o.danger ? "danger" : "confirm");
     o.danger = !!o.danger || o.type === "danger";
     o.alertOnly = false;
+    o.isPrompt = false;
 
     return new Promise(function (resolve) {
       GL._dialogQueue.push({ opts: o, resolve: resolve });
@@ -351,7 +546,7 @@ GL.escapeHtml = function escapeHtml(s) {
 
   /**
    * Hộp thoại thông báo (chỉ 1 nút).
-   * @returns {Promise&lt;void&gt;}
+   * @returns {Promise<void>}
    */
   GL.alert = function alertDialog(messageOrOpts, opts) {
     var o = normalizeDialogOpts(messageOrOpts, opts);
@@ -359,6 +554,7 @@ GL.escapeHtml = function escapeHtml(s) {
     o.okText = o.okText || "Đã hiểu";
     o.type = o.type || "info";
     o.alertOnly = true;
+    o.isPrompt = false;
 
     return new Promise(function (resolve) {
       GL._dialogQueue.push({
@@ -372,7 +568,7 @@ GL.escapeHtml = function escapeHtml(s) {
   };
 
   /**
-   * Hộp thoại nhập liệu (Promise&lt;string|null&gt;).
+   * Hộp thoại nhập liệu (Promise<string|null>).
    * @param {string|object} messageOrOpts
    * @param {object} [opts]
    */
@@ -382,6 +578,7 @@ GL.escapeHtml = function escapeHtml(s) {
     o.okText = o.okText || "Xong";
     o.cancelText = o.cancelText || "Hủy";
     o.isPrompt = true;
+    o.alertOnly = false;
 
     return new Promise(function (resolve) {
       GL._dialogQueue.push({ opts: o, resolve: resolve });
@@ -416,111 +613,70 @@ GL.escapeHtml = function escapeHtml(s) {
 
   /** Chuẩn hóa object học viên (migrate bản cũ chỉ có name) */
   GL.ensureNameFields = function ensureNameFields(st) {
-    if (!st) return st;
-    st.tenThanh = st.tenThanh != null ? String(st.tenThanh) : "";
-    st.hoDem = st.hoDem != null ? String(st.hoDem) : "";
-    st.ten = st.ten != null ? String(st.ten) : "";
-    if (st.ghiChu == null) st.ghiChu = "";
-    else st.ghiChu = String(st.ghiChu);
-    // Thông tin học viên
-    if (GL.INFO_FIELDS) {
-      GL.INFO_FIELDS.forEach(function (f) {
-        if (st[f.key] == null) st[f.key] = "";
-        else st[f.key] = String(st[f.key]);
-      });
+    if (!st) return;
+    if (st.tenThanh == null && st.hoDem == null && st.ten == null) {
+      if (st.name) {
+        var parts = String(st.name).trim().split(/\s+/);
+        if (parts.length === 1) {
+          st.ten = parts[0];
+        } else if (parts.length === 2) {
+          st.hoDem = parts[0];
+          st.ten = parts[1];
+        } else {
+          st.tenThanh = parts[0];
+          st.hoDem = parts.slice(1, -1).join(" ");
+          st.ten = parts[parts.length - 1];
+        }
+      }
     }
-    // Dữ liệu cũ: chỉ có name → giữ name làm fallback; không tự tách
-    if (!st.tenThanh && !st.hoDem && !st.ten && st.name) {
-      // để user tự sửa 3 cột; tạm để nguyên displayName đọc name
-    }
-    return st;
+    if (st.tenThanh == null) st.tenThanh = "";
+    if (st.hoDem == null) st.hoDem = "";
+    if (st.ten == null) st.ten = "";
   };
 
-  /** Tóm tắt 1 dòng thông tin HV (hiển thị nhanh) */
-  GL.infoSummary = function infoSummary(st) {
-    if (!st) return "";
-    var parts = [];
-    if (st.maHV) parts.push("Mã: " + st.maHV);
-    if (st.ngaySinh) parts.push("NS: " + st.ngaySinh);
-    if (st.gioiTinh) parts.push(st.gioiTinh);
-    if (st.giaoXu) parts.push(st.giaoXu);
-    if (st.phuHuynh) parts.push("PH: " + st.phuHuynh);
-    if (st.sdt) parts.push(st.sdt);
-    return parts.join(" · ");
+  /** Đảm bảo có scoresByTerm */
+  GL.ensureStudentTerms = function ensureStudentTerms(st) {
+    if (!st.scoresByTerm) st.scoresByTerm = { hk1: {}, hk2: {} };
+    if (!st.scoresByTerm.hk1) st.scoresByTerm.hk1 = {};
+    if (!st.scoresByTerm.hk2) st.scoresByTerm.hk2 = {};
   };
 
-  GL.createStudent = function createStudent(fields) {
-    fields = fields || {};
-    // emptyScores / cloneScores có ở calc.js (load trước khi user thao tác)
-    var empty = GL.emptyScores
-      ? GL.emptyScores
-      : function () {
-          var s = {};
-          GL.COLS.forEach(function (c) {
-            s[c.key] = [];
-          });
-          return s;
-        };
-    var cloneBag = GL.cloneScores
-      ? GL.cloneScores
-      : function (src) {
-          var out = empty();
-          if (!src) return out;
-          GL.COLS.forEach(function (c) {
-            out[c.key] = Array.isArray(src[c.key]) ? src[c.key].slice() : [];
-          });
-          return out;
-        };
+  /** Đảm bảo learningLog */
+  GL.ensureLearningLog = function ensureLearningLog(st) {
+    if (!Array.isArray(st.learningLog)) st.learningLog = [];
+  };
 
-    var scoresByTerm = { hk1: empty(), hk2: empty() };
-    if (fields.scoresByTerm) {
-      scoresByTerm.hk1 = cloneBag(fields.scoresByTerm.hk1);
-      scoresByTerm.hk2 = cloneBag(fields.scoresByTerm.hk2);
-    } else if (fields.scores) {
-      var term =
-        fields._term ||
-        (typeof GL.activeTerm !== "undefined" && GL.activeTerm) ||
-        "hk1";
-      if (term !== "hk1" && term !== "hk2") term = "hk1";
-      scoresByTerm[term] = cloneBag(fields.scores);
-    }
-
-    var base = {
-      id: fields.id || GL.uid(),
-      tenThanh: String(fields.tenThanh || "").trim(),
-      hoDem: String(fields.hoDem || "").trim(),
-      ten: String(fields.ten || "").trim(),
-      name: String(fields.name || "").trim(),
-      ghiChu: String(fields.ghiChu || "").trim(),
-      scoresByTerm: scoresByTerm,
-      learningLog: Array.isArray(fields.learningLog)
-        ? fields.learningLog.slice()
-        : [],
-    };
-    if (GL.INFO_FIELDS) {
-      GL.INFO_FIELDS.forEach(function (f) {
-        base[f.key] = String(fields[f.key] || "").trim();
-      });
-    }
-    var st = GL.ensureNameFields(base);
-    if (typeof GL.ensureStudentTerms === "function") {
-      GL.ensureStudentTerms(st);
-    }
-    if (typeof GL.ensureLearningLog === "function") {
-      GL.ensureLearningLog(st);
-    }
-    if (fields._lop != null && String(fields._lop).trim()) {
-      st._lop = String(fields._lop).trim();
-    }
-    return st;
+  /** Header mapping cho import */
+  GL.HEADER_ALIASEES = {
+    "ten thánh": "tenThanh",
+    "họ đệm": "hoDem",
+    "ten thanh": "tenThanh",
+    "ho dem": "hoDem",
+    hoten: "fullName",
+    "họ tên": "fullName",
+    "học viên": "fullName",
+    "tên": "ten",
+    "lop": "lop",
+    "lớp": "lop",
+    "ma hoc vien": "maHV",
+    "mã học viên": "maHV",
+    "ngay sinh": "ngaySinh",
+    "ngày sinh": "ngaySinh",
+    "gioi tinh": "gioiTinh",
+    "giới tính": "gioiTinh",
+    "ten phu huynh": "tenPhuHuynh",
+    "tên phụ huynh": "tenPhuHuynh",
+    "sdt": "sdt",
+    "sđt": "sdt",
+    "dia chi": "diaChi",
+    "địa chỉ": "diaChi",
+    email: "email",
   };
 
   GL.normalizeHeader = function normalizeHeader(h) {
-    return String(h ?? "")
+    return String(h || "")
       .normalize("NFC")
       .toLowerCase()
-      .replace(/\u00a0/g, " ")
-      .replace(/[_\-]+/g, " ")
       .replace(/\s+/g, " ")
       .trim();
   };
@@ -528,7 +684,7 @@ GL.escapeHtml = function escapeHtml(s) {
   GL.mapHeader = function mapHeader(h) {
     var n = GL.normalizeHeader(h);
     if (!n) return null;
-    if (GL.HEADER_ALIASES[n]) return GL.HEADER_ALIASES[n];
+    if (GL.HEADER_ALIASEES[n]) return GL.HEADER_ALIASEES[n];
     if (/đầu\s*giờ|dau\s*gio/.test(n)) return "dauGio";
     if (/15\s*(phút|phut|'|p)?/.test(n) && !/tb|trung/.test(n)) return "phut15";
     if (/(1\s*tiết|1\s*tiet|45\s*(phút|phut|'|p)?)/.test(n)) return "motTiet";
@@ -560,9 +716,8 @@ GL.escapeHtml = function escapeHtml(s) {
     if (/giáo\s*xứ|giao\s*xu|địa\s*chỉ|dia\s*chi|address/.test(n)) {
       return "giaoXu";
     }
-    if (/phụ\s*huynh|phu\s*huynh|bố\s*mẹ|bo\s*me/.test(n)) return "phuHuynh";
-    if (/sđt|sdt|điện\s*thoại|dien\s*thoai|phone|tel/.test(n)) return "sdt";
     if (/^email$|e\s*mail/.test(n)) return "email";
+    if (/sđt|sdt|điện\s*thoại|dien\s*thoai|phone|tel/.test(n)) return "sdt";
     if (/ngày\s*nhập\s*học|ngay\s*nhap\s*hoc|vào\s*lớp|vao\s*lop/.test(n)) {
       return "ngayNhapHoc";
     }
@@ -570,7 +725,7 @@ GL.escapeHtml = function escapeHtml(s) {
     return null;
   };
 
-  /** Parse ô Excel → mảng điểm (hỗ trợ "8,5" "8.5" "8;9") */
+  /** Parse ô Excel -> mảng điểm (hỗ trợ "8,5" "8.5" "8;9") */
   GL.parseScoreCell = function parseScoreCell(val) {
     if (val == null || val === "") return [];
     if (typeof val === "number" && !Number.isNaN(val)) {
@@ -591,9 +746,126 @@ GL.escapeHtml = function escapeHtml(s) {
       .filter(Boolean);
     var out = [];
     for (var i = 0; i < parts.length; i++) {
-      var sc = GL.parseScore(parts[i]);
-      if (sc != null) out.push(sc);
+      var parsed = GL.parseScore(parts[i]);
+      if (parsed != null) out.push(parsed);
     }
     return out;
+  };
+
+  GL.rowsToStudents = function rowsToStudents(rows, headerMap, opts) {
+    opts = opts || {};
+    var importTerm = opts.importTerm || "hk1";
+    var importMode = opts.importMode || "merge"; // merge | append | replace
+    var students = [];
+    var errors = [];
+
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || Object.keys(row).length === 0) continue;
+
+      var st = {};
+      var hasData = false;
+
+      // Map name fields
+      if (headerMap.fullName) {
+        var full = String(row[headerMap.fullName] || "").trim();
+        if (full) {
+          var parts = full.split(/\s+/);
+          if (parts.length === 1) {
+            st.ten = parts[0];
+          } else if (parts.length === 2) {
+            st.hoDem = parts[0];
+            st.ten = parts[1];
+          } else {
+            st.tenThanh = parts[0];
+            st.hoDem = parts.slice(1, -1).join(" ");
+            st.ten = parts[parts.length - 1];
+          }
+          hasData = true;
+        }
+      } else {
+        if (headerMap.tenThanh) {
+          st.tenThanh = String(row[headerMap.tenThanh] || "").trim();
+          if (st.tenThanh) hasData = true;
+        }
+        if (headerMap.hoDem) {
+          st.hoDem = String(row[headerMap.hoDem] || "").trim();
+          if (st.hoDem) hasData = true;
+        }
+        if (headerMap.ten) {
+          st.ten = String(row[headerMap.ten] || "").trim();
+          if (st.ten) hasData = true;
+        }
+      }
+
+      // Info fields
+      var infoFields = ["maHV", "ngaySinh", "gioiTinh", "tenPhuHuynh", "sdt", "diaChi", "email"];
+      for (var j = 0; j < infoFields.length; j++) {
+        var key = infoFields[j];
+        if (headerMap[key]) {
+          st[key] = String(row[headerMap[key]] || "").trim();
+          if (st[key]) hasData = true;
+        }
+      }
+
+      if (!hasData) {
+        errors.push({ row: i + 1, reason: "Không có dữ liệu tên" });
+        continue;
+      }
+
+      GL.ensureNameFields(st);
+      GL.ensureStudentTerms(st);
+      GL.ensureLearningLog(st);
+
+      // Parse scores
+      var scoreCols = ["khaoKinh", "thuocBai", "chuyenCan", "baiTap", "thaiDo", "kiemTra"];
+      for (var k = 0; k < scoreCols.length; k++) {
+        var col = scoreCols[k];
+        if (headerMap[col]) {
+          var val = row[headerMap[col]];
+          if (val != null && val !== "") {
+            var scores = GL.parseScoreCell(val);
+            if (scores.length) {
+              st.scoresByTerm[importTerm][col] = scores;
+            }
+          }
+        }
+      }
+
+      students.push(st);
+    }
+
+    return { students: students, errors: errors };
+  };
+
+  GL.buildFullBackup = function buildFullBackup() {
+    return {
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      state: GL.state,
+      auth: GL.authStore,
+      printSettings: GL.getPrintSettings ? GL.getPrintSettings() : {},
+    };
+  };
+
+  GL.restoreFullBackup = function restoreFullBackup(backup, mode) {
+    if (!backup || backup.version == null) return { ok: false, reason: "File backup không hợp lệ" };
+    if (mode === "replace") {
+      GL.state = backup.state;
+      GL.authStore = backup.auth;
+      if (backup.printSettings && typeof GL.applyPrintSettings === "function") {
+        GL.applyPrintSettings(backup.printSettings);
+      }
+    } else {
+      // merge logic - simplified
+      if (backup.state) GL.state = backup.state;
+      if (backup.auth) GL.authStore = backup.auth;
+    }
+    GL.saveState({ skipUndo: true });
+    return { ok: true };
+  };
+
+  GL.uid = function uid() {
+    return "id_" + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
   };
 })(window.GL = window.GL || {});
