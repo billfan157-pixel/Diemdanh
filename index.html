@@ -10,8 +10,8 @@
   <meta name="apple-mobile-web-app-title" content="Sổ Điểm GL" />
   <title>Sổ Điểm Giáo Lý</title>
   <link rel="stylesheet" href="css/styles.css" />
-  <!-- v=5: no double-tap zoom + mobile UI -->
-  <link rel="stylesheet" href="css/mobile.css?v=5" />
+  <!-- v=6: redesigned top/bottom bars -->
+  <link rel="stylesheet" href="css/mobile.css?v=6" />
   <!-- Thư viện local — hoạt động cả offline / file:// -->
   <script src="js/vendor/xlsx.full.min.js"></script>
   <script src="js/vendor/jszip.min.js"></script>
@@ -56,12 +56,16 @@
 <div class="app hidden" id="appRoot">
     <!-- Mobile: thanh trên kiểu app -->
     <header class="m-topbar" id="mTopbar">
-      <button type="button" class="m-icon-btn" id="mOpenDrawer" aria-label="Mở menu lớp">☰</button>
+      <button type="button" class="m-topbar-btn" id="mOpenDrawer" aria-label="Mở menu lớp">
+        <span class="m-hamburger" aria-hidden="true"><i></i><i></i><i></i></span>
+      </button>
       <div class="m-topbar-titles">
         <strong class="m-top-title" id="mTopTitle">Sổ Điểm Giáo Lý</strong>
         <span class="m-top-sub" id="mTopSub">Tổng quan</span>
       </div>
-      <button type="button" class="m-icon-btn m-icon-btn-soft" id="mTopHelp" aria-label="Hướng dẫn">?</button>
+      <button type="button" class="m-topbar-btn m-topbar-btn-text" id="mTopHelp" aria-label="Hướng dẫn" title="Hướng dẫn">
+        <span class="m-help-mark">?</span>
+      </button>
     </header>
 
     <!-- Lớp phủ khi mở drawer mobile -->
@@ -372,22 +376,26 @@
 
     <!-- Mobile: bottom navigation -->
     <nav class="m-bottom-nav" id="mBottomNav" aria-label="Điều hướng chính">
-      <button type="button" class="m-nav-item active" data-m-nav="home">
-        <span class="m-nav-ico" aria-hidden="true">🏠</span>
-        <span class="m-nav-lab">Tổng quan</span>
-      </button>
-      <button type="button" class="m-nav-item" data-m-nav="classes">
-        <span class="m-nav-ico" aria-hidden="true">📚</span>
-        <span class="m-nav-lab">Lớp</span>
-      </button>
-      <button type="button" class="m-nav-item m-nav-item-primary" data-m-nav="scores">
-        <span class="m-nav-ico" aria-hidden="true">✏️</span>
-        <span class="m-nav-lab">Điểm</span>
-      </button>
-      <button type="button" class="m-nav-item" data-m-nav="more">
-        <span class="m-nav-ico" aria-hidden="true">☰</span>
-        <span class="m-nav-lab">Thêm</span>
-      </button>
+      <div class="m-bottom-nav-inner">
+        <button type="button" class="m-nav-item active" data-m-nav="home">
+          <span class="m-nav-glyph m-nav-glyph-home" aria-hidden="true"></span>
+          <span class="m-nav-lab">Tổng quan</span>
+        </button>
+        <button type="button" class="m-nav-item" data-m-nav="classes">
+          <span class="m-nav-glyph m-nav-glyph-class" aria-hidden="true"></span>
+          <span class="m-nav-lab">Lớp</span>
+        </button>
+        <button type="button" class="m-nav-item m-nav-item-primary" data-m-nav="scores">
+          <span class="m-nav-primary-ring" aria-hidden="true">
+            <span class="m-nav-glyph m-nav-glyph-score"></span>
+          </span>
+          <span class="m-nav-lab">Điểm</span>
+        </button>
+        <button type="button" class="m-nav-item" data-m-nav="more">
+          <span class="m-nav-glyph m-nav-glyph-more" aria-hidden="true"></span>
+          <span class="m-nav-lab">Thêm</span>
+        </button>
+      </div>
     </nav>
 
     <!-- Mobile: sheet công cụ -->
