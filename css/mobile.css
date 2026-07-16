@@ -631,7 +631,7 @@
     color: var(--m-blue) !important;
   }
 
-  /* Dashboard — layout chi tiết ở styles.css (≤900px) */
+  /* Dashboard / Lớp / Cá nhân */
   #dashboardView {
     padding: 10px var(--m-pad) 16px !important;
   }
@@ -639,6 +639,14 @@
     border-radius: 16px !important;
     border: 1px solid var(--m-line) !important;
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+  }
+  .classes-view,
+  .me-view {
+    padding: 12px var(--m-pad) 24px !important;
+  }
+  .classes-item,
+  .me-row {
+    min-height: 60px !important;
   }
 
   /* Login */
@@ -882,6 +890,28 @@
         6px no-repeat,
       radial-gradient(circle, currentColor 2px, transparent 2.5px) 100% 50% / 7px
         6px no-repeat;
+  }
+  /* Icon Cá nhân (người) */
+  .m-nav-glyph-me {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    box-sizing: border-box;
+  }
+  .m-nav-glyph-me::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -7px;
+    width: 16px;
+    height: 8px;
+    border: 2px solid currentColor;
+    border-bottom: 0;
+    border-radius: 10px 10px 0 0;
+    transform: translateX(-50%);
+    box-sizing: border-box;
   }
   .m-nav-item-primary {
     gap: 1px;

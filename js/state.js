@@ -17,9 +17,13 @@
 
   // Lọc năm học: "" = tất cả; giá trị = năm học lớp (vd 2025-2026)
   GL.activeYearFilter = localStorage.getItem(GL.YEAR_FILTER_KEY) || "";
-  // Màn hình chính: dashboard (tổng quan) | class (bảng điểm lớp)
+  // Màn: dashboard | classes | class | me
+  var HOME_VIEWS = ["dashboard", "classes", "class", "me"];
   var savedHome = localStorage.getItem(GL.HOME_VIEW_KEY) || "dashboard";
-  GL.homeView = savedHome === "class" ? "class" : "dashboard";
+  // migrate giá trị cũ
+  if (savedHome === "home") savedHome = "dashboard";
+  GL.homeView =
+    HOME_VIEWS.indexOf(savedHome) >= 0 ? savedHome : "dashboard";
 
   GL.createClass = function createClass(name, year, classCount) {
     if (classCount == null) {
@@ -320,7 +324,8 @@
   };
 
   GL.setHomeView = function setHomeView(view) {
-    GL.homeView = view === "class" ? "class" : "dashboard";
+    var allowed = ["dashboard", "classes", "class", "me"];
+    GL.homeView = allowed.indexOf(view) >= 0 ? view : "dashboard";
     try {
       localStorage.setItem(GL.HOME_VIEW_KEY, GL.homeView);
     } catch (e) {

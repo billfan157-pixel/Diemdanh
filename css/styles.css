@@ -3005,6 +3005,263 @@
       animation: modalIn 0.2s ease;
     }
 
+    /* View switcher: desktop tabs / mobile Thêm */
+    .view-btn-more {
+      display: none;
+    }
+    @media (max-width: 900px) {
+      .view-btn-desktop {
+        display: none !important;
+      }
+      .view-btn-more {
+        display: inline-flex !important;
+      }
+    }
+
+    /* ===== Màn Lớp (mobile nav) ===== */
+    .classes-view {
+      padding: 14px 16px 24px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .classes-hero-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      margin: 0 0 4px;
+    }
+    .classes-hero-sub {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .classes-filter {
+      margin-bottom: 14px;
+    }
+    .classes-filter select {
+      width: 100%;
+      min-height: 46px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 650;
+      background: var(--surface);
+    }
+    .classes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .classes-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 14px 12px;
+      cursor: pointer;
+      font-family: inherit;
+      color: inherit;
+      min-height: 64px;
+      box-shadow: var(--shadow);
+    }
+    .classes-item:hover,
+    .classes-item:active {
+      border-color: #bfdbfe;
+      background: var(--accent-soft);
+    }
+    .classes-item.is-active {
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+    .classes-item-ord {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: #eff6ff;
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .classes-item-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .classes-item-name {
+      font-weight: 800;
+      font-size: 1.02rem;
+    }
+    .classes-item-meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .classes-create {
+      padding: 14px;
+    }
+    .classes-create-title {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+    .classes-create input {
+      width: 100%;
+      margin-bottom: 8px;
+      min-height: 46px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+
+    /* ===== Màn Cá nhân ===== */
+    .me-view {
+      padding: 14px 16px 32px;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .me-hero {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px;
+      background: linear-gradient(145deg, #eff6ff, #fff);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+    }
+    .me-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .me-name {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+    .me-role {
+      margin: 2px 0 0;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .me-user {
+      margin: 2px 0 0;
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .me-section {
+      margin-bottom: 16px;
+    }
+    .me-section-title {
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin: 0 4px 8px;
+    }
+    .me-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      color: inherit;
+      min-height: 58px;
+    }
+    .me-row:active {
+      background: var(--surface2);
+    }
+    .me-row-ico {
+      font-size: 1.25rem;
+      width: 36px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .me-row-txt {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .me-row-txt strong {
+      font-size: 0.95rem;
+      font-weight: 750;
+    }
+    .me-row-txt small {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .me-row-chev {
+      color: #cbd5e1;
+      font-size: 1.2rem;
+    }
+    .me-logout {
+      margin-top: 8px;
+      min-height: 50px;
+    }
+
+    .m-sheet-sm {
+      max-height: min(60dvh, 420px);
+    }
+    .m-sheet-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .m-sheet-list-btn {
+      width: 100%;
+      min-height: 52px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      text-align: left;
+      padding: 12px 16px;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .m-sheet-list-btn:active {
+      background: var(--accent-soft);
+      border-color: #bfdbfe;
+      color: var(--accent);
+    }
+
     /* ===== Dashboard / Tổng quan ===== */
     .dashboard-view {
       padding-bottom: 8px;

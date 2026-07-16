@@ -25,33 +25,39 @@
 
   GL.updateViewSwitcherUI = function updateViewSwitcherUI() {
     var isYear = GL.activeTerm === "year";
+    var moreModes = ["rank", "stats", "print"];
     document.querySelectorAll(".view-btn").forEach(function (btn) {
+      if (btn.getAttribute("data-view-more") === "1" || btn.id === "viewMoreBtn") {
+        // Nút Thêm: mobile luôn hiện; active nếu đang ở rank/stats/print
+        btn.classList.toggle("active", moreModes.indexOf(GL.viewMode) >= 0);
+        if (isYear) {
+          // năm: cards/table ẩn, Thêm vẫn hữu ích
+          btn.style.display = "";
+        }
+        return;
+      }
       var v = btn.getAttribute("data-view");
-      // Ở chế độ cả năm: ẩn nhập điểm / bảng / thiếu điểm
+      // Ở chế độ cả năm: ẩn nhập điểm / bảng
       if (isYear) {
         var allow =
           v === "rank" || v === "stats" || v === "print" || v === "journal";
-        btn.style.display = allow ? "" : "none";
-        btn.classList.toggle(
-          "active",
-          (GL.viewMode === "year" && v === "rank" && false) ||
-            btn.getAttribute("data-view") === GL.viewMode
-        );
-        if (
-          GL.viewMode === "year" ||
-          GL.viewMode === "cards" ||
-          GL.viewMode === "table" ||
-          GL.viewMode === "missing"
-        ) {
-          // không active các nút ẩn
-          if (!allow) btn.classList.remove("active");
+        // desktop tabs rank/stats/print; mobile ẩn desktop tabs
+        if (btn.classList.contains("view-btn-desktop")) {
+          btn.style.display = allow ? "" : "none";
+        } else {
+          btn.style.display = allow || v === "journal" ? "" : "none";
+          if (v === "cards" || v === "table") btn.style.display = "none";
         }
+        btn.classList.toggle("active", v === GL.viewMode);
+        if (!allow) btn.classList.remove("active");
       } else {
-        btn.style.display = "";
-        btn.classList.toggle(
-          "active",
-          btn.getAttribute("data-view") === GL.viewMode
-        );
+        if (btn.classList.contains("view-btn-desktop")) {
+          // desktop: hiện; mobile CSS ẩn
+          btn.style.display = "";
+        } else {
+          btn.style.display = "";
+        }
+        btn.classList.toggle("active", v === GL.viewMode);
       }
     });
     var hint = document.getElementById("viewHint");
@@ -106,7 +112,9 @@
 
     // select năm học (sidebar + dashboard)
     document
-      .querySelectorAll("#yearFilterSelect, #dashYearFilter")
+      .querySelectorAll(
+        "#yearFilterSelect, #dashYearFilter, #classesYearFilter"
+      )
       .forEach(function (sel) {
         if (typeof GL.fillYearFilterSelect === "function") {
           GL.fillYearFilterSelect(sel);
@@ -118,6 +126,13 @@
     var form = document.querySelector(".new-class-form");
     if (form) {
       form.style.display =
+        typeof GL.canCreateClass === "function" && !GL.canCreateClass()
+          ? "none"
+          : "";
+    }
+    var classesCreate = document.getElementById("classesCreateBox");
+    if (classesCreate) {
+      classesCreate.style.display =
         typeof GL.canCreateClass === "function" && !GL.canCreateClass()
           ? "none"
           : "";
@@ -494,7 +509,6 @@
 
   /** Cập nhật topbar + bottom-nav + FAB (mobile) */
   GL.updateMobileChrome = function updateMobileChrome(which, cls) {
-    var home = GL.homeView || "dashboard";
     var mTitle = document.getElementById("mTopTitle");
     var mSub = document.getElementById("mTopSub");
     var fab = document.getElementById("mFabAdd");
@@ -507,9 +521,19 @@
       if (mTitle) mTitle.textContent = "Sổ Điểm Giáo Lý";
       if (mSub) mSub.textContent = "Chưa có lớp";
     } else if (which === "dash") {
-      if (mTitle) mTitle.textContent = "Tổng quan năm học";
+      if (mTitle) mTitle.textContent = "Tổng quan";
       if (mSub) mSub.textContent = year ? "Năm " + year : "Tất cả năm học";
-    } else if (cls) {
+    } else if (which === "classes") {
+      if (mTitle) mTitle.textContent = "Lớp học";
+      if (mSub) mSub.textContent = year ? "Năm " + year : "Chọn lớp để nhập điểm";
+    } else if (which === "me") {
+      if (mTitle) mTitle.textContent = "Cá nhân";
+      var u = typeof GL.currentUser === "function" ? GL.currentUser() : null;
+      if (mSub)
+        mSub.textContent = u
+          ? u.displayName || u.username || "Tài khoản"
+          : "Tài khoản";
+    } else if (which === "class" && cls) {
       if (mTitle) mTitle.textContent = cls.name || "Lớp";
       if (mSub) {
         var termTxt =
@@ -526,13 +550,121 @@
       var key = btn.getAttribute("data-m-nav");
       var on =
         (key === "home" && (which === "dash" || which === "empty")) ||
-        (key === "scores" && which === "class");
+        (key === "classes" && which === "classes") ||
+        (key === "scores" && which === "class") ||
+        (key === "me" && which === "me");
       btn.classList.toggle("active", on);
     });
 
     if (fab) {
-      var showFab = which === "class" && !!cls;
-      fab.classList.toggle("hidden", !showFab);
+      fab.classList.toggle("hidden", !(which === "class" && !!cls));
+    }
+  };
+
+  /** Màn danh sách lớp */
+  GL.renderClassesView = function renderClassesView() {
+    var listEl = document.getElementById("classesViewList");
+    var sub = document.getElementById("classesViewSub");
+    var yearSel = document.getElementById("classesYearFilter");
+    if (yearSel && yearSel.value !== (GL.activeYearFilter || "")) {
+      // sync select from global filter (options filled by fillYearSelects)
+      try {
+        yearSel.value = GL.activeYearFilter || "";
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    var list =
+      typeof GL.classesInScope === "function"
+        ? GL.classesInScope()
+        : typeof GL.visibleClasses === "function"
+          ? GL.visibleClasses()
+          : (GL.state && GL.state.classes) || [];
+    if (sub) {
+      sub.textContent =
+        list.length +
+        " lớp" +
+        (GL.activeYearFilter ? " · " + GL.activeYearFilter : "");
+    }
+    if (!listEl) return;
+    if (!list.length) {
+      listEl.innerHTML =
+        '<div class="dash-empty"><p>Chưa có lớp. Tạo lớp bên dưới hoặc đổi năm học.</p></div>';
+      return;
+    }
+    var activeId = GL.state && GL.state.activeClassId;
+    listEl.innerHTML = list
+      .map(function (c, i) {
+        var n = (c.students && c.students.length) || 0;
+        var on = c.id === activeId ? " is-active" : "";
+        return (
+          '<button type="button" class="classes-item' +
+          on +
+          '" data-open-class="' +
+          GL.escapeHtml(c.id) +
+          '">' +
+          '<span class="classes-item-ord">' +
+          (i + 1) +
+          "</span>" +
+          '<span class="classes-item-main">' +
+          '<span class="classes-item-name">' +
+          GL.escapeHtml(c.name) +
+          "</span>" +
+          '<span class="classes-item-meta">' +
+          GL.escapeHtml(c.year || "Chưa ghi năm") +
+          " · " +
+          n +
+          " HV</span></span>" +
+          '<span class="dash-row-chev">›</span></button>'
+        );
+      })
+      .join("");
+  };
+
+  /** Màn Cá nhân */
+  GL.renderMeView = function renderMeView() {
+    var u = typeof GL.currentUser === "function" ? GL.currentUser() : null;
+    var nameEl = document.getElementById("meDisplayName");
+    var roleEl = document.getElementById("meRoleLabel");
+    var userEl = document.getElementById("meUsername");
+    if (nameEl) nameEl.textContent = u ? u.displayName || u.username || "—" : "—";
+    if (roleEl)
+      roleEl.textContent = u
+        ? u.role === "ban_gl"
+          ? "Ban Giáo lý"
+          : "Giáo lý viên"
+        : "—";
+    if (userEl) userEl.textContent = u ? "@" + (u.username || "") : "";
+
+    var bioLab = document.getElementById("meBioLabel");
+    var bioHint = document.getElementById("meBioHint");
+    var label =
+      typeof GL.bioLabel === "function" ? GL.bioLabel() : "Face ID / vân tay";
+    var enabled =
+      u &&
+      typeof GL.bioIsEnabledForUser === "function" &&
+      GL.bioIsEnabledForUser(u.id);
+    var supported =
+      typeof GL.bioIsSupported === "function" && GL.bioIsSupported();
+    if (bioLab) bioLab.textContent = enabled ? "Tắt " + label : "Bật " + label;
+    if (bioHint) {
+      bioHint.textContent = !supported
+        ? "Cần HTTPS / localhost"
+        : enabled
+          ? "Đang bật trên máy này"
+          : "Đăng nhập nhanh bằng sinh trắc";
+    }
+
+    var syncHint = document.getElementById("meSyncHint");
+    if (syncHint && typeof GL.getSyncStatus === "function") {
+      var st = GL.getSyncStatus();
+      syncHint.textContent = st.message || (GL.isSupabaseConfigured() ? "Đã cấu hình" : "Chưa cấu hình");
+    }
+
+    var adminSec = document.getElementById("meAdminSection");
+    if (adminSec) {
+      var isAdmin = typeof GL.isBanGL === "function" && GL.isBanGL();
+      adminSec.classList.toggle("hidden", !isAdmin);
     }
   };
 
@@ -542,24 +674,26 @@
     var noView = document.getElementById("noClassView");
     var classView = document.getElementById("classView");
     var dashView = document.getElementById("dashboardView");
+    var classesView = document.getElementById("classesView");
+    var meView = document.getElementById("meView");
     var home = GL.homeView || "dashboard";
-
-    // Nếu lớp active không thuộc năm học đang lọc → vẫn cho xem class
-    // nhưng dashboard chỉ thống kê lớp trong scope.
 
     function showOnly(which) {
       if (dashView) dashView.classList.toggle("hidden", which !== "dash");
       if (classView) classView.classList.toggle("hidden", which !== "class");
+      if (classesView)
+        classesView.classList.toggle("hidden", which !== "classes");
+      if (meView) meView.classList.toggle("hidden", which !== "me");
       if (noView) noView.classList.toggle("hidden", which !== "empty");
     }
 
-    // Không có lớp nào trong phạm vi quyền
     var anyVisible =
       typeof GL.visibleClasses === "function"
         ? GL.visibleClasses().length
         : (GL.state.classes || []).length;
 
-    if (!anyVisible) {
+    // Không có lớp: vẫn cho xem me / empty create
+    if (!anyVisible && home !== "me") {
       showOnly("empty");
       if (typeof GL.updateMobileChrome === "function") {
         GL.updateMobileChrome("empty", null);
@@ -570,10 +704,46 @@
       return;
     }
 
-    if (home === "dashboard" || !cls) {
+    if (home === "me") {
+      showOnly("me");
+      if (typeof GL.renderMeView === "function") GL.renderMeView();
+      document.querySelectorAll(".nav-home-btn").forEach(function (b) {
+        b.classList.toggle("active", false);
+      });
+      if (typeof GL.updateMobileChrome === "function") {
+        GL.updateMobileChrome("me", cls);
+      }
+      return;
+    }
+
+    if (home === "classes") {
+      showOnly("classes");
+      if (typeof GL.renderClassesView === "function") GL.renderClassesView();
+      document.querySelectorAll(".nav-home-btn").forEach(function (b) {
+        b.classList.toggle("active", false);
+      });
+      if (typeof GL.updateMobileChrome === "function") {
+        GL.updateMobileChrome("classes", cls);
+      }
+      if (typeof GL.updateBackupReminderUI === "function") {
+        GL.updateBackupReminderUI();
+      }
+      return;
+    }
+
+    if (home === "dashboard" || (home === "class" && !cls)) {
+      // class mà chưa có active → về danh sách lớp (mobile) / dashboard (nếu user chọn dash)
+      if (home === "class" && !cls) {
+        if (typeof GL.setHomeView === "function") GL.setHomeView("classes");
+        showOnly("classes");
+        if (typeof GL.renderClassesView === "function") GL.renderClassesView();
+        if (typeof GL.updateMobileChrome === "function") {
+          GL.updateMobileChrome("classes", null);
+        }
+        return;
+      }
       showOnly("dash");
       if (typeof GL.renderDashboard === "function") GL.renderDashboard();
-      // highlight sidebar
       document.querySelectorAll(".nav-home-btn").forEach(function (b) {
         b.classList.toggle("active", true);
       });
@@ -586,6 +756,7 @@
       return;
     }
 
+    // home === class
     showOnly("class");
     document.querySelectorAll(".nav-home-btn").forEach(function (b) {
       b.classList.toggle("active", false);

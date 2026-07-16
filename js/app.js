@@ -467,99 +467,214 @@
           var btn = e.target.closest("[data-m-nav]");
           if (!btn) return;
           var key = btn.getAttribute("data-m-nav");
+          closeDrawer();
+          closeMoreSheet();
+          closeViewMoreSheet();
           if (key === "home") {
-            closeDrawer();
-            closeMoreSheet();
             if (typeof GL.setHomeView === "function") GL.setHomeView("dashboard");
             GL.render();
           } else if (key === "classes") {
-            closeMoreSheet();
-            toggleDrawer();
+            if (typeof GL.setHomeView === "function") GL.setHomeView("classes");
+            GL.render();
           } else if (key === "scores") {
-            closeDrawer();
-            closeMoreSheet();
-            var cls = typeof GL.activeClass === "function" ? GL.activeClass() : null;
+            var cls =
+              typeof GL.activeClass === "function" ? GL.activeClass() : null;
             if (!cls) {
-              openDrawer();
+              if (typeof GL.setHomeView === "function") GL.setHomeView("classes");
+              GL.render();
               GL.toast("Chọn lớp để nhập điểm.", "info");
               return;
             }
             if (typeof GL.setHomeView === "function") GL.setHomeView("class");
             if (typeof GL.setViewMode === "function") GL.setViewMode("cards");
             GL.render();
-          } else if (key === "more") {
-            closeDrawer();
-            openMoreSheet();
+          } else if (key === "me") {
+            if (typeof GL.setHomeView === "function") GL.setHomeView("me");
+            GL.render();
           }
         });
       }
 
-      var sheetGrid = document.querySelector(".m-sheet-grid");
-      if (sheetGrid) {
-        sheetGrid.addEventListener("click", function (e) {
-          var b = e.target.closest("[data-m-action]");
-          if (!b) return;
+      function openViewMoreSheet() {
+        var sheet = document.getElementById("mViewMoreSheet");
+        if (sheet) sheet.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      }
+      function closeViewMoreSheet() {
+        var sheet = document.getElementById("mViewMoreSheet");
+        if (sheet) sheet.classList.add("hidden");
+        if (!document.querySelector(".modal-overlay:not(.hidden)")) {
+          document.body.style.overflow = "";
+        }
+      }
+      GL.openViewMoreSheet = openViewMoreSheet;
+      GL.closeViewMoreSheet = closeViewMoreSheet;
+
+      var viewMoreBtn = document.getElementById("viewMoreBtn");
+      if (viewMoreBtn) {
+        viewMoreBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          openViewMoreSheet();
+        });
+      }
+      var viewMoreClose = document.getElementById("mViewMoreClose");
+      if (viewMoreClose) {
+        viewMoreClose.addEventListener("click", closeViewMoreSheet);
+      }
+      var viewMoreSheet = document.getElementById("mViewMoreSheet");
+      if (viewMoreSheet) {
+        viewMoreSheet.addEventListener("click", function (e) {
+          if (e.target === viewMoreSheet) closeViewMoreSheet();
+          var b = e.target.closest("[data-view], [data-m-action]");
+          if (!b || !viewMoreSheet.contains(b)) return;
+          closeViewMoreSheet();
+          var v = b.getAttribute("data-view");
+          if (v && typeof GL.setViewMode === "function") {
+            GL.setViewMode(v);
+            return;
+          }
           var act = b.getAttribute("data-m-action");
-          closeMoreSheet();
-          var map = {
-            io: "openIoModal",
-            reports: "openReportsModal",
-            backup: "openBackupModal",
-            invite: "openInviteModal",
-            parish: "openParishModal",
-            history: "openHistoryModal",
-            users: "openUsersModal",
-            weights: "openWeightsModal",
-            help: "openHelpModal",
-          };
-          if (act === "pin") {
-            var pinBtn = document.getElementById("openChangePinBtn");
-            if (pinBtn) pinBtn.click();
-            else if (typeof openChangePinModal === "function") openChangePinModal();
-            return;
-          }
-          if (act === "bio") {
-            var bioBtn = document.getElementById("bioToggleBtn");
-            if (bioBtn) bioBtn.click();
-            else GL.toast("Mở menu sidebar để bật Face ID / vân tay.", "info");
-            return;
-          }
-          if (act === "sync") {
-            var syncOpen = document.getElementById("openSyncModal");
-            if (syncOpen) syncOpen.click();
-            return;
-          }
-          var id = map[act];
-          if (id) {
-            var el = document.getElementById(id);
-            if (el) el.click();
+          if (act === "reports") {
+            var r = document.getElementById("openReportsModal");
+            if (r) r.click();
+          } else if (act === "weights") {
+            var w = document.getElementById("openWeightsModal");
+            if (w) w.click();
           }
         });
       }
     })();
 
+    // Màn Lớp + Cá nhân (bind open-class sau khi bindDashOpenClass định nghĩa — gọi lại ở dưới)
+
+    function createClassFromFields(nameEl, yearEl) {
+      if (!nameEl) return;
+      var name = nameEl.value.trim();
+      if (!name) {
+        GL.toast("Nhập tên lớp.", "err");
+        return;
+      }
+      var year = yearEl ? yearEl.value.trim() : "";
+      // reuse add class button logic if possible
+      var sidebarName = document.getElementById("newClassName");
+      var sidebarYear = document.getElementById("newClassYear");
+      if (sidebarName) sidebarName.value = name;
+      if (sidebarYear) sidebarYear.value = year || GL.activeYearFilter || "";
+      var addBtn = document.getElementById("addClassBtn");
+      if (addBtn) addBtn.click();
+      nameEl.value = "";
+    }
+    var classesAddBtn = document.getElementById("classesAddBtn");
+    if (classesAddBtn) {
+      classesAddBtn.addEventListener("click", function () {
+        createClassFromFields(
+          document.getElementById("classesNewName"),
+          document.getElementById("classesNewYear")
+        );
+      });
+    }
+
+    function meClickAction(act) {
+      var map = {
+        users: "openUsersModal",
+        backup: "openBackupModal",
+        invite: "openInviteModal",
+        parish: "openParishModal",
+        history: "openHistoryModal",
+        weights: "openWeightsModal",
+      };
+      var id = map[act];
+      if (id) {
+        var el = document.getElementById(id);
+        if (el) el.click();
+      }
+    }
+    var meView = document.getElementById("meView");
+    if (meView) {
+      meView.addEventListener("click", function (e) {
+        var t = e.target;
+        if (!(t instanceof HTMLElement)) return;
+        if (t.id === "meChangePin" || t.closest("#meChangePin")) {
+          var pinBtn = document.getElementById("openChangePinBtn");
+          if (pinBtn) pinBtn.click();
+          else if (typeof openChangePinModal === "function") openChangePinModal();
+          return;
+        }
+        if (t.id === "meBioToggle" || t.closest("#meBioToggle")) {
+          var bioBtn = document.getElementById("bioToggleBtn");
+          if (bioBtn) bioBtn.click();
+          else GL.toast("Bật/tắt sinh trắc từ sidebar.", "info");
+          setTimeout(function () {
+            if (typeof GL.renderMeView === "function") GL.renderMeView();
+          }, 400);
+          return;
+        }
+        if (t.id === "meSync" || t.closest("#meSync")) {
+          var syncOpen = document.getElementById("openSyncModal");
+          if (syncOpen) syncOpen.click();
+          return;
+        }
+        if (t.id === "meIo" || t.closest("#meIo")) {
+          var io = document.getElementById("openIoModal");
+          if (io) io.click();
+          return;
+        }
+        if (t.id === "meHelp" || t.closest("#meHelp")) {
+          var h = document.getElementById("openHelpModal");
+          if (h) h.click();
+          return;
+        }
+        if (t.id === "meLogout" || t.closest("#meLogout")) {
+          GL.logout();
+          if (typeof showLogin === "function") showLogin();
+          else {
+            document.getElementById("loginScreen").classList.remove("hidden");
+            document.getElementById("appRoot").classList.add("hidden");
+          }
+          GL.toast("Đã đăng xuất.");
+          return;
+        }
+        var adminRow = t.closest("[data-me-action]");
+        if (adminRow) {
+          meClickAction(adminRow.getAttribute("data-me-action"));
+        }
+      });
+    }
+
     // Năm học filter
     function onYearFilterChange(val) {
       if (typeof GL.setYearFilter === "function") GL.setYearFilter(val);
-      // Nếu lớp active không thuộc năm → vẫn giữ, user có thể mở dashboard
       GL.render();
-      if (GL.homeView === "dashboard" && typeof GL.renderDashboard === "function") {
+      if (
+        GL.homeView === "dashboard" &&
+        typeof GL.renderDashboard === "function"
+      ) {
         GL.renderDashboard();
       }
+      if (
+        GL.homeView === "classes" &&
+        typeof GL.renderClassesView === "function"
+      ) {
+        GL.renderClassesView();
+      }
     }
-    ["yearFilterSelect", "dashYearFilter"].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      el.addEventListener("change", function () {
-        onYearFilterChange(el.value);
-        // sync other select
-        document
-          .querySelectorAll("#yearFilterSelect, #dashYearFilter")
-          .forEach(function (s) {
-            if (s !== el) s.value = el.value;
-          });
-      });
-    });
+    ["yearFilterSelect", "dashYearFilter", "classesYearFilter"].forEach(
+      function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("change", function () {
+          onYearFilterChange(el.value);
+          document
+            .querySelectorAll(
+              "#yearFilterSelect, #dashYearFilter, #classesYearFilter"
+            )
+            .forEach(function (s) {
+              if (s !== el) s.value = el.value;
+            });
+        });
+      }
+    );
 
     // Dashboard
     var dashBtn = document.getElementById("openDashboardBtn");
@@ -595,6 +710,8 @@
     }
     bindDashOpenClass(document.getElementById("dashboardView"));
     bindDashOpenClass(document.getElementById("missingBody"));
+    bindDashOpenClass(document.getElementById("classesView"));
+    bindDashOpenClass(document.getElementById("classesViewList"));
 
     var dashMissingBtn = document.getElementById("dashMissingBtn");
     if (dashMissingBtn) {
@@ -1162,9 +1279,15 @@
     });
 
     document.getElementById("viewSwitcher").addEventListener("click", function (e) {
-      var btn = e.target.closest("[data-view]");
+      var btn = e.target.closest("[data-view], [data-view-more]");
       if (!btn) return;
-      GL.setViewMode(btn.getAttribute("data-view"));
+      if (btn.getAttribute("data-view-more") === "1" || btn.id === "viewMoreBtn") {
+        if (typeof GL.openViewMoreSheet === "function") GL.openViewMoreSheet();
+        return;
+      }
+      var mode = btn.getAttribute("data-view");
+      if (!mode) return;
+      GL.setViewMode(mode);
       var cls = GL.activeClass();
       if (cls) GL.renderStudents(cls);
     });

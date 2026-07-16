@@ -12,7 +12,7 @@
   <!-- Khóa zoom TRƯỚC khi load CSS/body (iOS bỏ qua meta một mình) -->
   <script src="js/no-zoom.js?v=8"></script>
   <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/mobile.css?v=10" />
+  <link rel="stylesheet" href="css/mobile.css?v=11" />
   <!-- Thư viện local — hoạt động cả offline / file:// -->
   <script src="js/vendor/xlsx.full.min.js"></script>
   <script src="js/vendor/jszip.min.js"></script>
@@ -278,6 +278,104 @@
         </section>
       </div>
 
+      <!-- Màn danh sách lớp (bottom nav «Lớp») -->
+      <div id="classesView" class="classes-view hidden">
+        <div class="classes-hero">
+          <h2 class="classes-hero-title">Lớp học</h2>
+          <p class="classes-hero-sub" id="classesViewSub">Chọn lớp để nhập điểm</p>
+          <div class="classes-filter">
+            <label class="field-label" for="classesYearFilter">Năm học</label>
+            <select id="classesYearFilter" title="Lọc lớp theo năm">
+              <option value="">Tất cả năm học</option>
+            </select>
+          </div>
+        </div>
+        <div class="classes-list" id="classesViewList"></div>
+        <div class="classes-create card" id="classesCreateBox">
+          <h3 class="classes-create-title">Tạo lớp mới</h3>
+          <input type="text" id="classesNewName" placeholder="Tên lớp (vd: Ấu Nhi 1A)" maxlength="60" />
+          <input type="text" id="classesNewYear" placeholder="Năm học (vd: 2025-2026)" maxlength="20" />
+          <button type="button" class="btn btn-primary btn-block" id="classesAddBtn">+ Tạo lớp</button>
+        </div>
+      </div>
+
+      <!-- Màn Cá nhân (bottom nav «Cá nhân») -->
+      <div id="meView" class="me-view hidden">
+        <div class="me-hero">
+          <div class="me-avatar" aria-hidden="true">✝</div>
+          <div class="me-hero-text">
+            <h2 class="me-name" id="meDisplayName">—</h2>
+            <p class="me-role" id="meRoleLabel">—</p>
+            <p class="me-user" id="meUsername">—</p>
+          </div>
+        </div>
+        <div class="me-section">
+          <h3 class="me-section-title">Tài khoản</h3>
+          <button type="button" class="me-row" id="meChangePin">
+            <span class="me-row-ico">🔑</span>
+            <span class="me-row-txt"><strong>Đổi PIN</strong><small>Bảo mật đăng nhập</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+          <button type="button" class="me-row" id="meBioToggle">
+            <span class="me-row-ico">🔐</span>
+            <span class="me-row-txt"><strong id="meBioLabel">Face ID / vân tay</strong><small id="meBioHint">Trên máy này</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+          <button type="button" class="me-row" id="meSync">
+            <span class="me-row-ico">☁️</span>
+            <span class="me-row-txt"><strong>Đồng bộ cloud</strong><small id="meSyncHint">Supabase</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+        </div>
+        <div class="me-section">
+          <h3 class="me-section-title">Công cụ</h3>
+          <button type="button" class="me-row" id="meIo">
+            <span class="me-row-ico">📤</span>
+            <span class="me-row-txt"><strong>Xuất / Nhập</strong><small>Excel · CSV</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+          <button type="button" class="me-row" id="meHelp">
+            <span class="me-row-ico">❓</span>
+            <span class="me-row-txt"><strong>Hướng dẫn</strong><small>Cách dùng app</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+        </div>
+        <div class="me-section admin-only hidden" id="meAdminSection">
+          <h3 class="me-section-title">Quản trị (Ban GL)</h3>
+          <button type="button" class="me-row" data-me-action="users">
+            <span class="me-row-ico">👥</span>
+            <span class="me-row-txt"><strong>Tài khoản GLV</strong><small>Tạo · sửa · xóa</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+          <button type="button" class="me-row" data-me-action="backup">
+            <span class="me-row-ico">💾</span>
+            <span class="me-row-txt"><strong>Sao lưu</strong><small>JSON trên máy</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+          <button type="button" class="me-row" data-me-action="invite">
+            <span class="me-row-ico">📨</span>
+            <span class="me-row-txt"><strong>Mời họp PH</strong><small>Thư mời · mẫu in</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+          <button type="button" class="me-row" data-me-action="parish">
+            <span class="me-row-ico">🏛️</span>
+            <span class="me-row-txt"><strong>Tổng hợp giáo xứ</strong><small>Toàn bộ HV</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+          <button type="button" class="me-row" data-me-action="history">
+            <span class="me-row-ico">🕒</span>
+            <span class="me-row-txt"><strong>Lịch sử điểm</strong><small>Ai sửa gì</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+          <button type="button" class="me-row" data-me-action="weights">
+            <span class="me-row-ico">⚖️</span>
+            <span class="me-row-txt"><strong>Hệ số cột</strong><small>Lớp đang chọn</small></span>
+            <span class="me-row-chev">›</span>
+          </button>
+        </div>
+        <button type="button" class="btn btn-danger-soft btn-block me-logout" id="meLogout">Đăng xuất</button>
+      </div>
+
       <div id="classView" class="hidden">
         <div class="page-header">
           <div class="page-title">
@@ -323,9 +421,13 @@
             <button type="button" class="view-btn active" data-view="cards" title="Nhập điểm"><span class="vb-ico">✏️</span><span class="vb-txt">Nhập</span></button>
             <button type="button" class="view-btn" data-view="table" title="Bảng"><span class="vb-ico">📊</span><span class="vb-txt">Bảng</span></button>
             <button type="button" class="view-btn" data-view="journal" title="Theo dõi"><span class="vb-ico">📋</span><span class="vb-txt">Theo dõi</span></button>
-            <button type="button" class="view-btn" data-view="rank" title="Xếp hạng"><span class="vb-ico">🏆</span><span class="vb-txt">Hạng</span></button>
-            <button type="button" class="view-btn" data-view="stats" title="Thống kê"><span class="vb-ico">📈</span><span class="vb-txt">TK</span></button>
-            <button type="button" class="view-btn" data-view="print" title="In"><span class="vb-ico">🖨️</span><span class="vb-txt">In</span></button>
+            <button type="button" class="view-btn view-btn-more" id="viewMoreBtn" title="Thêm chế độ xem" data-view-more="1">
+              <span class="vb-ico">⋯</span><span class="vb-txt">Thêm</span>
+            </button>
+            <!-- Desktop: hiện đủ tab -->
+            <button type="button" class="view-btn view-btn-desktop" data-view="rank" title="Xếp hạng"><span class="vb-ico">🏆</span><span class="vb-txt">Hạng</span></button>
+            <button type="button" class="view-btn view-btn-desktop" data-view="stats" title="Thống kê"><span class="vb-ico">📈</span><span class="vb-txt">TK</span></button>
+            <button type="button" class="view-btn view-btn-desktop" data-view="print" title="In"><span class="vb-ico">🖨️</span><span class="vb-txt">In</span></button>
           </div>
 
           <div class="toolbar m-search-bar" id="listToolbar">
@@ -391,7 +493,7 @@
       <span class="m-fab-ico">＋</span>
     </button>
 
-    <!-- Mobile: bottom navigation -->
+    <!-- Mobile: bottom navigation — Tổng quan · Lớp · Điểm · Cá nhân -->
     <nav class="m-bottom-nav" id="mBottomNav" aria-label="Điều hướng chính">
       <div class="m-bottom-nav-inner">
         <button type="button" class="m-nav-item active" data-m-nav="home">
@@ -408,72 +510,28 @@
           </span>
           <span class="m-nav-lab">Điểm</span>
         </button>
-        <button type="button" class="m-nav-item" data-m-nav="more">
-          <span class="m-nav-glyph m-nav-glyph-more" aria-hidden="true"></span>
-          <span class="m-nav-lab">Thêm</span>
+        <button type="button" class="m-nav-item" data-m-nav="me">
+          <span class="m-nav-glyph m-nav-glyph-me" aria-hidden="true"></span>
+          <span class="m-nav-lab">Cá nhân</span>
         </button>
       </div>
     </nav>
 
-    <!-- Mobile: sheet công cụ -->
-    <div class="m-sheet-overlay hidden" id="mMoreSheet" role="dialog" aria-modal="true" aria-labelledby="mMoreTitle">
-      <div class="m-sheet">
+    <!-- Sheet: thêm chế độ xem trong màn Điểm -->
+    <div class="m-sheet-overlay hidden" id="mViewMoreSheet" role="dialog" aria-modal="true" aria-labelledby="mViewMoreTitle">
+      <div class="m-sheet m-sheet-sm">
         <div class="m-sheet-handle" aria-hidden="true"></div>
         <div class="m-sheet-head">
-          <h3 id="mMoreTitle">Công cụ nhanh</h3>
-          <button type="button" class="m-icon-btn" id="mMoreClose" aria-label="Đóng">×</button>
+          <h3 id="mViewMoreTitle">Chế độ xem thêm</h3>
+          <button type="button" class="m-icon-btn" id="mViewMoreClose" aria-label="Đóng">×</button>
         </div>
-        <div class="m-sheet-grid">
-          <button type="button" class="m-sheet-btn" data-m-action="io">
-            <span class="m-sheet-ico">📤</span>
-            <span>Xuất / Nhập</span>
-          </button>
-          <button type="button" class="m-sheet-btn" data-m-action="reports">
-            <span class="m-sheet-ico">📊</span>
-            <span>Báo cáo</span>
-          </button>
-          <button type="button" class="m-sheet-btn admin-only hidden" data-m-action="backup">
-            <span class="m-sheet-ico">💾</span>
-            <span>Sao lưu</span>
-          </button>
-          <button type="button" class="m-sheet-btn admin-only hidden" data-m-action="invite">
-            <span class="m-sheet-ico">📨</span>
-            <span>Mời họp PH</span>
-          </button>
-          <button type="button" class="m-sheet-btn admin-only hidden" data-m-action="parish">
-            <span class="m-sheet-ico">🏛️</span>
-            <span>Tổng hợp GX</span>
-          </button>
-          <button type="button" class="m-sheet-btn admin-only hidden" data-m-action="history">
-            <span class="m-sheet-ico">🕒</span>
-            <span>Lịch sử</span>
-          </button>
-          <button type="button" class="m-sheet-btn admin-only hidden" data-m-action="users">
-            <span class="m-sheet-ico">👥</span>
-            <span>Tài khoản</span>
-          </button>
-          <button type="button" class="m-sheet-btn admin-only hidden" data-m-action="weights">
-            <span class="m-sheet-ico">⚖️</span>
-            <span>Hệ số</span>
-          </button>
-          <button type="button" class="m-sheet-btn" data-m-action="help">
-            <span class="m-sheet-ico">❓</span>
-            <span>Hướng dẫn</span>
-          </button>
-          <button type="button" class="m-sheet-btn" data-m-action="pin">
-            <span class="m-sheet-ico">🔑</span>
-            <span>Đổi PIN</span>
-          </button>
-          <button type="button" class="m-sheet-btn" data-m-action="bio">
-            <span class="m-sheet-ico">🔐</span>
-            <span>Face ID / vân tay</span>
-          </button>
-          <button type="button" class="m-sheet-btn" data-m-action="sync">
-            <span class="m-sheet-ico">☁️</span>
-            <span>Đồng bộ cloud</span>
-          </button>
+        <div class="m-sheet-list">
+          <button type="button" class="m-sheet-list-btn" data-view="rank">🏆 Xếp hạng</button>
+          <button type="button" class="m-sheet-list-btn" data-view="stats">📈 Thống kê</button>
+          <button type="button" class="m-sheet-list-btn" data-view="print">🖨️ Bản in</button>
+          <button type="button" class="m-sheet-list-btn" data-m-action="reports">📊 Báo cáo nhanh</button>
+          <button type="button" class="m-sheet-list-btn admin-only hidden" data-m-action="weights">⚖️ Hệ số cột</button>
         </div>
-        <p class="m-sheet-hint">Trên điện thoại: vuốt / cuộn để xem hết. Drawer lớp mở bằng nút «Lớp».</p>
       </div>
     </div>
   </div>
