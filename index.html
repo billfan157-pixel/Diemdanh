@@ -12,7 +12,7 @@
   <!-- Khóa zoom TRƯỚC khi load CSS/body (iOS bỏ qua meta một mình) -->
   <script src="js/no-zoom.js?v=8"></script>
   <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/mobile.css?v=8" />
+  <link rel="stylesheet" href="css/mobile.css?v=9" />
   <!-- Thư viện local — hoạt động cả offline / file:// -->
   <script src="js/vendor/xlsx.full.min.js"></script>
   <script src="js/vendor/jszip.min.js"></script>
@@ -269,7 +269,7 @@
             <h2 id="classTitle">—</h2>
             <p id="classSubtitle">Nhập điểm → tự động ra trung bình</p>
           </div>
-          <div class="stats">
+          <div class="stats m-stat-strip" id="classStats">
             <div class="stat">
               <div class="stat-label">Học viên</div>
               <div class="stat-value accent" id="statCount">0</div>
@@ -289,21 +289,40 @@
           </div>
         </div>
 
-        <!-- Chọn học kỳ / cả năm -->
-        <div class="term-switcher" id="termSwitcher" role="tablist" aria-label="Học kỳ">
-          <button type="button" class="term-btn active" data-term="hk1">
-            <span class="term-ico">1</span><span class="term-txt"> HK1</span>
-          </button>
-          <button type="button" class="term-btn" data-term="hk2">
-            <span class="term-ico">2</span><span class="term-txt"> HK2</span>
-          </button>
-          <button type="button" class="term-btn term-btn-year" data-term="year">
-            <span class="term-ico">📅</span><span class="term-txt"> Cả năm</span>
-          </button>
-          <span class="term-note" id="termNote">Đang xem bảng điểm <strong>Học kỳ 1</strong></span>
+        <!-- Khối điều khiển sticky trên mobile -->
+        <div class="m-class-controls" id="mClassControls">
+          <div class="term-switcher m-seg" id="termSwitcher" role="tablist" aria-label="Học kỳ">
+            <button type="button" class="term-btn active" data-term="hk1">
+              <span class="term-txt">HK1</span>
+            </button>
+            <button type="button" class="term-btn" data-term="hk2">
+              <span class="term-txt">HK2</span>
+            </button>
+            <button type="button" class="term-btn term-btn-year" data-term="year">
+              <span class="term-txt">Cả năm</span>
+            </button>
+            <span class="term-note" id="termNote">Đang xem bảng điểm <strong>Học kỳ 1</strong></span>
+          </div>
+
+          <div class="view-switcher m-seg m-seg-scroll" id="viewSwitcher" role="tablist" aria-label="Kiểu hiển thị">
+            <button type="button" class="view-btn active" data-view="cards" title="Nhập điểm"><span class="vb-ico">✏️</span><span class="vb-txt">Nhập</span></button>
+            <button type="button" class="view-btn" data-view="table" title="Bảng"><span class="vb-ico">📊</span><span class="vb-txt">Bảng</span></button>
+            <button type="button" class="view-btn" data-view="journal" title="Theo dõi"><span class="vb-ico">📋</span><span class="vb-txt">Theo dõi</span></button>
+            <button type="button" class="view-btn" data-view="rank" title="Xếp hạng"><span class="vb-ico">🏆</span><span class="vb-txt">Hạng</span></button>
+            <button type="button" class="view-btn" data-view="stats" title="Thống kê"><span class="vb-ico">📈</span><span class="vb-txt">TK</span></button>
+            <button type="button" class="view-btn" data-view="print" title="In"><span class="vb-ico">🖨️</span><span class="vb-txt">In</span></button>
+          </div>
+
+          <div class="toolbar m-search-bar" id="listToolbar">
+            <div class="search-wrap">
+              <input type="text" id="searchInput" placeholder="Tìm học viên…" enterkeyhint="search" />
+            </div>
+            <button type="button" class="btn btn-ghost m-btn-sort" id="sortBtn" title="Sắp xếp theo TB">TB ↓</button>
+            <button type="button" class="btn btn-danger-soft m-btn-clear" id="clearBtn">Xóa hết HV</button>
+          </div>
         </div>
 
-        <!-- Nút nhỏ mở cửa sổ (trong phạm vi bảng điểm lớp) -->
+        <!-- Nút desktop (ẩn trên mobile — dùng FAB + sheet) -->
         <div class="quick-actions" id="quickActions">
           <button type="button" class="chip-btn chip-btn-icon" id="undoBtn" title="Hoàn tác (Ctrl+Z)" aria-label="Hoàn tác" disabled>
             <span class="chip-ico">↶</span>
@@ -339,40 +358,22 @@
         </div>
 
         <!-- List -->
-        <section class="card">
+        <section class="card m-score-card">
           <div class="card-head">
             <h3><span class="emoji">📋</span> Điểm học viên <span class="term-pill" id="listTermPill">HK1</span></h3>
             <span class="card-sub" id="listMeta"></span>
           </div>
-
-          <div class="view-switcher" id="viewSwitcher" role="tablist" aria-label="Kiểu hiển thị">
-            <button type="button" class="view-btn active" data-view="cards" title="Nhập / sửa điểm chi tiết"><span class="vb-ico">✏️</span><span class="vb-txt">Nhập điểm</span></button>
-            <button type="button" class="view-btn" data-view="table" title="Nhìn nhanh cả lớp"><span class="vb-ico">📊</span><span class="vb-txt">Bảng</span></button>
-            <button type="button" class="view-btn" data-view="journal" title="Thiếu điểm + nhật ký theo dõi"><span class="vb-ico">📋</span><span class="vb-txt">Theo dõi</span></button>
-            <button type="button" class="view-btn" data-view="rank" title="Xếp hạng khen thưởng"><span class="vb-ico">🏆</span><span class="vb-txt">Xếp hạng</span></button>
-            <button type="button" class="view-btn" data-view="stats" title="Thống kê lớp"><span class="vb-ico">📈</span><span class="vb-txt">Thống kê</span></button>
-            <button type="button" class="view-btn" data-view="print" title="In / họp phụ huynh"><span class="vb-ico">🖨️</span><span class="vb-txt">In</span></button>
-          </div>
           <div class="view-hint" id="viewHint"></div>
-
-          <div class="toolbar" id="listToolbar">
-            <div class="search-wrap">
-              <input type="text" id="searchInput" placeholder="Tìm tên, mã HV, SĐT, phụ huynh…" />
-            </div>
-            <button type="button" class="btn btn-ghost" id="sortBtn">Sắp xếp TB ↓</button>
-            <button type="button" class="btn btn-danger-soft" id="clearBtn">Xóa hết HV</button>
-          </div>
           <div class="students" id="students"></div>
         </section>
 
-        <footer>Dữ liệu lưu trên máy bạn · Mỗi lớp độc lập · Thang điểm 10</footer>
+        <footer class="m-desktop-footer">Dữ liệu lưu trên máy bạn · Mỗi lớp độc lập · Thang điểm 10</footer>
       </div>
     </main>
 
-    <!-- Mobile: FAB thêm HV (khi đang ở lớp) -->
+    <!-- Mobile: FAB thêm HV (icon tròn) -->
     <button type="button" class="m-fab hidden" id="mFabAdd" title="Thêm học viên" aria-label="Thêm học viên">
       <span class="m-fab-ico">＋</span>
-      <span class="m-fab-lab">Thêm HV</span>
     </button>
 
     <!-- Mobile: bottom navigation -->
