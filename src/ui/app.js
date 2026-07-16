@@ -67,11 +67,53 @@
     if (next) next.focus();
   }
 
+  var _focusHistory = [];
+  function getFocusable(el) {
+    return el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  }
+
+  function trapTab(e, modal) {
+    var focusable = getFocusable(modal);
+    if (!focusable.length) return;
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    if (e.shiftKey && e.target === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && e.target === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  function onModalKeydown(e) {
+    if (e.key === "Escape") {
+      var modals = document.querySelectorAll(".modal-overlay:not(.hidden)");
+      if (!modals.length) return;
+      var top = modals[modals.length - 1];
+      if (top && top.id) {
+        e.preventDefault();
+        closeModal(top.id);
+      }
+    } else if (e.key === "Tab") {
+      var modals = document.querySelectorAll(".modal-overlay:not(.hidden)");
+      if (!modals.length) return;
+      trapTab(e, modals[modals.length - 1]);
+    }
+  }
+
   function openModal(id) {
     var el = document.getElementById(id);
     if (!el) return;
+    _focusHistory.push(document.activeElement);
     el.classList.remove("hidden");
     document.body.style.overflow = "hidden";
+    // focus phần tử đầu tiên trong modal
+    var focusable = getFocusable(el);
+    if (focusable.length) setTimeout(function () { focusable[0].focus(); }, 30);
+    if (_focusHistory.length === 1) {
+      document.addEventListener("keydown", onModalKeydown);
+    }
   }
 
   function closeModal(id) {
@@ -81,6 +123,14 @@
     // chỉ mở lại scroll nếu không còn modal nào
     var anyOpen = document.querySelector(".modal-overlay:not(.hidden)");
     if (!anyOpen) document.body.style.overflow = "";
+    // restore focus
+    var prev = _focusHistory.pop();
+    if (prev && prev !== document.body && prev.focus) {
+      setTimeout(function () { prev.focus(); }, 30);
+    }
+    if (!_focusHistory.length) {
+      document.removeEventListener("keydown", onModalKeydown);
+    }
   }
 
 
@@ -121,7 +171,7 @@
       GL.initCloudSync().then(function () {
         if (typeof GL.render === "function") GL.render();
         if (typeof GL.updateSyncUI === "function") GL.updateSyncUI();
-      });
+      }).catch(function () {});
     }
     return true;
   }

@@ -133,18 +133,29 @@
           return c.id === rid;
         });
         if (!rcls) return;
-        var newName = prompt("Tên lớp mới:", rcls.name);
-        if (newName == null) return;
-        var n = newName.trim();
-        if (!n) return;
-        var year = prompt("Năm học (để trống nếu giữ nguyên):", rcls.year || "");
-        if (year != null) rcls.year = year.trim();
-        rcls.name = n;
-        GL.touchClass(rcls);
-        if (typeof GL.setUndoLabel === "function") GL.setUndoLabel("Đổi tên lớp");
-        GL.saveState();
-        GL.render();
-        GL.toast("Đã đổi tên lớp.");
+        GL.prompt({
+          title: "Đổi tên lớp",
+          message: "Nhập tên mới cho lớp \"" + rcls.name + "\":",
+          defaultValue: rcls.name,
+          okText: "Tiếp theo",
+        }).then(function (newName) {
+          if (!newName) return;
+          GL.prompt({
+            title: "Năm học",
+            message: "Năm học (để trống nếu giữ nguyên):",
+            defaultValue: rcls.year || "",
+            okText: "Xong",
+            cancelText: "Bỏ qua",
+          }).then(function (year) {
+            if (year) rcls.year = year;
+            rcls.name = newName;
+            GL.touchClass(rcls);
+            if (typeof GL.setUndoLabel === "function") GL.setUndoLabel("Đổi tên lớp");
+            GL.saveState();
+            GL.render();
+            GL.toast("Đã đổi tên lớp.");
+          });
+        });
         return;
       }
 

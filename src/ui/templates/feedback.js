@@ -22,6 +22,7 @@
       </div>
       <h3 class="dialog-title" id="appDialogTitle">Xác nhận</h3>
       <p class="dialog-message" id="appDialogMessage"></p>
+      <input type="text" class="dialog-input" id="appDialogInput" style="display:none;width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:12px;font-size:1rem;box-sizing:border-box;margin:4px 0 8px" />
       <div class="dialog-actions">
         <button type="button" class="btn btn-ghost" id="appDialogCancel">Hủy</button>
         <button type="button" class="btn btn-primary" id="appDialogOk">Đồng ý</button>

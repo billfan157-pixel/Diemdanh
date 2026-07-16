@@ -182,7 +182,7 @@
 
     // tối đa 4 toast
     while (host.children.length > 4) {
-      host.removeChild(host.firstChild);
+      host.removeChild(host.children[0]);
     }
   };
 
@@ -211,7 +211,9 @@
     var panel = overlay && overlay.querySelector(".dialog-panel");
 
     if (!overlay || !okBtn) {
-      if (o.alertOnly) {
+      if (o.isPrompt) {
+        resolve(window.prompt(o.message || "", o.defaultValue || ""));
+      } else if (o.alertOnly) {
         window.alert(o.message);
         resolve(true);
       } else {
@@ -223,16 +225,25 @@
 
     GL._dialogOpen = true;
 
+    var inputEl = document.getElementById("appDialogInput");
+
     if (titleEl) titleEl.textContent = o.title || "Xác nhận";
     if (msgEl) {
       msgEl.textContent = o.message || "";
       msgEl.style.whiteSpace = "pre-wrap";
     }
-    okBtn.textContent = o.okText || (o.alertOnly ? "Đã hiểu" : "Đồng ý");
+    okBtn.textContent = o.okText || (o.alertOnly ? "Đã hiểu" : o.isPrompt ? "Xong" : "Đồng ý");
     if (cancelBtn) {
       cancelBtn.textContent = o.cancelText || "Hủy";
-      if (o.alertOnly) cancelBtn.classList.add("hidden");
-      else cancelBtn.classList.remove("hidden");
+      cancelBtn.classList.toggle("hidden", !!o.alertOnly);
+    }
+
+    if (o.isPrompt && inputEl) {
+      inputEl.style.display = "block";
+      inputEl.value = o.defaultValue || "";
+      inputEl.placeholder = o.placeholder || "";
+    } else if (inputEl) {
+      inputEl.style.display = "none";
     }
 
     var kind = o.danger || o.type === "danger" ? "danger" : o.type || "confirm";
@@ -256,33 +267,45 @@
     overlay.classList.remove("hidden");
     document.body.style.overflow = "hidden";
 
-    function finish(val) {
-      overlay.classList.add("hidden");
-      var anyOpen = document.querySelector(".modal-overlay:not(.hidden)");
-      if (!anyOpen) document.body.style.overflow = "";
+    function cleanup() {
       okBtn.removeEventListener("click", onOk);
       if (cancelBtn) cancelBtn.removeEventListener("click", onCancel);
       overlay.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKey);
+      if (inputEl) inputEl.style.display = "none";
+    }
+
+    function finish(val) {
+      overlay.classList.add("hidden");
+      var anyOpen = document.querySelector(".modal-overlay:not(.hidden)");
+      if (!anyOpen) document.body.style.overflow = "";
+      cleanup();
       GL._dialogOpen = false;
       resolve(val);
       setTimeout(pumpDialogQueue, 40);
     }
 
+    function promptValue() {
+      return inputEl ? String(inputEl.value || "").trim() || null : true;
+    }
+
     function onOk() {
-      finish(true);
+      finish(o.isPrompt ? promptValue() : true);
     }
     function onCancel() {
-      finish(false);
+      finish(o.isPrompt ? null : false);
     }
     function onBackdrop(e) {
-      if (e.target === overlay) finish(o.alertOnly ? true : false);
+      if (e.target === overlay) finish(o.alertOnly ? true : o.isPrompt ? null : false);
     }
     function onKey(e) {
       if (e.key === "Escape") {
         e.preventDefault();
-        finish(o.alertOnly ? true : false);
-      } else if (e.key === "Enter") {
+        finish(o.alertOnly ? true : o.isPrompt ? null : false);
+      } else if (e.key === "Enter" && o.isPrompt) {
+        e.preventDefault();
+        finish(promptValue());
+      } else if (e.key === "Enter" && !o.isPrompt) {
         e.preventDefault();
         finish(true);
       }
@@ -293,7 +316,8 @@
     overlay.addEventListener("click", onBackdrop);
     document.addEventListener("keydown", onKey);
     setTimeout(function () {
-      okBtn.focus();
+      if (o.isPrompt && inputEl) inputEl.focus();
+      else okBtn.focus();
     }, 30);
   }
 
@@ -342,6 +366,24 @@
           resolve();
         },
       });
+      pumpDialogQueue();
+    });
+  };
+
+  /**
+   * Hộp thoại nhập liệu (Promise&lt;string|null&gt;).
+   * @param {string|object} messageOrOpts
+   * @param {object} [opts]
+   */
+  GL.prompt = function promptDialog(messageOrOpts, opts) {
+    var o = normalizeDialogOpts(messageOrOpts, opts);
+    o.title = o.title || "Nhập thông tin";
+    o.okText = o.okText || "Xong";
+    o.cancelText = o.cancelText || "Hủy";
+    o.isPrompt = true;
+
+    return new Promise(function (resolve) {
+      GL._dialogQueue.push({ opts: o, resolve: resolve });
       pumpDialogQueue();
     });
   };

@@ -1009,11 +1009,15 @@
       "<th>TB cả năm</th><th>Xếp loại năm</th>" +
       "<th>Ghi chú</th></tr>";
 
-    var body = ranked
-      .map(function (r, rankIdx) {
-        var c1 = GL.classify(r.t1);
-        var c2 = GL.classify(r.t2);
-        var cy = GL.classify(r.ty);
+    var isMobile =
+      window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+
+    var body = !isMobile
+      ? ranked
+        .map(function (r, rankIdx) {
+          var c1 = GL.classify(r.t1);
+          var c2 = GL.classify(r.t2);
+          var cy = GL.classify(r.ty);
         var nameCells = GL.NAME_FIELDS.map(function (nf) {
           var val = r.st[nf.key] || "";
           if (
@@ -1079,24 +1083,26 @@
           "</td></tr>"
         );
       })
-      .join("");
+      .join("")
+      : "";
 
     // Thẻ mobile: 1 HV / card — gọn, rõ hạng, so sánh 2 HK
-    var cards = ranked
-      .map(function (r, rankIdx) {
-        var c1 = GL.classify(r.t1);
-        var c2 = GL.classify(r.t2);
-        var cy = GL.classify(r.ty);
-        var isTop = r.ty != null && rankIdx < 3;
-        var topClass =
-          isTop && rankIdx === 0
-            ? " year-card--gold"
-            : isTop && rankIdx === 1
-              ? " year-card--silver"
-              : isTop && rankIdx === 2
-                ? " year-card--bronze"
-                : "";
-        var medal =
+    var cards = isMobile
+      ? ranked
+        .map(function (r, rankIdx) {
+          var c1 = GL.classify(r.t1);
+          var c2 = GL.classify(r.t2);
+          var cy = GL.classify(r.ty);
+          var isTop = r.ty != null && rankIdx < 3;
+          var topClass =
+            isTop && rankIdx === 0
+              ? " year-card--gold"
+              : isTop && rankIdx === 1
+                ? " year-card--silver"
+                : isTop && rankIdx === 2
+                  ? " year-card--bronze"
+                  : "";
+          var medal =
           rankIdx === 0 && r.ty != null
             ? "🥇"
             : rankIdx === 1 && r.ty != null
@@ -1173,7 +1179,168 @@
           "</article>"
         );
       })
-      .join("");
+      .join("")
+      : "";
+
+    var isMobile =
+      window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+
+    var body = !isMobile
+      ? ranked
+        .map(function (r, rankIdx) {
+          var c1 = GL.classify(r.t1);
+          var c2 = GL.classify(r.t2);
+          var cy = GL.classify(r.ty);
+          var nameCells = GL.NAME_FIELDS.map(function (nf) {
+            var val = r.st[nf.key] || "";
+            if (
+              !val &&
+              nf.key === "hoDem" &&
+              !r.st.tenThanh &&
+              !r.st.ten &&
+              r.st.name
+            ) {
+              val = r.st.name;
+            }
+            return (
+              '<td class="name-col" style="text-align:left;font-weight:650">' +
+              GL.escapeHtml(val || "—") +
+              "</td>"
+            );
+          }).join("");
+          var medal =
+            rankIdx === 0 && r.ty != null
+              ? "🥇"
+              : rankIdx === 1 && r.ty != null
+                ? "🥈"
+                : rankIdx === 2 && r.ty != null
+                  ? "🥉"
+                  : String(rankIdx + 1);
+          return (
+            "<tr>" +
+            '<td class="tb-cell">' +
+            medal +
+            "</td><td>" +
+            (r.i + 1) +
+            "</td>" +
+            nameCells +
+            '<td class="tb-cell ' +
+            c1.score +
+            '">' +
+            GL.fmt(r.t1, 2) +
+            '</td><td><span class="rank-pill ' +
+            c1.rank +
+            '">' +
+            c1.label +
+            "</span></td>" +
+            '<td class="tb-cell ' +
+            c2.score +
+            '">' +
+            GL.fmt(r.t2, 2) +
+            '</td><td><span class="rank-pill ' +
+            c2.rank +
+            '">' +
+            c2.label +
+            "</span></td>" +
+            '<td class="tb-cell ' +
+            cy.score +
+            '" style="font-size:1.05rem">' +
+            GL.fmt(r.ty, 2) +
+            '</td><td><span class="rank-pill ' +
+            cy.rank +
+            '">' +
+            cy.label +
+            "</span></td>" +
+            '<td class="name-col" style="text-align:left;font-size:0.82rem">' +
+            GL.escapeHtml(r.st.ghiChu || "—") +
+            "</td></tr>"
+          );
+        })
+        .join("")
+      : "";
+
+    // Thẻ mobile: 1 HV / card — gọn, rõ hạng, so sánh 2 HK
+    var cards = isMobile
+      ? ranked
+        .map(function (r, rankIdx) {
+          var c1 = GL.classify(r.t1);
+          var c2 = GL.classify(r.t2);
+          var cy = GL.classify(r.ty);
+          var isTop = r.ty != null && rankIdx < 3;
+          var topClass =
+            isTop && rankIdx === 0
+              ? " year-card--gold"
+              : isTop && rankIdx === 1
+                ? " year-card--silver"
+                : isTop && rankIdx === 2
+                  ? " year-card--bronze"
+                  : "";
+          var medal =
+            isTop && rankIdx === 0
+              ? "🥇"
+              : isTop && rankIdx === 1
+                ? "🥈"
+                : isTop && rankIdx === 2
+                  ? "🥉"
+                  : String(rankIdx + 1);
+          var note = r.st.ghiChu || "";
+          return (
+            '<article class="year-card' +
+            topClass +
+            '" data-st-id="' +
+            r.st.id +
+            '">' +
+            '<div class="year-card-top">' +
+            '<div class="year-card-rank">' +
+            medal +
+            "</div>" +
+            '<div class="year-card-name">' +
+            '<div class="yc-ten-thanh">' +
+            GL.escapeHtml(r.st.tenThanh || "") +
+            "</div>" +
+            '<div class="yc-ho-ten">' +
+            GL.escapeHtml(r.st.hoDem + " " + r.st.ten || "") +
+            "</div>" +
+            '<div class="yc-stt">STT ' +
+            (r.i + 1) +
+            "</div></div></div>" +
+            '<div class="year-card-year' +
+            (r.ty == null ? " is-empty" : "") +
+            '">' +
+            '<div class="year-term' +
+            (r.t1 == null ? " is-empty" : "") +
+            '">' +
+            '<span class="year-term-l">HK1 <em>×' +
+            w1 +
+            "</em></span>" +
+            '<span class="year-term-v ' +
+            c1.score +
+            '">' +
+            GL.fmt(r.t1, 2) +
+            "</span>" +
+            rankPill(c1, { emptyDash: true, short: true }) +
+            "</div>" +
+            '<div class="year-term' +
+            (r.t2 == null ? " is-empty" : "") +
+            '">' +
+            '<span class="year-term-l">HK2 <em>×' +
+            w2 +
+            "</em></span>" +
+            '<span class="year-term-v ' +
+            c2.score +
+            '">' +
+            GL.fmt(r.t2, 2) +
+            "</span>" +
+            rankPill(c2, { emptyDash: true, short: true }) +
+            "</div></div>" +
+            (note
+              ? '<div class="year-card-note">' + GL.escapeHtml(note) + "</div>"
+              : "") +
+            "</article>"
+          );
+        })
+        .join("")
+      : "";
 
     return (
       '<div class="year-board">' +

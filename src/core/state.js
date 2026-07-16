@@ -146,11 +146,15 @@
       if (!c.weights && typeof GL.defaultWeights === "function") {
         c.weights = GL.defaultWeights();
       }
+      if (c.weights && c.weights.khaoKinh === 2) c.weights.khaoKinh = 1;
       if (Array.isArray(c.students)) {
         c.students.forEach(function (st) {
           if (typeof GL.ensureNameFields === "function") GL.ensureNameFields(st);
           if (typeof GL.ensureStudentTerms === "function") {
             GL.ensureStudentTerms(st);
+          }
+          if (typeof GL.ensureLearningLog === "function") {
+            GL.ensureLearningLog(st);
           }
         });
       }
@@ -182,7 +186,11 @@
 
     lastSavedJson = nextJson;
     GL._pendingUndoLabel = null;
-    localStorage.setItem(GL.STORAGE_KEY, nextJson);
+    try {
+      localStorage.setItem(GL.STORAGE_KEY, nextJson);
+    } catch (e) {
+      if (typeof GL.toast === "function") GL.toast("Không thể lưu: bộ nhớ đầy.", "err");
+    }
 
     if (typeof GL.updateUndoRedoUI === "function") GL.updateUndoRedoUI();
   };
