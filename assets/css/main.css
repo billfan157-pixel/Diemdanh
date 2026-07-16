@@ -331,6 +331,11 @@
     .class-item:hover .class-actions,
     .class-item:focus-within .class-actions { opacity: 1; }
 
+    @media (max-width: 900px) {
+      .class-actions { opacity: 1; }
+      .icon-btn { width: 44px; height: 44px; }
+    }
+
     .icon-btn {
       width: 28px;
       height: 28px;
@@ -2864,6 +2869,7 @@
       transition: opacity 0.28s ease, transform 0.28s ease;
       position: relative;
       overflow: hidden;
+      -webkit-backdrop-filter: blur(8px);
       backdrop-filter: blur(8px);
     }
 
@@ -3020,6 +3026,7 @@
     .dialog-overlay {
       z-index: 10050;
       background: rgba(15, 23, 42, 0.45);
+      -webkit-backdrop-filter: blur(4px);
       backdrop-filter: blur(4px);
     }
 
@@ -5020,6 +5027,7 @@
       align-items: center;
       justify-content: center;
       padding: 16px;
+      -webkit-backdrop-filter: blur(3px);
       backdrop-filter: blur(3px);
     }
 

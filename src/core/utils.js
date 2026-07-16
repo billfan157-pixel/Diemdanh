@@ -66,12 +66,13 @@
     return Number.isInteger(f) ? String(f) : f.toFixed(digits);
   };
 
-  GL.escapeHtml = function escapeHtml(s) {
+GL.escapeHtml = function escapeHtml(s) {
     return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/&/g, "&")
+      .replace(/</g, "<")
+      .replace(/>/g, ">")
+      .replace(/"/g, """)
+      .replace(/'/g, "'");
   };
 
   GL.parseScore = function parseScore(raw) {
@@ -389,8 +390,9 @@
   };
 
   GL.normName = function normName(name) {
-    return String(name || "")
-      .normalize("NFC")
+    var s = String(name || "");
+    if (typeof s.normalize === "function") s = s.normalize("NFC");
+    return s
       .toLowerCase()
       .replace(/\s+/g, " ")
       .trim();
@@ -564,9 +566,7 @@
     if (/ngày\s*nhập\s*học|ngay\s*nhap\s*hoc|vào\s*lớp|vao\s*lop/.test(n)) {
       return "ngayNhapHoc";
     }
-    if (/stt|số\s*tt|^tt$|tb|xếp|xep/.test(n)) {
-      return "_skip";
-    }
+    if (/stt|s[oố]\s*tt|^tt$|tb|x[eé]p/.test(n)) return "_skip";
     return null;
   };
 
@@ -584,7 +584,7 @@
       return single == null ? [] : [single];
     }
     var parts = s
-      .split(/[;|/]+|\s*,\s*(?=\d)/)
+      .split(/[;|]+|\s*,\s*(?=\d)/)
       .map(function (p) {
         return p.trim();
       })

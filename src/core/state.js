@@ -100,7 +100,7 @@
   });
 
   /* ─── Undo / Redo (snapshot state trước mỗi lần save) ─── */
-  var MAX_UNDO = 50;
+  var MAX_UNDO = 20;
   var lastSavedJson = JSON.stringify(GL.state);
   GL._undoStack = [];
   GL._redoStack = [];

@@ -835,8 +835,8 @@
     );
   };
 
-  /** Bảng tổng điểm cả năm (+ thẻ mobile) */
-  GL.renderViewYear = function renderViewYear(cls, list) {
+  /** Shared helper: compute year ranking for a class list */
+  GL.getYearRanked = function getYearRanked(cls, list) {
     var w1 = (GL.YEAR_WEIGHTS && GL.YEAR_WEIGHTS.hk1) || 1;
     var w2 = (GL.YEAR_WEIGHTS && GL.YEAR_WEIGHTS.hk2) || 2;
     var ranked = list
@@ -851,6 +851,17 @@
         if (a.ty == null && b.ty == null) return 0;
         if (a.ty == null) return 1;
         if (b.ty == null) return -1;
+        return b.ty - a.ty;
+      });
+    return { ranked: ranked, w1: w1, w2: w2 };
+  };
+
+  /** Bảng tổng điểm cả năm (+ thẻ mobile) */
+  GL.renderViewYear = function renderViewYear(cls, list) {
+    var yearData = GL.getYearRanked(cls, list);
+    var ranked = yearData.ranked;
+    var w1 = yearData.w1;
+    var w2 = yearData.w2;
         return b.ty - a.ty;
       });
 
@@ -1368,22 +1379,8 @@
   };
 
   GL.renderViewPrintYear = function renderViewPrintYear(cls, list) {
-    var ranked = list
-      .map(function (item) {
-        return {
-          st: item.s,
-          i: item.i,
-          t1: GL.studentTB(item.s, cls.weights, "hk1"),
-          t2: GL.studentTB(item.s, cls.weights, "hk2"),
-          ty: GL.studentYearTB(item.s, cls.weights),
-        };
-      })
-      .sort(function (a, b) {
-        if (a.ty == null && b.ty == null) return 0;
-        if (a.ty == null) return 1;
-        if (b.ty == null) return -1;
-        return b.ty - a.ty;
-      });
+    var yearData = GL.getYearRanked(cls, list);
+    var ranked = yearData.ranked;
 
     var rows = ranked
       .map(function (r, idx) {
