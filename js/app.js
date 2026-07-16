@@ -524,6 +524,11 @@
             else GL.toast("Mở menu sidebar để bật Face ID / vân tay.", "info");
             return;
           }
+          if (act === "sync") {
+            var syncOpen = document.getElementById("openSyncModal");
+            if (syncOpen) syncOpen.click();
+            return;
+          }
           var id = map[act];
           if (id) {
             var el = document.getElementById(id);
@@ -1652,6 +1657,148 @@
         openBackupModalSafe();
       });
     });
+
+    // ─── Supabase sync UI ───
+    GL.updateSyncUI = function updateSyncUI() {
+      var box = document.getElementById("syncStatusBox");
+      var text = document.getElementById("syncText");
+      var st =
+        typeof GL.getSyncStatus === "function"
+          ? GL.getSyncStatus()
+          : { status: "off", message: "" };
+      var configured =
+        typeof GL.isSupabaseConfigured === "function" &&
+        GL.isSupabaseConfigured();
+      if (box) {
+        box.classList.remove("is-ok", "is-err", "is-syncing", "is-off");
+        var cls = "is-off";
+        if (!configured) cls = "is-off";
+        else if (st.status === "ok") cls = "is-ok";
+        else if (st.status === "err") cls = "is-err";
+        else if (st.status === "syncing") cls = "is-syncing";
+        else cls = "is-off";
+        box.classList.add(cls);
+      }
+      if (text) {
+        if (!configured) text.textContent = "Cloud: chưa cấu hình";
+        else if (st.message) text.textContent = st.message;
+        else text.textContent = "Cloud: sẵn sàng";
+      }
+      var modalSt = document.getElementById("syncModalStatus");
+      if (modalSt) {
+        var meta =
+          typeof GL.getSyncMeta === "function" ? GL.getSyncMeta() : {};
+        var parts = [];
+        if (configured) parts.push("Key: đã lưu");
+        else parts.push("Key: chưa có");
+        if (meta.lastRev != null) parts.push("rev " + meta.lastRev);
+        if (meta.lastPushAt)
+          parts.push(
+            "đẩy " + new Date(meta.lastPushAt).toLocaleString("vi-VN")
+          );
+        if (meta.lastPullAt)
+          parts.push(
+            "kéo " + new Date(meta.lastPullAt).toLocaleString("vi-VN")
+          );
+        modalSt.textContent = parts.join(" · ");
+      }
+    };
+
+    function openSyncModal() {
+      var ta = document.getElementById("syncAnonKey");
+      if (ta && typeof GL.getSupabaseAnonKey === "function") {
+        ta.value = GL.getSupabaseAnonKey() || "";
+      }
+      var err = document.getElementById("syncModalError");
+      if (err) {
+        err.classList.add("hidden");
+        err.textContent = "";
+      }
+      if (typeof GL.updateSyncUI === "function") GL.updateSyncUI();
+      openModal("syncModal");
+    }
+    var openSyncBtn = document.getElementById("openSyncModal");
+    if (openSyncBtn) openSyncBtn.addEventListener("click", openSyncModal);
+    ["syncModalClose", "syncModalDone"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el)
+        el.addEventListener("click", function () {
+          closeModal("syncModal");
+        });
+    });
+    var syncModal = document.getElementById("syncModal");
+    if (syncModal) {
+      syncModal.addEventListener("click", function (e) {
+        if (e.target === e.currentTarget) closeModal("syncModal");
+      });
+    }
+    var syncSaveKey = document.getElementById("syncSaveKeyBtn");
+    if (syncSaveKey) {
+      syncSaveKey.addEventListener("click", function () {
+        var ta = document.getElementById("syncAnonKey");
+        var key = ta ? ta.value.trim() : "";
+        var err = document.getElementById("syncModalError");
+        if (!key) {
+          if (err) {
+            err.textContent = "Dán anon public key từ Supabase.";
+            err.classList.remove("hidden");
+          }
+          return;
+        }
+        if (typeof GL.setSupabaseAnonKey === "function") {
+          GL.setSupabaseAnonKey(key);
+        }
+        if (typeof GL.resetSupabaseClient === "function") {
+          GL.resetSupabaseClient();
+        }
+        if (typeof GL.installCloudHooks === "function") GL.installCloudHooks();
+        if (err) err.classList.add("hidden");
+        GL.toast("Đã lưu key — đang đồng bộ…");
+        if (typeof GL.initCloudSync === "function") {
+          GL.initCloudSync().then(function (r) {
+            if (typeof GL.updateSyncUI === "function") GL.updateSyncUI();
+            if (r && r.ok) {
+              GL.toast("☁️ Cloud sẵn sàng");
+              if (typeof GL.render === "function") GL.render();
+            } else if (r && r.error) {
+              if (err) {
+                err.textContent = r.error;
+                err.classList.remove("hidden");
+              }
+              GL.toast(r.error, "err");
+            }
+          });
+        }
+      });
+    }
+    var syncPullBtn = document.getElementById("syncPullBtn");
+    if (syncPullBtn) {
+      syncPullBtn.addEventListener("click", function () {
+        if (!GL.isSupabaseConfigured || !GL.isSupabaseConfigured()) {
+          GL.toast("Lưu anon key trước.", "err");
+          return;
+        }
+        GL.cloudPull({ force: true }).then(function (r) {
+          if (typeof GL.updateSyncUI === "function") GL.updateSyncUI();
+          if (!r.ok) GL.toast(r.error || "Không tải được.", "err");
+          else if (typeof GL.render === "function") GL.render();
+        });
+      });
+    }
+    var syncPushBtn = document.getElementById("syncPushBtn");
+    if (syncPushBtn) {
+      syncPushBtn.addEventListener("click", function () {
+        if (!GL.isSupabaseConfigured || !GL.isSupabaseConfigured()) {
+          GL.toast("Lưu anon key trước.", "err");
+          return;
+        }
+        GL.cloudPush({ force: true }).then(function (r) {
+          if (typeof GL.updateSyncUI === "function") GL.updateSyncUI();
+          if (!r.ok) GL.toast(r.error || "Không đẩy được.", "err");
+        });
+      });
+    }
+    if (typeof GL.updateSyncUI === "function") GL.updateSyncUI();
 
     // Banner + sidebar quick backup + chọn thư mục
     document.addEventListener("click", function (e) {
@@ -2917,6 +3064,14 @@
       }, 120);
     } else if (typeof GL.updateBackupReminderUI === "function") {
       GL.updateBackupReminderUI();
+    }
+    // Đồng bộ Supabase sau khi vào app
+    if (typeof GL.installCloudHooks === "function") GL.installCloudHooks();
+    if (typeof GL.initCloudSync === "function") {
+      GL.initCloudSync().then(function () {
+        if (typeof GL.render === "function") GL.render();
+        if (typeof GL.updateSyncUI === "function") GL.updateSyncUI();
+      });
     }
     return true;
   }

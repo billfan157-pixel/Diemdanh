@@ -14,6 +14,8 @@
   <!-- Thư viện local — hoạt động cả offline / file:// -->
   <script src="js/vendor/xlsx.full.min.js"></script>
   <script src="js/vendor/jszip.min.js"></script>
+  <!-- Supabase JS (cần mạng để đồng bộ cloud) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 <!-- Login gate -->
@@ -119,6 +121,13 @@
             <button type="button" class="btn btn-ghost undo-redo-btn" id="undoBtnSidebar" title="Hoàn tác (Ctrl+Z)" aria-label="Hoàn tác" disabled>↶</button>
             <button type="button" class="btn btn-ghost undo-redo-btn" id="redoBtnSidebar" title="Làm lại (Ctrl+Y)" aria-label="Làm lại" disabled>↷</button>
           </div>
+          <div class="sync-status-box" id="syncStatusBox" title="Đồng bộ Supabase">
+            <span class="sync-dot" id="syncDot"></span>
+            <span class="sync-text" id="syncText">Cloud: chưa cấu hình</span>
+          </div>
+          <button type="button" class="btn btn-ghost btn-block sidebar-tool-btn" id="openSyncModal" title="Cấu hình &amp; đồng bộ Supabase">
+            ☁️ Đồng bộ cloud
+          </button>
           <button type="button" class="btn btn-ghost btn-block sidebar-tool-btn" id="openIoModal" title="Xuất điểm · Admin có thêm Nhập file">
             📤 Xuất / Nhập
           </button>
@@ -432,6 +441,10 @@
           <button type="button" class="m-sheet-btn" data-m-action="bio">
             <span class="m-sheet-ico">🔐</span>
             <span>Face ID / vân tay</span>
+          </button>
+          <button type="button" class="m-sheet-btn" data-m-action="sync">
+            <span class="m-sheet-ico">☁️</span>
+            <span>Đồng bộ cloud</span>
           </button>
         </div>
         <p class="m-sheet-hint">Trên điện thoại: vuốt / cuộn để xem hết. Drawer lớp mở bằng nút «Lớp».</p>
@@ -1130,6 +1143,38 @@
     </div>
   </div>
 
+  <!-- Modal: Đồng bộ Supabase -->
+  <div class="modal-overlay hidden" id="syncModal" role="dialog" aria-modal="true" aria-labelledby="syncModalTitle">
+    <div class="modal-panel modal-panel-md">
+      <div class="modal-head">
+        <div>
+          <h3 id="syncModalTitle">☁️ Đồng bộ cloud (Supabase)</h3>
+          <p class="modal-sub">Máy tính · điện thoại dùng chung một dữ liệu</p>
+        </div>
+        <button type="button" class="icon-btn modal-close" id="syncModalClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="modal-body" style="padding:14px 18px 8px">
+        <p class="hint" style="margin-top:0">
+          Project: <code>vugoskzssqhusnzcbfhmn</code><br />
+          1) SQL Editor → chạy file <code>supabase/schema.sql</code><br />
+          2) Settings → API → copy <strong>anon public</strong> key → dán bên dưới
+        </p>
+        <label class="field-label" for="syncAnonKey">Anon public key</label>
+        <textarea id="syncAnonKey" class="note-input" rows="3" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="font-family:ui-monospace,monospace;font-size:0.75rem"></textarea>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+          <button type="button" class="btn btn-primary" id="syncSaveKeyBtn">Lưu key</button>
+          <button type="button" class="btn btn-ghost" id="syncPullBtn">⬇ Tải từ cloud</button>
+          <button type="button" class="btn btn-ghost" id="syncPushBtn">⬆ Đẩy lên cloud</button>
+        </div>
+        <p class="hint" id="syncModalStatus" style="margin:12px 0 0"></p>
+        <p class="login-error hidden" id="syncModalError" style="margin-top:8px"></p>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="syncModalDone">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Đổi PIN (tài khoản đang đăng nhập) -->
   <div class="modal-overlay hidden" id="changePinModal" role="dialog" aria-modal="true" aria-labelledby="changePinTitle">
     <div class="modal-panel modal-panel-sm">
@@ -1430,11 +1475,13 @@
 
   <!-- Modules: giữ đúng thứ tự phụ thuộc -->
   <script src="js/config.js"></script>
+  <script src="js/supabase-config.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/calc.js"></script>
   <script src="js/state.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/biometric.js"></script>
+  <script src="js/supabase-sync.js"></script>
   <script src="js/backup.js"></script>
   <script src="js/history.js"></script>
   <script src="js/reports.js"></script>
