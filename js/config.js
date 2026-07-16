@@ -220,6 +220,8 @@
   GL.HOME_VIEW_KEY = "giao-ly-home-view"; // dashboard | class
   GL.AUTH_KEY = "giao-ly-auth-v1";
   GL.SESSION_KEY = "giao-ly-session-v1";
+  /** Face ID / vân tay (WebAuthn) — theo từng máy */
+  GL.BIO_KEY = "giao-ly-bio-v1";
   GL.PRINT_KEY = "giao-ly-print-v1";
   GL.SETTINGS_KEY = "giao-ly-settings-v1";
   GL.BACKUP_META_KEY = "giao-ly-backup-meta-v1";

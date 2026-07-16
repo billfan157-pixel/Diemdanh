@@ -518,6 +518,12 @@
             else if (typeof openChangePinModal === "function") openChangePinModal();
             return;
           }
+          if (act === "bio") {
+            var bioBtn = document.getElementById("bioToggleBtn");
+            if (bioBtn) bioBtn.click();
+            else GL.toast("Mở menu sidebar để bật Face ID / vân tay.", "info");
+            return;
+          }
           var id = map[act];
           if (id) {
             var el = document.getElementById(id);
@@ -2670,18 +2676,53 @@
       });
     }
 
-    // Logout + Đổi PIN (nút render động trong sidebar)
+    // Logout + Đổi PIN + Face ID (nút render động trong sidebar)
     document.getElementById("sidebar").addEventListener("click", function (e) {
       var t = e.target;
       if (!(t instanceof HTMLElement)) return;
       if (t.id === "logoutBtn") {
         GL.logout();
         showLogin();
+        if (typeof GL.updateLoginBioUI === "function") GL.updateLoginBioUI();
         GL.toast("Đã đăng xuất.");
         return;
       }
       if (t.id === "openChangePinBtn") {
         openChangePinModal();
+        return;
+      }
+      if (t.id === "bioToggleBtn") {
+        var u = GL.currentUser && GL.currentUser();
+        if (!u) return;
+        var enabled =
+          typeof GL.bioIsEnabledForUser === "function" &&
+          GL.bioIsEnabledForUser(u.id);
+        if (enabled) {
+          GL.confirm({
+            title: "Tắt " + (GL.bioLabel ? GL.bioLabel() : "sinh trắc") + "?",
+            message: "Lần sau sẽ chỉ đăng nhập bằng PIN trên máy này.",
+            danger: true,
+            okText: "Tắt",
+          }).then(function (ok) {
+            if (!ok) return;
+            GL.bioRevoke(u.id);
+            if (typeof GL.updateBioToggleUI === "function") GL.updateBioToggleUI();
+            if (typeof GL.updateLoginBioUI === "function") GL.updateLoginBioUI();
+            GL.toast("Đã tắt sinh trắc trên máy này.");
+          });
+        } else {
+          GL.bioRegister().then(function (r) {
+            if (r.ok) {
+              GL.toast(
+                "Đã bật " + (GL.bioLabel ? GL.bioLabel() : "Face ID / vân tay") + "."
+              );
+            } else {
+              GL.toast(r.error || "Không bật được.", "err");
+            }
+            if (typeof GL.updateBioToggleUI === "function") GL.updateBioToggleUI();
+            if (typeof GL.updateLoginBioUI === "function") GL.updateLoginBioUI();
+          });
+        }
       }
     });
 
@@ -2731,7 +2772,119 @@
       err.classList.add("hidden");
       showAppIfLoggedIn();
       GL.toast("Xin chào " + (res.user.displayName || res.user.username));
+      // Gợi ý bật Face ID / vân tay sau lần đăng nhập PIN
+      if (
+        typeof GL.bioIsSupported === "function" &&
+        GL.bioIsSupported() &&
+        typeof GL.bioIsEnabledForUser === "function" &&
+        !GL.bioIsEnabledForUser(res.user.id)
+      ) {
+        setTimeout(function () {
+          if (typeof GL.confirm === "function") {
+            GL.confirm({
+              title: "Bật " + (GL.bioLabel ? GL.bioLabel() : "Face ID / vân tay") + "?",
+              message:
+                "Lần sau mở app nhanh hơn bằng Face ID / vân tay trên máy này. Vẫn dùng PIN khi cần.",
+              okText: "Bật ngay",
+              cancelText: "Để sau",
+            }).then(function (ok) {
+              if (!ok) return;
+              GL.bioRegister().then(function (r) {
+                if (r.ok) {
+                  GL.toast("Đã bật " + (GL.bioLabel ? GL.bioLabel() : "sinh trắc") + ".");
+                  if (typeof GL.updateBioToggleUI === "function") GL.updateBioToggleUI();
+                  if (typeof GL.updateLoginBioUI === "function") GL.updateLoginBioUI();
+                } else GL.toast(r.error || "Không bật được.", "err");
+              });
+            });
+          }
+        }, 500);
+      }
     });
+
+    // ─── Face ID / vân tay ───
+    GL.updateLoginBioUI = function updateLoginBioUI() {
+      var wrap = document.getElementById("loginBioWrap");
+      var btn = document.getElementById("loginBioBtn");
+      var lab = document.getElementById("loginBioLabel");
+      var hint = document.getElementById("loginBioHint");
+      if (!wrap || !btn) return;
+      var label = typeof GL.bioLabel === "function" ? GL.bioLabel() : "Face ID / vân tay";
+      if (lab) lab.textContent = "Mở bằng " + label;
+      var supported =
+        typeof GL.bioIsSupported === "function" && GL.bioIsSupported();
+      wrap.classList.toggle("is-unsupported", !supported);
+      if (!supported) {
+        if (hint) {
+          hint.textContent =
+            "Sinh trắc cần HTTPS (GitHub Pages) hoặc localhost — không dùng file://";
+        }
+        btn.disabled = true;
+        return;
+      }
+      var has =
+        typeof GL.bioHasAny === "function" ? GL.bioHasAny() : false;
+      wrap.classList.toggle("is-ready", has);
+      btn.disabled = !has;
+      if (hint) {
+        hint.textContent = has
+          ? "Chạm để mở bằng " + label + " trên máy này."
+          : "Lần đầu: đăng nhập PIN → sidebar → bật " + label + ".";
+      }
+    };
+
+    GL.updateBioToggleUI = function updateBioToggleUI() {
+      var btn = document.getElementById("bioToggleBtn");
+      if (!btn) return;
+      var label = typeof GL.bioLabel === "function" ? GL.bioLabel() : "Face ID / vân tay";
+      var u = typeof GL.currentUser === "function" ? GL.currentUser() : null;
+      var on =
+        u &&
+        typeof GL.bioIsEnabledForUser === "function" &&
+        GL.bioIsEnabledForUser(u.id);
+      var supported =
+        typeof GL.bioIsSupported === "function" && GL.bioIsSupported();
+      if (!supported) {
+        btn.textContent = "🔐 " + label + " (cần HTTPS)";
+        btn.disabled = true;
+        return;
+      }
+      btn.disabled = false;
+      btn.textContent = on
+        ? "🔐 Tắt " + label
+        : "🔐 Bật " + label;
+    };
+
+    var loginBioBtn = document.getElementById("loginBioBtn");
+    if (loginBioBtn) {
+      loginBioBtn.addEventListener("click", function () {
+        var err = document.getElementById("loginError");
+        if (err) {
+          err.classList.add("hidden");
+          err.textContent = "";
+        }
+        loginBioBtn.disabled = true;
+        var remember = document.getElementById("loginRemember");
+        GL.bioLogin(remember ? remember.checked : true).then(function (res) {
+          loginBioBtn.disabled = false;
+          if (typeof GL.updateLoginBioUI === "function") GL.updateLoginBioUI();
+          if (!res.ok) {
+            if (err) {
+              err.textContent = res.error || "Không mở khóa được.";
+              err.classList.remove("hidden");
+            }
+            GL.toast(res.error || "Không mở khóa được.", "err");
+            return;
+          }
+          showAppIfLoggedIn();
+          GL.toast(
+            "Xin chào " + (res.user.displayName || res.user.username) + " 🔐"
+          );
+        });
+      });
+    }
+
+    if (typeof GL.updateLoginBioUI === "function") GL.updateLoginBioUI();
   }
 
   function setHelpFabVisible(on) {
@@ -2743,6 +2896,7 @@
     document.getElementById("loginScreen").classList.remove("hidden");
     document.getElementById("appRoot").classList.add("hidden");
     setHelpFabVisible(false);
+    if (typeof GL.updateLoginBioUI === "function") GL.updateLoginBioUI();
   }
 
   function showAppIfLoggedIn() {

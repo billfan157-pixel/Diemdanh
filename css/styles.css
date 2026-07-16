@@ -2878,6 +2878,66 @@
       font-weight: 600;
     }
 
+    .login-bio-wrap {
+      margin-top: 14px;
+    }
+
+    .login-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 4px 0 12px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 650;
+    }
+    .login-divider::before,
+    .login-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .btn-bio {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #0f172a, #1e3a8a);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-weight: 750;
+      font-size: 0.92rem;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 6px 16px rgba(30, 58, 138, 0.28);
+    }
+    .btn-bio:hover {
+      filter: brightness(1.06);
+    }
+    .btn-bio:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      filter: none;
+    }
+    .btn-bio-ico {
+      font-size: 1.15rem;
+      line-height: 1;
+    }
+    .login-bio-hint {
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+    .login-bio-wrap.is-unsupported .btn-bio {
+      display: none;
+    }
+    .login-bio-wrap.is-ready .login-bio-hint {
+      color: #15803d;
+    }
+
     .sidebar-user {
       background: var(--accent-soft);
       border: 1px solid #bfdbfe;

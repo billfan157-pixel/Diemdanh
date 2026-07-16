@@ -32,6 +32,16 @@
       </label>
       <button type="submit" class="btn btn-primary btn-block" style="margin-top:14px">Đăng nhập</button>
     </form>
+    <div class="login-bio-wrap" id="loginBioWrap">
+      <div class="login-divider"><span>hoặc</span></div>
+      <button type="button" class="btn btn-bio btn-block" id="loginBioBtn">
+        <span class="btn-bio-ico" aria-hidden="true">🔐</span>
+        <span id="loginBioLabel">Mở bằng Face ID / vân tay</span>
+      </button>
+      <p class="hint login-bio-hint" id="loginBioHint" style="margin-top:8px;text-align:center">
+        Lần đầu: đăng nhập PIN → bật sinh trắc trong sidebar.
+      </p>
+    </div>
     <p class="hint" style="margin-top:14px;text-align:center">
       Mặc định: <strong>admin</strong> / PIN <strong>1234</strong><br>
       (Ban Giáo lý — vào app bấm <strong>Đổi PIN</strong> ngay)
@@ -418,6 +428,10 @@
           <button type="button" class="m-sheet-btn" data-m-action="pin">
             <span class="m-sheet-ico">🔑</span>
             <span>Đổi PIN</span>
+          </button>
+          <button type="button" class="m-sheet-btn" data-m-action="bio">
+            <span class="m-sheet-ico">🔐</span>
+            <span>Face ID / vân tay</span>
           </button>
         </div>
         <p class="m-sheet-hint">Trên điện thoại: vuốt / cuộn để xem hết. Drawer lớp mở bằng nút «Lớp».</p>
@@ -1420,6 +1434,7 @@
   <script src="js/calc.js"></script>
   <script src="js/state.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/biometric.js"></script>
   <script src="js/backup.js"></script>
   <script src="js/history.js"></script>
   <script src="js/reports.js"></script>

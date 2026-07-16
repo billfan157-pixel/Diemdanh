@@ -135,7 +135,14 @@
           (u.role === "ban_gl" ? "Ban Giáo lý" : "Giáo lý viên") +
           '</div>' +
           '<button type="button" class="btn btn-ghost btn-block" id="openChangePinBtn" style="margin-top:8px;font-size:0.8rem">🔑 Đổi PIN</button>' +
+          '<button type="button" class="btn btn-ghost btn-block" id="bioToggleBtn" style="margin-top:6px;font-size:0.8rem" title="Face ID / vân tay trên máy này">🔐 Face ID / vân tay</button>' +
           '<button type="button" class="btn btn-ghost btn-block" id="logoutBtn" style="margin-top:6px;font-size:0.8rem">Đăng xuất</button>';
+        // Cập nhật nhãn bật/tắt sinh trắc
+        if (typeof GL.updateBioToggleUI === "function") {
+          setTimeout(function () {
+            GL.updateBioToggleUI();
+          }, 0);
+        }
       }
     }
 
