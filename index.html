@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#2563eb" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -10,7 +10,8 @@
   <meta name="apple-mobile-web-app-title" content="Sổ Điểm GL" />
   <title>Sổ Điểm Giáo Lý</title>
   <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/mobile.css" />
+  <!-- v=4 cache-bust mobile UI -->
+  <link rel="stylesheet" href="css/mobile.css?v=4" />
   <!-- Thư viện local — hoạt động cả offline / file:// -->
   <script src="js/vendor/xlsx.full.min.js"></script>
   <script src="js/vendor/jszip.min.js"></script>
@@ -286,13 +287,13 @@
         <!-- Chọn học kỳ / cả năm -->
         <div class="term-switcher" id="termSwitcher" role="tablist" aria-label="Học kỳ">
           <button type="button" class="term-btn active" data-term="hk1">
-            <span class="term-ico">1️⃣</span> Học kỳ 1
+            <span class="term-ico">1</span><span class="term-txt"> HK1</span>
           </button>
           <button type="button" class="term-btn" data-term="hk2">
-            <span class="term-ico">2️⃣</span> Học kỳ 2
+            <span class="term-ico">2</span><span class="term-txt"> HK2</span>
           </button>
           <button type="button" class="term-btn term-btn-year" data-term="year">
-            <span class="term-ico">📅</span> Cả năm
+            <span class="term-ico">📅</span><span class="term-txt"> Cả năm</span>
           </button>
           <span class="term-note" id="termNote">Đang xem bảng điểm <strong>Học kỳ 1</strong></span>
         </div>
@@ -340,12 +341,12 @@
           </div>
 
           <div class="view-switcher" id="viewSwitcher" role="tablist" aria-label="Kiểu hiển thị">
-            <button type="button" class="view-btn active" data-view="cards" title="Nhập / sửa điểm chi tiết">✏️ Nhập điểm</button>
-            <button type="button" class="view-btn" data-view="table" title="Nhìn nhanh cả lớp">📊 Bảng tổng hợp</button>
-            <button type="button" class="view-btn" data-view="journal" title="Thiếu điểm + nhật ký theo dõi">📋 Theo dõi</button>
-            <button type="button" class="view-btn" data-view="rank" title="Xếp hạng khen thưởng">🏆 Xếp hạng</button>
-            <button type="button" class="view-btn" data-view="stats" title="Thống kê lớp">📈 Thống kê</button>
-            <button type="button" class="view-btn" data-view="print" title="In / họp phụ huynh">🖨️ Bản in</button>
+            <button type="button" class="view-btn active" data-view="cards" title="Nhập / sửa điểm chi tiết"><span class="vb-ico">✏️</span><span class="vb-txt">Nhập điểm</span></button>
+            <button type="button" class="view-btn" data-view="table" title="Nhìn nhanh cả lớp"><span class="vb-ico">📊</span><span class="vb-txt">Bảng</span></button>
+            <button type="button" class="view-btn" data-view="journal" title="Thiếu điểm + nhật ký theo dõi"><span class="vb-ico">📋</span><span class="vb-txt">Theo dõi</span></button>
+            <button type="button" class="view-btn" data-view="rank" title="Xếp hạng khen thưởng"><span class="vb-ico">🏆</span><span class="vb-txt">Xếp hạng</span></button>
+            <button type="button" class="view-btn" data-view="stats" title="Thống kê lớp"><span class="vb-ico">📈</span><span class="vb-txt">Thống kê</span></button>
+            <button type="button" class="view-btn" data-view="print" title="In / họp phụ huynh"><span class="vb-ico">🖨️</span><span class="vb-txt">In</span></button>
           </div>
           <div class="view-hint" id="viewHint"></div>
 

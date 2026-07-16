@@ -3103,6 +3103,18 @@
     return true;
   }
 
+  // Mobile UI class — tăng độ ưu tiên CSS trên điện thoại
+  function applyMobileUiClass() {
+    var isM =
+      window.matchMedia &&
+      window.matchMedia("(max-width: 900px)").matches;
+    document.documentElement.classList.toggle("mobile-ui", !!isM);
+    document.body.classList.toggle("mobile-ui", !!isM);
+  }
+  applyMobileUiClass();
+  window.addEventListener("resize", applyMobileUiClass);
+  window.addEventListener("orientationchange", applyMobileUiClass);
+
   // Init
   GL.saveState({ skipUndo: true });
   // Gợi ý năm học mặc định (mẫu in / năm mới nhất) nếu chưa chọn
