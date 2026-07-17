@@ -1,0 +1,44 @@
+// Entry point (Vite) — thay cho 34 thẻ <script> thủ công.
+// Các file vẫn ở dạng IIFE gắn vào window.GL; thứ tự import = thứ tự load cũ.
+import "./vendor.js";
+
+import "./ui/templates/registry.js";
+import "./ui/templates/login.js";
+import "./ui/templates/app-shell.js";
+import "./ui/templates/feedback.js";
+import "./ui/templates/modals/data.js";
+import "./ui/templates/modals/tools.js";
+import "./ui/templates/modals/admin.js";
+import "./ui/mount-templates.js";
+import "./config/constants.js";
+import "./config/supabase.js";
+import "./core/utils.js";
+import "./core/calc.js";
+import "./core/state.js";
+import "./core/auth.js";
+import "./core/biometric.js";
+import "./services/supabase-sync.js";
+import "./services/backup.js";
+import "./services/auto-backup.js";
+import "./core/history.js";
+import "./features/reports.js";
+import "./features/dashboard.js";
+import "./features/journal.js";
+import "./features/parish.js";
+import "./features/invite.js";
+import "./ui/views/cards.js";
+import "./ui/views/table.js";
+import "./ui/views/year.js";
+import "./ui/views/print.js";
+import "./ui/render.js";
+import "./services/export/workbook.js";
+import "./services/export/ui.js";
+import "./services/import/data.js";
+import "./services/import/preview.js";
+import "./services/import/parsers.js";
+import "./ui/events/navigation.js";
+import "./ui/events/students.js";
+import "./ui/events/import-export.js";
+import "./ui/events/operations.js";
+import "./ui/events/security.js";
+import "./ui/app.js";

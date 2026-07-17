@@ -2,7 +2,7 @@
 
 App web tính điểm giáo lý theo lớp — chạy trên trình duyệt (máy tính & điện thoại).
 
-**Mở local:** double-click `index.html` hoặc serve thư mục này.
+**Mở local:** `npm install && npm run dev` → http://localhost:8080 (từ GĐ2 app build bằng Vite, không còn mở trực tiếp `index.html` qua file://).
 
 ## Repo
 
@@ -25,13 +25,12 @@ URL: `https://gqmbhvgyoenweiepvrvk.supabase.co`
 ## Dùng trên điện thoại / chia sẻ (GitHub Pages)
 
 1. Vào repo → **Settings** → **Pages**.
-2. **Source:** Deploy from a branch.
-3. Branch: **`main`** · folder: **`/ (root)`** → **Save**.
-4. Đợi 1–2 phút, mở link:
+2. **Source:** chọn **GitHub Actions** (workflow `deploy.yml` tự build Vite và deploy mỗi lần push lên `main`).
+3. Đợi 1–2 phút, mở link:
 
    **https://billfan157-pixel.github.io/Diemdanh/**
 
-5. Trên điện thoại: mở link → **Thêm vào Màn hình chính**.
+4. Trên điện thoại: mở link → **Thêm vào Màn hình chính**.
 
 > Dữ liệu điểm lưu **trên từng máy** (localStorage). Sao lưu JSON định kỳ nếu dùng nhiều thiết bị.
 
@@ -39,14 +38,19 @@ URL: `https://gqmbhvgyoenweiepvrvk.supabase.co`
 
 ```
 tinh-diem/
-├── index.html
+├── index.html          # entry Vite (1 thẻ <script type="module">)
+├── public/
+│   └── no-zoom.js      # chạy rất sớm, trước layout/CSS
 ├── assets/
-│   ├── css/
-│   │   ├── main.css
-│   │   └── mobile.css
-│   └── vendor/         # xlsx, jszip (offline)
+│   └── css/
+│       ├── main.css    # @import các file trong main/
+│       ├── main/       # tách theo khu vực giao diện
+│       └── mobile.css
 ├── src/
-│   ├── platform/       # code chạy rất sớm, trước layout/CSS
+│   ├── main.js         # entry — import mọi module theo thứ tự
+│   ├── vendor.js       # xlsx, jszip, supabase-js (bundle từ npm)
+│   ├── types.js        # định nghĩa type JSDoc (Student, GLClass…)
+│   ├── global.d.ts     # khai báo window.GL cho type-check
 │   ├── config/         # hằng số, cấu hình Supabase public
 │   ├── core/           # state, auth, tính điểm, helper chung
 │   ├── services/
@@ -55,10 +59,11 @@ tinh-diem/
 │   │   └── ...         # cloud sync, backup
 │   ├── features/       # dashboard, báo cáo, journal, parish, invite
 │   └── ui/
-│       ├── templates/  # login, app shell, feedback, modal
+│       ├── templates/  # login, app shell, feedback, modals/
+│       ├── views/      # cards, table, year, print
 │       ├── events/     # binding theo luồng nghiệp vụ UI
 │       ├── mount-templates.js
-│       └── ...         # render view + bootstrap gắn event
+│       └── ...         # render + bootstrap gắn event
 ├── docs/
 │   └── ARCHITECTURE.md
 ├── supabase/
@@ -69,13 +74,16 @@ tinh-diem/
 ## Dành cho dev
 
 ```bash
-npm install     # cài tooling (eslint, prettier, vitest)
-npm run lint    # kiểm tra code
-npm test        # chạy unit test (tính điểm, auth, import)
-npm run serve   # mở app tại http://localhost:8080
+npm install       # cài dependencies + tooling
+npm run dev       # dev server Vite tại http://localhost:8080
+npm run build     # build production ra dist/
+npm run preview   # xem thử bản build
+npm run lint      # kiểm tra code
+npm run typecheck # type-check JSDoc (tsc, checkJs)
+npm test          # chạy unit test (tính điểm, auth, import)
 ```
 
-CI (GitHub Actions) tự chạy lint + test trên mỗi PR.
+CI (GitHub Actions) tự chạy lint + typecheck + test + build trên mỗi PR.
 
 ## Tài khoản mặc định
 
@@ -83,6 +91,6 @@ CI (GitHub Actions) tự chạy lint + test trên mỗi PR.
 
 ## Namespace
 
-Mọi module gắn vào `window.GL`. Template UI được mount trước, sau đó thứ tự `<script>` phải giữ nguyên: `config` → `core` → `services` → `features` → `ui` → `app`.
+Mọi module gắn vào `window.GL` (shim tạm trong lúc chuyển dần sang ES modules). Thứ tự load nằm trong `src/main.js`: template → `config` → `core` → `services` → `features` → `ui` → `app`.
 
 Xem thêm [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) trước khi thêm module mới.

@@ -355,7 +355,7 @@
     }
     if (typeof XLSX === "undefined") {
       GL.toast(
-        "Chưa tải thư viện Excel (assets/vendor/xlsx.full.min.js).",
+        "Chưa tải thư viện Excel.",
         "err"
       );
       return;
@@ -523,7 +523,7 @@
   GL.downloadTemplate = function downloadTemplate() {
     try {
     if (typeof XLSX === "undefined") {
-      GL.toast("Chưa tải thư viện Excel (assets/vendor/xlsx.full.min.js).", "err");
+      GL.toast("Chưa tải thư viện Excel.", "err");
       return;
     }
     var headers = ["STT", "Lớp"]

@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "lib": ["es2020", "dom", "dom.iterable"]
+  },
+  "include": ["src/global.d.ts", "src/types.js", "src/core/calc.js", "src/config/constants.js"]
+}
