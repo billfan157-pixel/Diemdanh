@@ -1,11 +1,14 @@
-# Backup files (dữ liệu thật — không đẩy git)
-backups/*.json
-!backups/.gitkeep
-!backups/README.md
-
-# OS / editor
+# .gitignore
+node_modules/
+dist/
+.env
+.env.local
+*.log
 .DS_Store
-Thumbs.db
+*.tgz
 *.swp
+*.swo
 .vscode/
 .idea/
+coverage/
+*.tsbuildinfo

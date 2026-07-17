@@ -10,54 +10,19 @@
   <meta name="apple-mobile-web-app-title" content="Sổ Điểm GL" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co;" />
   <title>Sổ Điểm Giáo Lý</title>
-  <!-- Khóa zoom TRƯỚC khi load CSS/body (iOS bỏ qua meta một mình) -->
-  <script src="src/platform/no-zoom.js?v=8"></script>
-  <link rel="stylesheet" href="assets/css/main.css" />
-  <link rel="stylesheet" href="assets/css/mobile.css?v=11" />
-  <!-- Thư viện local — hoạt động cả offline / file:// -->
-  <script src="assets/vendor/xlsx.full.min.js"></script>
-  <script src="assets/vendor/jszip.min.js"></script>
-  <!-- Supabase JS (cần mạng để đồng bộ cloud) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 </head>
 <body>
-  <a href="#mainContent" class="skip-link" style="position:absolute;top:-100%;left:0;padding:12px 16px;background:#2563eb;color:#fff;z-index:10000;text-decoration:none;font-weight:600">Chuyển đến nội dung chính</a>
-  <noscript><div style="padding:24px;text-align:center;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-family:system-ui,sans-serif"><strong>JavaScript bị tắt</strong><br>Vui lòng bật JavaScript để sử dụng Sổ Điểm Giáo Lý.</div></noscript>
+  <a href="#mainContent" class="skip-link">Chuyển đến nội dung chính</a>
+  <noscript>
+    <div class="noscript">
+      <strong>JavaScript bị tắt</strong><br>
+      Vui lòng bật JavaScript để sử dụng Sổ Điểm Giáo Lý.
+    </div>
+  </noscript>
   <div id="appMount"></div>
-
-  <script src="src/ui/templates/registry.js"></script>
-  <script src="src/ui/templates/login.js"></script>
-  <script src="src/ui/templates/app-shell.js"></script>
-  <script src="src/ui/templates/feedback.js"></script>
-  <script src="src/ui/templates/modals.js"></script>
-  <script src="src/ui/mount-templates.js"></script>
-  <script src="src/config/constants.js"></script>
-  <script src="src/config/supabase.js"></script>
-  <script src="src/core/utils.js"></script>
-  <script src="src/core/calc.js"></script>
-  <script src="src/core/state.js"></script>
-  <script src="src/core/auth.js"></script>
-  <script src="src/core/biometric.js"></script>
-  <script src="src/services/supabase-sync.js"></script>
-  <script src="src/services/backup.js"></script>
-  <script src="src/core/history.js"></script>
-  <script src="src/features/reports.js"></script>
-  <script src="src/features/dashboard.js"></script>
-  <script src="src/features/journal.js"></script>
-  <script src="src/features/parish.js"></script>
-  <script src="src/features/invite.js"></script>
-  <script src="src/ui/views.js"></script>
-  <script src="src/ui/render.js"></script>
-  <script src="src/services/export/workbook.js"></script>
-  <script src="src/services/export/ui.js"></script>
-  <script src="src/services/import/data.js"></script>
-  <script src="src/services/import/preview.js"></script>
-  <script src="src/services/import/parsers.js"></script>
-  <script src="src/ui/events/navigation.js"></script>
-  <script src="src/ui/events/students.js"></script>
-  <script src="src/ui/events/import-export.js"></script>
-  <script src="src/ui/events/operations.js"></script>
-  <script src="src/ui/events/security.js"></script>
-  <script src="src/ui/app.js"></script>
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
