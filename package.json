@@ -4,10 +4,14 @@
   "private": true,
   "description": "Sổ Điểm Giáo Lý — app web tính điểm giáo lý theo lớp",
   "scripts": {
-    "serve": "python3 -m http.server 8080",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "vite",
     "lint": "eslint src tests",
     "format": "prettier --check \"src/**/*.js\" \"tests/**/*.js\"",
     "format:fix": "prettier --write \"src/**/*.js\" \"tests/**/*.js\"",
+    "typecheck": "tsc -p jsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -17,6 +21,13 @@
     "globals": "^15.15.0",
     "happy-dom": "^20.10.6",
     "prettier": "^3.9.5",
+    "typescript": "^7.0.2",
+    "vite": "^6.4.3",
     "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
+    "jszip": "^3.10.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

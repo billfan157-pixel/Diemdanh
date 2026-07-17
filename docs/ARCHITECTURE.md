@@ -1,19 +1,17 @@
 # Kiến trúc app
 
-App này vẫn là static web app, không cần build step. Các module dùng chung namespace `window.GL` và được load trực tiếp trong `index.html`.
+App là static web app build bằng Vite. Các module dùng chung namespace `window.GL` (shim tạm trong lúc chuyển dần sang ES modules) và được import theo thứ tự trong `src/main.js`.
 
 ## Mục tiêu cấu trúc
 
-- `index.html` chỉ giữ shell tối thiểu, điểm mount và thứ tự load script.
-- `assets/` chỉ chứa tài nguyên tĩnh: CSS, thư viện vendor, hình ảnh nếu có.
+- `index.html` chỉ giữ shell tối thiểu, điểm mount và 1 thẻ `<script type="module" src="/src/main.js">`.
+- `public/` chứa file copy nguyên trạng (ví dụ `no-zoom.js` phải chạy rất sớm, trước CSS).
+- `assets/` chỉ chứa tài nguyên tĩnh: CSS, hình ảnh nếu có. Thư viện ngoài (xlsx, jszip, supabase-js) bundle từ npm qua `src/vendor.js`.
 - `src/` chứa toàn bộ logic app, chia theo trách nhiệm để dễ tìm và dễ review.
 - `supabase/` chứa tài nguyên phía database, không trộn vào code frontend.
 - `backups/` chứa dữ liệu sao lưu thật trên máy, không commit file JSON.
 
 ## Nhóm module
-
-`src/platform/`
-: Code phải chạy rất sớm trước khi body/CSS hoàn tất, ví dụ khóa zoom mobile.
 
 `src/config/`
 : Hằng số nghiệp vụ, storage keys, cấu hình public. Không đặt logic UI ở đây.
@@ -35,10 +33,10 @@ App này vẫn là static web app, không cần build step. Các module dùng ch
 - `templates/login.js`: màn hình đăng nhập.
 - `templates/app-shell.js`: khung điều hướng và các màn hình chính.
 - `templates/feedback.js`: toast, hướng dẫn và lớp phủ giao diện.
-- `templates/modals.js`: toàn bộ modal nhập liệu.
+- `templates/modals/`: modal nhập liệu chia 3 nhóm: `data.js` (học viên, xuất/nhập, hệ số), `tools.js` (hướng dẫn, sao lưu, giáo xứ, báo cáo), `admin.js` (đồng bộ cloud, PIN, tài khoản).
 - `templates/registry.js` và `mount-templates.js`: đăng ký, sau đó chèn template vào `#appMount` trước khi logic UI chạy.
 
-Template là JavaScript thay vì HTML partial để app vẫn mở được bằng `file://` mà không cần web server.
+Template là JavaScript thay vì HTML partial để không phải fetch file rời khi chạy.
 
 ## Event UI
 
@@ -52,19 +50,20 @@ Template là JavaScript thay vì HTML partial để app vẫn mở được bằ
 
 ## Thứ tự load bắt buộc
 
-Giữ thứ tự trong `index.html`:
+Giữ thứ tự import trong `src/main.js`:
 
-1. Template registry, template UI và `mount-templates.js`
-2. `src/config/*`
-3. `src/core/utils.js`, `src/core/calc.js`, `src/core/state.js`
-4. Auth/biometric/cloud/backup/history
-5. `src/features/*`
-6. `src/ui/views.js`, `src/ui/render.js`
-7. `src/services/export/*`, rồi `src/services/import/*`
-8. `src/ui/events/*`
-9. `src/ui/app.js`
+1. `src/vendor.js` (xlsx, jszip, supabase-js)
+2. Template registry, template UI và `mount-templates.js`
+3. `src/config/*`
+4. `src/core/utils.js`, `src/core/calc.js`, `src/core/state.js`
+5. Auth/biometric/cloud/backup/history
+6. `src/features/*`
+7. `src/ui/views/*`, `src/ui/render.js`
+8. `src/services/export/*`, rồi `src/services/import/*`
+9. `src/ui/events/*`
+10. `src/ui/app.js`
 
-Nếu thêm module mới, đặt file vào nhóm đúng trách nhiệm và thêm `<script>` ở vị trí mà dependency của nó đã được load trước.
+Nếu thêm module mới, đặt file vào nhóm đúng trách nhiệm và thêm `import` trong `src/main.js` ở vị trí mà dependency của nó đã được load trước.
 
 ## Quy tắc bảo trì
 
@@ -72,5 +71,6 @@ Nếu thêm module mới, đặt file vào nhóm đúng trách nhiệm và thêm
 - Không đọc DOM trong `config` hoặc `core` nếu không thật cần thiết.
 - Feature chỉ nên gọi API public trên `GL`, hạn chế chọc trực tiếp DOM ngoài phần màn hình/modal của nó.
 - Thêm markup tĩnh vào template phù hợp, không đưa trở lại `index.html`; phần tử UI sinh theo dữ liệu tiếp tục thuộc `render.js`.
-- Vendor minified giữ trong `assets/vendor/`, không sửa tay.
-- CSS tổng quát ở `assets/css/main.css`; override riêng mobile ở `assets/css/mobile.css`.
+- Thư viện ngoài thêm qua npm và expose trong `src/vendor.js`, không chép file minified vào repo.
+- CSS tổng quát chia theo khu vực trong `assets/css/main/` (gộp qua `main.css`); override riêng mobile ở `assets/css/mobile.css`.
+- Type dùng chung khai báo JSDoc trong `src/types.js`; member mới của `GL` đã type-check thì khai báo thêm vào `src/global.d.ts` và mở rộng `include` trong `jsconfig.json`.

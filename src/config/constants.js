@@ -312,4 +312,4 @@
     journal:
       "<strong>Theo dõi:</strong> Thiếu điểm + nhật ký (học bài, thái độ, tiến bộ, can thiệp). Không điểm danh. Lọc «thiếu điểm» / «cần quan tâm».",
   };
-})(window.GL = window.GL || {});
+})((window.GL = window.GL || /** @type {GLNamespace} */ ({})));

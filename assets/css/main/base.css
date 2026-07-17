@@ -1,0 +1,41 @@
+/* Nền tảng: biến CSS, reset, body */
+:root {
+  --bg: #f3f6fb;
+  --bg2: #e8eef8;
+  --surface: #ffffff;
+  --surface2: #f8fafc;
+  --surface3: #f1f5f9;
+  --border: #d8e0ec;
+  --border-strong: #c0cce0;
+  --text: #1a2332;
+  --text2: #3d4f66;
+  --muted: var(--muted);
+  --muted-2: var(--muted-2);
+  --accent: #2563eb;
+  --accent-soft: #eff6ff;
+  --accent2: #4f46e5;
+  --gold: #d97706;
+  --gold-soft: #fffbeb;
+  --success: #16a34a;
+  --success-soft: #f0fdf4;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --purple: #7c3aed;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
+  --shadow-lg: 0 4px 12px rgba(16, 24, 40, 0.06), 0 16px 40px rgba(16, 24, 40, 0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(ellipse 80% 40% at 10% -10%, #dbeafe 0%, transparent 50%),
+    radial-gradient(ellipse 60% 30% at 100% 0%, #ede9fe 0%, transparent 45%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}

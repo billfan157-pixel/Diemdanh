@@ -163,4 +163,4 @@
     if (avg >= 5) return { label: "Trung bình", rank: "rank-tb", score: "score-tb" };
     return { label: "Yếu", rank: "rank-y", score: "score-y" };
   };
-})(window.GL = window.GL || {});
+})((window.GL = window.GL || /** @type {GLNamespace} */ ({})));
