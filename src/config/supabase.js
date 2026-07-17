@@ -37,4 +37,26 @@
   GL.isSupabaseConfigured = function isSupabaseConfigured() {
     return !!(GL.SUPABASE_URL && GL.getSupabaseAnonKey());
   };
+
+  /**
+   * Mã bảo vệ giáo xứ — gửi kèm header x-parish-key khi gọi Supabase.
+   * Chỉ có tác dụng sau khi chạy supabase/secure-policies.sql (RLS kiểm tra mã).
+   */
+  GL.PARISH_KEY_STORAGE = "giao-ly-parish-key-v1";
+
+  GL.getParishKey = function getParishKey() {
+    try {
+      var k = localStorage.getItem(GL.PARISH_KEY_STORAGE);
+      if (k && String(k).trim()) return String(k).trim();
+    } catch (e) {
+      /* ignore */
+    }
+    return "";
+  };
+
+  GL.setParishKey = function setParishKey(key) {
+    key = String(key || "").trim();
+    if (key) localStorage.setItem(GL.PARISH_KEY_STORAGE, key);
+    else localStorage.removeItem(GL.PARISH_KEY_STORAGE);
+  };
 })(window.GL = window.GL || {});

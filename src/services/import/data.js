@@ -62,7 +62,7 @@ GL.rowsToStudents = function rowsToStudents(matrix) {
           lop = String(val ?? "").trim();
         } else if (key === "ghiChu") {
           ghiChu = String(val ?? "").trim();
-        } else if (info.hasOwnProperty(key)) {
+        } else if (Object.prototype.hasOwnProperty.call(info, key)) {
           info[key] = String(val ?? "").trim();
         } else if (scores[key]) {
           scores[key] = scores[key].concat(GL.parseScoreCell(val));

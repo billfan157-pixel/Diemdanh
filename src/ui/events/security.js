@@ -39,10 +39,7 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
                 return c ? c.name : id;
               })
               .join(", ");
-            var pinShow =
-              u.pinPlain != null && String(u.pinPlain).length
-                ? String(u.pinPlain)
-                : null;
+            var pinShow = null; // PIN không còn lưu dạng đọc được
             return (
               '<div class="user-row">' +
               "<div><strong>" +
@@ -59,7 +56,7 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
                 ? '<div class="user-pin-badge" title="PIN (admin xem)">PIN: ' +
                   GL.escapeHtml(pinShow) +
                   "</div>"
-                : '<div class="hint" style="margin-top:4px">PIN: <em>chưa lưu dạng xem — đặt lại PIN để hiện</em></div>') +
+                : '<div class="hint" style="margin-top:4px">PIN: <em>đã mã hóa — quên PIN thì đặt PIN mới</em></div>') +
               "</div>" +
               '<div class="user-row-actions">' +
               '<button type="button" class="btn btn-ghost" data-toggle-user="' +
@@ -103,22 +100,23 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
       document.querySelectorAll(".new-user-class:checked").forEach(function (cb) {
         classIds.push(cb.value);
       });
-      var res = GL.createUser({
+      GL.createUser({
         username: document.getElementById("newUserName").value,
         displayName: document.getElementById("newUserDisplay").value,
         pin: document.getElementById("newUserPin").value,
         role: document.getElementById("newUserRole").value,
         classIds: classIds,
+      }).then(function (res) {
+        if (!res.ok) {
+          GL.toast(res.error, "err");
+          return;
+        }
+        document.getElementById("newUserName").value = "";
+        document.getElementById("newUserDisplay").value = "";
+        document.getElementById("newUserPin").value = "";
+        GL.toast("Đã tạo tài khoản " + res.user.username);
+        renderUsersModal();
       });
-      if (!res.ok) {
-        GL.toast(res.error, "err");
-        return;
-      }
-      document.getElementById("newUserName").value = "";
-      document.getElementById("newUserDisplay").value = "";
-      document.getElementById("newUserPin").value = "";
-      GL.toast("Đã tạo tài khoản " + res.user.username);
-      renderUsersModal();
     });
     document.getElementById("usersList").addEventListener("click", function (e) {
       var t = e.target;
@@ -130,17 +128,18 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
           return u.id === uid;
         });
         if (!user) return;
-        var resT = GL.updateUser(uid, { active: user.active === false });
-        if (!resT.ok) {
-          GL.toast(resT.error || "Không cập nhật được.", "err");
-          return;
-        }
-        renderUsersModal();
-        GL.toast(
-          user.active === false
-            ? "Đã mở khóa tài khoản."
-            : "Đã khóa tài khoản."
-        );
+        GL.updateUser(uid, { active: user.active === false }).then(function (resT) {
+          if (!resT.ok) {
+            GL.toast(resT.error || "Không cập nhật được.", "err");
+            return;
+          }
+          renderUsersModal();
+          GL.toast(
+            user.active === false
+              ? "Đã mở khóa tài khoản."
+              : "Đã khóa tài khoản."
+          );
+        });
         return;
       }
       var ed = t.closest("[data-edit-user]");
@@ -158,24 +157,12 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
       var view = document.getElementById("editUserPinView");
       var hint = document.getElementById("editUserPinHint");
       if (!view) return;
-      var plain =
-        u.pinPlain != null && String(u.pinPlain).length
-          ? String(u.pinPlain)
-          : "";
-      view.dataset.plain = plain;
+      view.dataset.plain = "";
       view.dataset.hidden = "1";
-      if (plain) {
-        view.value = "••••••••";
-        if (hint) {
-          hint.textContent =
-            "Bấm 👁 để hiện PIN · 📋 để sao chép. Đặt PIN mới bên dưới nếu cần đổi.";
-        }
-      } else {
-        view.value = "(chưa có — hãy đặt PIN mới bên dưới)";
-        if (hint) {
-          hint.textContent =
-            "Tài khoản cũ chưa lưu PIN dạng xem được. Đặt PIN mới để admin xem được sau này.";
-        }
+      view.value = "(đã mã hóa — không xem được)";
+      if (hint) {
+        hint.textContent =
+          "PIN được mã hóa một chiều để bảo mật. Quên PIN → đặt PIN mới bên dưới.";
       }
     }
 
@@ -297,7 +284,7 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
         if (!view) return;
         var plain = view.dataset.plain || "";
         if (!plain) {
-          GL.toast("Chưa có PIN dạng xem được. Hãy đặt PIN mới.", "warn");
+          GL.toast("PIN đã mã hóa — không xem được. Quên PIN thì đặt PIN mới.", "warn");
           return;
         }
         if (view.dataset.hidden === "1") {
@@ -317,7 +304,7 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
         var view = document.getElementById("editUserPinView");
         var plain = view && view.dataset.plain;
         if (!plain) {
-          GL.toast("Chưa có PIN để sao chép.", "err");
+          GL.toast("PIN đã mã hóa — không sao chép được.", "err");
           return;
         }
         function ok() {
@@ -383,14 +370,15 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
             });
           patch.classIds = classIds;
         }
-        var res = GL.updateUser(id, patch);
-        if (!res.ok) {
-          showErr(res.error || "Không lưu được.");
-          return;
-        }
-        closeEditUserModal();
-        GL.toast("Đã cập nhật @" + res.user.username);
-        renderUsersModal();
+        GL.updateUser(id, patch).then(function (res) {
+          if (!res.ok) {
+            showErr(res.error || "Không lưu được.");
+            return;
+          }
+          closeEditUserModal();
+          GL.toast("Đã cập nhật @" + res.user.username);
+          renderUsersModal();
+        });
       });
     }
 
@@ -446,31 +434,32 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
         var oldP = document.getElementById("pinOld").value;
         var newP = document.getElementById("pinNew").value;
         var newP2 = document.getElementById("pinNew2").value;
-        var res = GL.changeOwnPin(oldP, newP, newP2);
-        var err = document.getElementById("changePinError");
-        if (!res.ok) {
-          if (err) {
-            err.textContent = res.error || "Không đổi được PIN.";
-            err.classList.remove("hidden");
-          }
-          GL.toast(res.error || "Không đổi được PIN.", "err");
-          return;
-        }
-        closeChangePinModal();
-        GL.toast("Đã đổi PIN thành công. Lần sau đăng nhập bằng PIN mới.");
-        // Đẩy cloud ngay để máy khác / điện thoại không còn PIN cũ
-        if (typeof GL.cloudPush === "function" && GL.isSupabaseConfigured()) {
-          GL.cloudPush({ force: true, silent: true }).then(function (r) {
-            if (r && r.ok) {
-              /* ok */
-            } else if (r && r.error) {
-              GL.toast(
-                "PIN đã đổi trên máy này; chưa đẩy cloud: " + r.error,
-                "warn"
-              );
+        GL.changeOwnPin(oldP, newP, newP2).then(function (res) {
+          var err = document.getElementById("changePinError");
+          if (!res.ok) {
+            if (err) {
+              err.textContent = res.error || "Không đổi được PIN.";
+              err.classList.remove("hidden");
             }
-          });
-        }
+            GL.toast(res.error || "Không đổi được PIN.", "err");
+            return;
+          }
+          closeChangePinModal();
+          GL.toast("Đã đổi PIN thành công. Lần sau đăng nhập bằng PIN mới.");
+          // Đẩy cloud ngay để máy khác / điện thoại không còn PIN cũ
+          if (typeof GL.cloudPush === "function" && GL.isSupabaseConfigured()) {
+            GL.cloudPush({ force: true, silent: true }).then(function (r) {
+              if (r && r.ok) {
+                /* ok */
+              } else if (r && r.error) {
+                GL.toast(
+                  "PIN đã đổi trên máy này; chưa đẩy cloud: " + r.error,
+                  "warn"
+                );
+              }
+            });
+          }
+        });
       });
       // Enter trong ô PIN
       ["pinOld", "pinNew", "pinNew2"].forEach(function (id) {
@@ -526,28 +515,29 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
     var forcePinSave = document.getElementById("forcePinSave");
     if (forcePinSave) {
       forcePinSave.addEventListener("click", function () {
-        var res = GL.changeOwnPin(
+        GL.changeOwnPin(
           document.getElementById("forcePinOld").value,
           document.getElementById("forcePinNew").value,
           document.getElementById("forcePinNew2").value
-        );
-        var err = document.getElementById("forcePinError");
-        if (!res.ok) {
-          if (err) {
-            err.textContent = res.error || "Không đổi được PIN.";
-            err.classList.remove("hidden");
+        ).then(function (res) {
+          var err = document.getElementById("forcePinError");
+          if (!res.ok) {
+            if (err) {
+              err.textContent = res.error || "Không đổi được PIN.";
+              err.classList.remove("hidden");
+            }
+            GL.toast(res.error || "Không đổi được PIN.", "err");
+            return;
           }
-          GL.toast(res.error || "Không đổi được PIN.", "err");
-          return;
-        }
-        closeForcePinModal();
-        GL.toast("Đã đổi PIN. Hãy ghi nhớ PIN mới.");
-        if (typeof GL.cloudPush === "function" && GL.isSupabaseConfigured()) {
-          GL.cloudPush({ force: true, silent: true });
-        }
-        if (typeof GL.updateBackupReminderUI === "function") {
-          GL.updateBackupReminderUI();
-        }
+          closeForcePinModal();
+          GL.toast("Đã đổi PIN. Hãy ghi nhớ PIN mới.");
+          if (typeof GL.cloudPush === "function" && GL.isSupabaseConfigured()) {
+            GL.cloudPush({ force: true, silent: true });
+          }
+          if (typeof GL.updateBackupReminderUI === "function") {
+            GL.updateBackupReminderUI();
+          }
+        });
       });
       ["forcePinOld", "forcePinNew", "forcePinNew2"].forEach(function (id) {
         var el = document.getElementById(id);
@@ -585,6 +575,7 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
     };
 
     // ─── Chuyển HV sang lớp khác ───
+    GL.openTransferModal = openTransferModal;
     function openTransferModal(studentId) {
       var cls = GL.activeClass();
       if (!cls) {
@@ -787,11 +778,11 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
 
     document.getElementById("loginForm").addEventListener("submit", function (e) {
       e.preventDefault();
-      var res = GL.login(
+      GL.login(
         document.getElementById("loginUser").value,
         document.getElementById("loginPin").value,
         document.getElementById("loginRemember").checked
-      );
+      ).then(function (res) {
       var err = document.getElementById("loginError");
       if (!res.ok) {
         err.textContent = res.error;
@@ -829,6 +820,7 @@ GL.bindSecurityEvents = function bindSecurityEvents() {
           }
         }, 500);
       }
+      });
     });
 
     // ─── Face ID / vân tay ───

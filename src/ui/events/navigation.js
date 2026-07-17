@@ -393,7 +393,9 @@
         topHelp.addEventListener("click", function () {
           var h = document.getElementById("openHelpModal");
           if (h) h.click();
-          else if (typeof openHelpModal === "function") openHelpModal();
+          else if (typeof window.openHelpModal === "function") {
+            window.openHelpModal();
+          }
         });
       }
 

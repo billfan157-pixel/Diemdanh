@@ -34,12 +34,18 @@
     if (typeof supabase === "undefined" || !supabase.createClient) return null;
     if (GL._sbClient) return GL._sbClient;
     try {
+      var options = {
+        auth: { persistSession: false, autoRefreshToken: false },
+      };
+      var parishKey =
+        typeof GL.getParishKey === "function" ? GL.getParishKey() : "";
+      if (parishKey) {
+        options.global = { headers: { "x-parish-key": parishKey } };
+      }
       GL._sbClient = supabase.createClient(
         GL.SUPABASE_URL,
         GL.getSupabaseAnonKey(),
-        {
-          auth: { persistSession: false, autoRefreshToken: false },
-        }
+        options
       );
       return GL._sbClient;
     } catch (e) {
@@ -168,26 +174,15 @@
           var merged = Object.assign({}, lu, ru);
           if (lt > rt) {
             merged.pinHash = lu.pinHash;
-            merged.pinPlain = lu.pinPlain;
             merged.pinChangedAt = lu.pinChangedAt;
           } else if (rt > lt) {
             merged.pinHash = ru.pinHash;
-            merged.pinPlain = ru.pinPlain;
             merged.pinChangedAt = ru.pinChangedAt;
-          } else {
-            // cùng mốc / không có — nếu local có plain+hash khớp thì giữ local
-            if (lu.pinPlain && lu.pinHash) {
-              merged.pinHash = lu.pinHash;
-              merged.pinPlain = lu.pinPlain;
-            }
+          } else if (lu.pinHash) {
+            // cùng mốc / không có — ưu tiên hash local (có thể đã nâng cấp PBKDF2)
+            merged.pinHash = lu.pinHash;
           }
-          // Sửa hash nếu lệch plain
-          if (
-            typeof GL.pinMatchesUser === "function" &&
-            merged.pinPlain
-          ) {
-            GL.pinMatchesUser(merged, merged.pinPlain);
-          }
+          delete merged.pinPlain;
           byId[ru.id] = merged;
         });
         GL.authStore = Object.assign({}, row.auth, {
@@ -195,6 +190,9 @@
             return byId[k];
           }),
         });
+        if (typeof GL.scrubPinPlain === "function") {
+          GL.scrubPinPlain(GL.authStore);
+        }
         localStorage.setItem(GL.AUTH_KEY, JSON.stringify(GL.authStore));
       }
       if (row.print && typeof row.print === "object") {

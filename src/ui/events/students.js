@@ -266,8 +266,8 @@
         t.id === "openPrintSettingsBtn" ||
         t.closest("#openPrintSettingsBtn")
       ) {
-        if (typeof openPrintSettingsModal === "function") {
-          openPrintSettingsModal();
+        if (typeof window.openPrintSettingsModal === "function") {
+          window.openPrintSettingsModal();
         }
         return;
       }
@@ -288,7 +288,9 @@
 
       var moveSt = t.closest("[data-move-student]");
       if (moveSt) {
-        openTransferModal(moveSt.getAttribute("data-move-student"));
+        if (typeof GL.openTransferModal === "function") {
+          GL.openTransferModal(moveSt.getAttribute("data-move-student"));
+        }
         return;
       }
 

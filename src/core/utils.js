@@ -868,4 +868,139 @@
   GL.uid = function uid() {
     return "id_" + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
   };
+
+  // ─── Khôi phục các hàm bị mất trong đợt dọn code (commit 58e135a) ───
+
+  GL.A4_PAGE_CSS =
+    "@page{size:A4 portrait;margin:12mm 10mm}" +
+    "html,body{width:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact}";
+
+  /**
+   * Mở cửa sổ in với khổ A4 dọc.
+   * @param {string} title
+   * @param {string} bodyHtml
+   * @param {string} [extraCss]
+   * @returns {Window|null}
+   */
+
+  GL.openPrintWindow = function openPrintWindow(title, bodyHtml, extraCss) {
+    var w = window.open("", "_blank");
+    if (!w) {
+      if (typeof GL.toast === "function") {
+        GL.toast("Trình duyệt chặn popup in. Cho phép popup để in.", "err");
+      }
+      return null;
+    }
+    var css =
+      GL.A4_PAGE_CSS +
+      ";body{font-family:'Times New Roman',Times,Segoe UI,sans-serif;color:#111;margin:0;padding:0;line-height:1.45}" +
+      "@media print{body{padding:0;margin:0}}" +
+      (extraCss || "");
+    w.document.write(
+      "<!DOCTYPE html><html><head><meta charset='utf-8'><title>" +
+        String(title || "In")
+          .replace(/</g, "")
+          .replace(/>/g, "") +
+        "</title><style>" +
+        css +
+        "</style></head><body>" +
+        (bodyHtml || "") +
+        "</body></html>"
+    );
+    w.document.close();
+    w.focus();
+    setTimeout(function () {
+      try {
+        w.print();
+      } catch (e) {
+        /* ignore */
+      }
+    }, 280);
+    return w;
+  };
+
+  /** Tóm tắt thông tin học viên (mã, NS, PH…) */
+
+  GL.infoSummary = function infoSummary(st) {
+    if (!st) return "";
+    var parts = [];
+    if (st.maHV) parts.push("Mã: " + st.maHV);
+    if (st.ngaySinh) parts.push("NS: " + st.ngaySinh);
+    if (st.gioiTinh) parts.push(st.gioiTinh);
+    if (st.giaoXu) parts.push(st.giaoXu);
+    if (st.phuHuynh) parts.push("PH: " + st.phuHuynh);
+    if (st.sdt) parts.push(st.sdt);
+    return parts.join(" · ");
+  };
+
+  /** Tạo học viên mới từ fields (dùng bởi UI thêm HV + import) */
+
+  GL.createStudent = function createStudent(fields) {
+    fields = fields || {};
+    // emptyScores / cloneScores có ở calc.js (load trước khi user thao tác)
+    var empty = GL.emptyScores
+      ? GL.emptyScores
+      : function () {
+          var s = {};
+          GL.COLS.forEach(function (c) {
+            s[c.key] = [];
+          });
+          return s;
+        };
+    var cloneBag = GL.cloneScores
+      ? GL.cloneScores
+      : function (src) {
+          var out = empty();
+          if (!src) return out;
+          GL.COLS.forEach(function (c) {
+            out[c.key] = Array.isArray(src[c.key]) ? src[c.key].slice() : [];
+          });
+          return out;
+        };
+
+    var scoresByTerm = { hk1: empty(), hk2: empty() };
+    if (fields.scoresByTerm) {
+      scoresByTerm.hk1 = cloneBag(fields.scoresByTerm.hk1);
+      scoresByTerm.hk2 = cloneBag(fields.scoresByTerm.hk2);
+    } else if (fields.scores) {
+      var term =
+        fields._term ||
+        (typeof GL.activeTerm !== "undefined" && GL.activeTerm) ||
+        "hk1";
+      if (term !== "hk1" && term !== "hk2") term = "hk1";
+      scoresByTerm[term] = cloneBag(fields.scores);
+    }
+
+    var base = {
+      id: fields.id || GL.uid(),
+      tenThanh: String(fields.tenThanh || "").trim(),
+      hoDem: String(fields.hoDem || "").trim(),
+      ten: String(fields.ten || "").trim(),
+      name: String(fields.name || "").trim(),
+      ghiChu: String(fields.ghiChu || "").trim(),
+      scoresByTerm: scoresByTerm,
+      learningLog: Array.isArray(fields.learningLog)
+        ? fields.learningLog.slice()
+        : [],
+    };
+    if (GL.INFO_FIELDS) {
+      GL.INFO_FIELDS.forEach(function (f) {
+        base[f.key] = String(fields[f.key] || "").trim();
+      });
+    }
+    // ensureNameFields bản hiện tại sửa tại chỗ, không trả về object
+    GL.ensureNameFields(base);
+    var st = base;
+    if (typeof GL.ensureStudentTerms === "function") {
+      GL.ensureStudentTerms(st);
+    }
+    if (typeof GL.ensureLearningLog === "function") {
+      GL.ensureLearningLog(st);
+    }
+    if (fields._lop != null && String(fields._lop).trim()) {
+      st._lop = String(fields._lop).trim();
+    }
+    return st;
+  };
+
 })(window.GL = window.GL || {});
