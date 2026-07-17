@@ -14,6 +14,7 @@ Project: `gqmbhvgyoenweiepvrvk`
 URL: `https://gqmbhvgyoenweiepvrvk.supabase.co`
 
 1. Supabase Dashboard → **SQL Editor** → dán & Run file `supabase/schema.sql`
+   → sau đó chạy thêm `supabase/secure-policies.sql` (khuyến nghị mạnh — chặn người lạ đọc/ghi dữ liệu; xem hướng dẫn trong file)
 2. **Settings → API** → copy **anon public** key
 3. Trong app: **☁️ Đồng bộ cloud** → dán key → **Lưu key**
 4. Máy A: **⬆ Đẩy lên cloud** (hoặc tự đẩy khi lưu điểm)
@@ -64,6 +65,17 @@ tinh-diem/
 │   └── schema.sql
 └── backups/            # file sao lưu thật — không commit
 ```
+
+## Dành cho dev
+
+```bash
+npm install     # cài tooling (eslint, prettier, vitest)
+npm run lint    # kiểm tra code
+npm test        # chạy unit test (tính điểm, auth, import)
+npm run serve   # mở app tại http://localhost:8080
+```
+
+CI (GitHub Actions) tự chạy lint + test trên mỗi PR.
 
 ## Tài khoản mặc định
 

@@ -87,8 +87,9 @@
   }
 
   function onModalKeydown(e) {
+    var modals;
     if (e.key === "Escape") {
-      var modals = document.querySelectorAll(".modal-overlay:not(.hidden)");
+      modals = document.querySelectorAll(".modal-overlay:not(.hidden)");
       if (!modals.length) return;
       var top = modals[modals.length - 1];
       if (top && top.id) {
@@ -96,7 +97,7 @@
         closeModal(top.id);
       }
     } else if (e.key === "Tab") {
-      var modals = document.querySelectorAll(".modal-overlay:not(.hidden)");
+      modals = document.querySelectorAll(".modal-overlay:not(.hidden)");
       if (!modals.length) return;
       trapTab(e, modals[modals.length - 1]);
     }

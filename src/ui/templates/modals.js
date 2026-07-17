@@ -691,6 +691,9 @@
         </p>
         <label class="field-label" for="syncAnonKey">Anon public key</label>
         <textarea id="syncAnonKey" class="note-input" rows="3" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="font-family:ui-monospace,monospace;font-size:0.75rem"></textarea>
+        <label class="field-label" for="syncParishKey" style="margin-top:10px">Mã bảo vệ giáo xứ (nếu đã bật)</label>
+        <input id="syncParishKey" type="password" autocomplete="off" placeholder="Để trống nếu chưa bật secure-policies" />
+        <p class="hint" style="margin:6px 0 0">Bật bằng cách chạy <code>supabase/secure-policies.sql</code> — chặn người lạ đọc/ghi dữ liệu dù có anon key.</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
           <button type="button" class="btn btn-primary" id="syncSaveKeyBtn">Lưu key</button>
           <button type="button" class="btn btn-ghost" id="syncPullBtn">⬇ Tải từ cloud</button>

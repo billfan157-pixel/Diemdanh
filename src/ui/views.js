@@ -1191,10 +1191,10 @@ GL.renderViewYear = function renderViewYear(cls, list) {
       .join("")
       : "";
 
-    var isMobile =
+    isMobile =
       window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
 
-    var body = !isMobile
+    body = !isMobile
       ? ranked
         .map(function (r, rankIdx) {
           var c1 = GL.classify(r.t1);
@@ -1269,7 +1269,7 @@ GL.renderViewYear = function renderViewYear(cls, list) {
       : "";
 
     // Thẻ mobile: 1 HV / card — gọn, rõ hạng, so sánh 2 HK
-    var cards = isMobile
+    cards = isMobile
       ? ranked
         .map(function (r, rankIdx) {
           var c1 = GL.classify(r.t1);

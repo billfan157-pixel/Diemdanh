@@ -98,6 +98,10 @@ GL.bindOperationEvents = function bindOperationEvents() {
       if (ta && typeof GL.getSupabaseAnonKey === "function") {
         ta.value = GL.getSupabaseAnonKey() || "";
       }
+      var pk = document.getElementById("syncParishKey");
+      if (pk && typeof GL.getParishKey === "function") {
+        pk.value = GL.getParishKey() || "";
+      }
       var err = document.getElementById("syncModalError");
       if (err) {
         err.classList.add("hidden");
@@ -136,6 +140,10 @@ GL.bindOperationEvents = function bindOperationEvents() {
         }
         if (typeof GL.setSupabaseAnonKey === "function") {
           GL.setSupabaseAnonKey(key);
+        }
+        var pkEl = document.getElementById("syncParishKey");
+        if (pkEl && typeof GL.setParishKey === "function") {
+          GL.setParishKey(pkEl.value);
         }
         if (typeof GL.resetSupabaseClient === "function") {
           GL.resetSupabaseClient();
