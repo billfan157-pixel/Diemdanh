@@ -12,8 +12,6 @@ export const COLS = [
   { key: 'kiemTra' as const, short: 'KT', label: 'Kiểm tra', defaultWeight: 1 }
 ] as const
 
-export type ColumnKey = (typeof COLS)[number]['key']
-
 export const COL_KEYS: ColumnKey[] = COLS.map(c => c.key)
 export const COL_SHORTS = Object.fromEntries(COLS.map(c => [c.key, c.short]))
 export const COL_LABELS = Object.fromEntries(COLS.map(c => [c.key, c.label]))
@@ -32,16 +30,6 @@ export const INFO_FIELDS = ['maHV', 'ngaySinh', 'gioiTinh', 'tenPhuHuynh', 'sdPh
 
 export type NameField = typeof NAME_FIELDS[number]
 export type InfoField = typeof INFO_FIELDS[number]
-
-// Default weights
-export const DEFAULT_WEIGHTS: Record<ColumnKey, number> = {
-  khaoKinh: 1,
-  thuocBai: 1,
-  chuyenCan: 1,
-  baiTap: 1,
-  thaiDo: 1,
-  kiemTra: 1
-}
 
 // Log types and levels
 export const LOG_TYPES = [
@@ -127,12 +115,6 @@ export function getRankBadgeClass(rank: string): string {
   return classes[rank] || classes.none
 }
 
-// Year weights for final grade calculation
-export const YEAR_WEIGHTS = {
-  hk1: 1,
-  hk2: 2
-} as const
-
 // Column weights
 export interface ColumnWeights {
   khaoKinh: number
@@ -154,9 +136,9 @@ export const DEFAULT_WEIGHTS: ColumnWeights = {
 
 export function validateWeights(weights: Partial<ColumnWeights>): ColumnWeights {
   const result = { ...DEFAULT_WEIGHTS }
-  for (const key of COLS) {
-    if (weights[key] !== undefined && typeof weights[key] === 'number' && weights[key]! > 0) {
-      result[key] = weights[key]!
+  for (const col of COLS) {
+    if (weights[col.key] !== undefined && typeof weights[col.key] === 'number' && weights[col.key]! > 0) {
+      result[col.key] = weights[col.key]!
     }
   }
   return result
@@ -238,44 +220,67 @@ export function classifyStudent(tb: number): { score: string; rank: string; labe
   return { score: 'score-y', rank: 'y', label: 'Yếu' }
 }
 
-export function classifyRank(tb: number | null): RankInfo {
-  if (tb === null || tb === undefined || isNaN(tb)) {
-    return { score: 'score-none', rank: 'none', label: 'Chưa có điểm' }
-  }
-  for (const threshold of RANK_THRESHOLDS) {
-    if (tb >= threshold.min) {
-      return { score: threshold.score, rank: threshold.rank, label: threshold.label }
-    }
-  }
-  return { score: 'score-y', rank: 'y', label: 'Yếu' }
-}
-
-export function getRankColorClass(rank: string): string {
-  const colors: Record<string, string> = {
-    xs: 'text-amber-600 dark:text-amber-400',
-    g: 'text-green-600 dark:text-green-400',
-    k: 'text-blue-600 dark:text-blue-400',
-    tb: 'text-gray-600 dark:text-gray-400',
-    y: 'text-red-600 dark:text-red-400',
-    none: 'text-gray-400'
-  }
-  return colors[rank] || colors.none
-}
-
-export function getRankBadgeClass(rank: string): string {
-  const classes: Record<string, string> = {
-    xs: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-    g: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    k: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    tb: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
-    y: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    none: 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400'
-  }
-  return classes[rank] || classes.none
-}
-
 // Year weights for final grade calculation
 export const YEAR_WEIGHTS = {
   hk1: 1,
   hk2: 2
 } as const
+
+export function normalizeName(name: string): string {
+  if (!name) return ''
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function displayName(st: { tenThanh?: string; hoDem?: string; ten?: string; name?: string } | null | undefined): string {
+  if (!st) return ""
+  const parts = [st.tenThanh, st.hoDem, st.ten]
+    .map(x => String(x || '').trim())
+    .filter(Boolean)
+  if (parts.length) return parts.join(' ')
+  return String(st.name || '').trim()
+}
+
+export function sortName(a: string, b: string): number {
+  return a.localeCompare(b, 'vi')
+}
+
+export function generateId(prefix = 'id'): string {
+  return `${prefix}_${Math.random().toString(36).substring(2, 9)}_${Date.now().toString(36)}`
+}
+
+export function deepClone<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+  return JSON.parse(JSON.stringify(obj))
+}
+
+export function debounce<T extends (...args: any[]) => any>(fn: T, delay: number): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  return function (this: any, ...args: Parameters<T>) {
+    if (timeoutId) clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => {
+      fn.apply(this, args)
+    }, delay)
+  }
+}
+
+export function throttle<T extends (...args: any[]) => any>(fn: T, limit: number): (...args: Parameters<T>) => void {
+  let inThrottle = false
+  return function (this: any, ...args: Parameters<T>) {
+    if (!inThrottle) {
+      fn.apply(this, args)
+      inThrottle = true
+      setTimeout(() => (inThrottle = false), limit)
+    }
+  }
+}
+
+

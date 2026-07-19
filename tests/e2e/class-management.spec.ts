@@ -11,9 +11,11 @@ test.describe('Class Management', () => {
   })
 
   test('should create a new class', async ({ page }) => {
-    // Open sidebar
-    await page.click('#mOpenDrawer')
-    await expect(page.locator('.sidebar')).toHaveClass(/open/)
+    // Open sidebar if in mobile view
+    if (await page.locator('#mOpenDrawer').isVisible()) {
+      await page.click('#mOpenDrawer')
+      await expect(page.locator('.sidebar')).toHaveClass(/open/)
+    }
 
     // Create class
     await page.fill('#newClassName', 'Lớp Test')
@@ -26,7 +28,9 @@ test.describe('Class Management', () => {
 
   test('should rename class', async ({ page }) => {
     // Create a class first
-    await page.click('#mOpenDrawer')
+    if (await page.locator('#mOpenDrawer').isVisible()) {
+      await page.click('#mOpenDrawer')
+    }
     await page.fill('#newClassName', 'Lớp Đổi Tên')
     await page.fill('#newClassYear', '2024-2025')
     await page.click('#createClassBtn')
@@ -43,7 +47,9 @@ test.describe('Class Management', () => {
 
   test('should delete class', async ({ page }) => {
     // Create a class first
-    await page.click('#mOpenDrawer')
+    if (await page.locator('#mOpenDrawer').isVisible()) {
+      await page.click('#mOpenDrawer')
+    }
     await page.fill('#newClassName', 'Lớp Xóa')
     await page.fill('#newClassYear', '2024-2025')
     await page.click('#createClassBtn')

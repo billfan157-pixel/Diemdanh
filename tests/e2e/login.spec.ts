@@ -40,3 +40,4 @@ test.describe('Sổ Điểm GL', () => {
     await expect(page.locator('.m-top-title')).toContainText('Sổ Điểm')
     await expect(page.locator('.m-nav-item.active')).toHaveAttribute('data-m-nav', 'home')
   })
+})

@@ -3,14 +3,13 @@
 // Immutable state management with Immer + patch-based undo/redo
 // ============================================================
 
-import { produce, produceWithPatches, enablePatches, enableES5, Patch } from 'immer'
+import { produce, produceWithPatches, enablePatches, Patch } from 'immer'
 import { StorageAdapter } from '../services/storage/StorageAdapter'
-import { AppState, ClassData, StudentData, ColumnWeights } from '../services/storage/StorageAdapter'
-import { COLS, DEFAULT_WEIGHTS, ColumnKey, generateId, createEmptyTermScores, createEmptyScoresByTerm, migrateStudent, migrateClass } from '../config/constants'
+import { AppState, ClassData, StudentData, ColumnWeights } from '../services/storage/StorageAdapter.types'
+import { COLS, DEFAULT_WEIGHTS, ColumnKey, generateId, createEmptyScoresByTerm } from '../config/constants.ts'
 
 // Enable Immer patches for undo/redo
 enablePatches()
-enableES5()
 
 // ============================================================
 // Types
@@ -31,9 +30,9 @@ type StateListener = (state: Readonly<AppState>) => void
 // ============================================================
 
 export class StateManager {
-  private state: AppState
+  private state!: AppState
   private storage: StorageAdapter
-  private listeners: Set<(state: Readonly<AppState>) => void> = new Set()
+  private listeners: Set<StateListener> = new Set()
   private undoStack: UndoEntry[] = []
   private redoStack: UndoEntry[] = []
   private maxUndoSize = 50
@@ -69,7 +68,7 @@ export class StateManager {
     return this.state
   }
 
-  subscribe(listener: (state: Readonly<AppState>) => void): () => void {
+  subscribe(listener: StateListener): () => void {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
   }
@@ -204,7 +203,7 @@ export class StateManager {
 
   getYears(): string[] {
     return [...new Set(this.state.classes.map(c => c.year).filter(Boolean))]
-      .sort((a, b) => b.localeCompare(a))
+      .sort((a, b) => b.localeCompare(a)) as string[]
   }
 
   // ============================================================
@@ -575,7 +574,7 @@ export class StateManager {
 
 function applyPatch(obj: any, patch: Patch): void {
   const { op, path, value } = patch
-  const keys = path.split('/').filter(Boolean)
+  const keys = path
 
   if (keys.length === 0) return
 
@@ -596,7 +595,7 @@ function applyPatch(obj: any, patch: Patch): void {
   switch (op) {
     case 'add':
       if (Array.isArray(target)) {
-        const idx = parseInt(lastKey, 10)
+        const idx = parseInt(String(lastKey), 10)
         if (idx >= 0 && idx <= target.length) {
           target.splice(idx, 0, value)
         }
@@ -607,7 +606,7 @@ function applyPatch(obj: any, patch: Patch): void {
 
     case 'remove':
       if (Array.isArray(target)) {
-        const idx = parseInt(lastKey, 10)
+        const idx = parseInt(String(lastKey), 10)
         if (idx >= 0 && idx < target.length) {
           target.splice(idx, 1)
         }

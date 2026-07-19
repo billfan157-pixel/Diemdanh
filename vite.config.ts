@@ -15,14 +15,9 @@ export default defineConfig({
       },
       output: {
         manualChunks: {
-          vendor: ['immer', 'idb', '@supabase/supabase-js'],
-          xlsx: ['xlsx'],
-          jszip: ['jszip']
+          vendor: ['immer', 'idb', '@supabase/supabase-js']
         }
       }
-    },
-    commonjsOptions: {
-      include: [/xlsx/, /jszip/]
     }
   },
   server: {
@@ -42,7 +37,6 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['immer', 'idb', '@supabase/supabase-js'],
-    exclude: ['xlsx', 'jszip']
+    include: ['immer', 'idb', '@supabase/supabase-js']
   }
 })

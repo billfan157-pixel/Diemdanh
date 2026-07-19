@@ -2,7 +2,8 @@
 // Sổ Điểm GL - Main Entry Point
 // ============================================================
 
-import './styles/main.css'
+import '../assets/css/main.css'
+import '../assets/css/mobile.css'
 
 import { App } from './ui/App'
 

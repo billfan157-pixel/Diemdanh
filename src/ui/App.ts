@@ -10,18 +10,12 @@ import { SyncManager } from '../services/sync/SyncManager'
 import { NotificationManager } from '../services/NotificationManager'
 
 export class App extends EventEmitter {
-  private mountPoint: HTMLElement
-  private storage: StorageAdapter
-  private stateManager: StateManager
-  private authManager: AuthManager
-  private syncManager: SyncManager
-  private notificationManager: NotificationManager
-  private initialized = false
-
-  constructor() {
-    super()
-  }
-
+  private mountPoint!: HTMLElement
+  private storage!: StorageAdapter
+  private stateManager!: StateManager
+  private authManager!: AuthManager
+  private syncManager!: SyncManager
+  private notificationManager!: NotificationManager
   async mount(mountPoint: HTMLElement): Promise<void> {
     this.mountPoint = mountPoint
 
@@ -35,13 +29,25 @@ export class App extends EventEmitter {
     this.stateManager = new StateManager(this.storage)
     await this.stateManager.init()
 
-    this.authManager = new AuthManager(this.stateManager)
+    this.authManager = new AuthManager(this.storage)
+    this.authManager.setStateManager(this.stateManager)
     await this.authManager.init()
 
-    this.syncManager = new SyncManager(this.stateManager, this.authManager)
+    this.syncManager = new SyncManager(this.storage)
+    this.syncManager.setStateManager(this.stateManager)
+    this.syncManager.setAuthManager(this.authManager)
 
     // Setup global error handlers
     this.setupGlobalHandlers()
+
+    // Listen for login/logout events to switch views
+    window.addEventListener('gl:login', () => {
+      this.showApp()
+    })
+
+    window.addEventListener('gl:logout', () => {
+      this.showLogin()
+    })
 
     // Check if user is logged in
     if (this.authManager.isLoggedIn()) {
@@ -50,7 +56,6 @@ export class App extends EventEmitter {
       this.showLogin()
     }
 
-    this.initialized = true
     this.emit('ready')
   }
 

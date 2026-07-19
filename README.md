@@ -2,7 +2,25 @@
 
 App web tính điểm giáo lý theo lớp — chạy trên trình duyệt (máy tính & điện thoại).
 
-**Mở local:** double-click `index.html` hoặc serve thư mục này.
+## Chạy local (phát triển)
+
+```bash
+npm install
+npm run dev        # http://localhost:3002
+```
+
+## Build sản phẩm
+
+```bash
+npm run build      # output vào dist/
+```
+
+## Kiểm thử
+
+```bash
+npm run test:run       # Unit tests (Vitest)
+npx playwright test    # E2E tests (Playwright)
+```
 
 ## Repo
 
@@ -32,45 +50,62 @@ URL: `https://gqmbhvgyoenweiepvrvk.supabase.co`
 
 5. Trên điện thoại: mở link → **Thêm vào Màn hình chính**.
 
-> Dữ liệu điểm lưu **trên từng máy** (localStorage). Sao lưu JSON định kỳ nếu dùng nhiều thiết bị.
+> Dữ liệu điểm lưu **trên từng máy** (IndexedDB). Sao lưu JSON định kỳ nếu dùng nhiều thiết bị.
 
-## Cấu trúc
+## Cấu trúc dự án
 
 ```
 tinh-diem/
-├── index.html
+├── index.html              # HTML shell, điểm mount duy nhất
+├── src/                    # Toàn bộ mã TypeScript
+│   ├── main.ts             # Entry point của Vite
+│   ├── styles/
+│   │   └── main.css        # CSS Design System v2 (đang dùng)
+│   ├── config/             # Hằng số nghiệp vụ, storage keys
+│   │   └── constants.ts
+│   ├── core/               # Logic nền
+│   │   ├── calc.ts         # Tính điểm TB, hệ số, xếp loại
+│   │   ├── events.ts       # EventEmitter
+│   │   └── auth/
+│   │       └── AuthManager.ts
+│   ├── services/           # Tầng I/O và tích hợp ngoài
+│   │   ├── storage/        # IndexedDB adapter + types
+│   │   ├── sync/           # SyncManager (Supabase)
+│   │   └── NotificationManager.ts
+│   └── ui/                 # Giao diện
+│       ├── App.ts          # Bootstrap app
+│       ├── StateManager.ts # Quản lý state (Immer + Undo/Redo)
+│       └── views/
+│           ├── AppView.ts
+│           ├── LoginView.ts
+│           └── modals/
+│               └── AddStudentModal.ts
 ├── assets/
-│   ├── css/
+│   ├── css/                # CSS cũ (không còn dùng)
 │   │   ├── main.css
 │   │   └── mobile.css
-│   └── vendor/         # xlsx, jszip (offline)
-├── src/
-│   ├── platform/       # code chạy rất sớm, trước layout/CSS
-│   ├── config/         # hằng số, cấu hình Supabase public
-│   ├── core/           # state, auth, tính điểm, helper chung
-│   ├── services/
-│   │   ├── export/     # tạo workbook và UI xuất file
-│   │   ├── import/     # chuẩn hóa, preview và đọc file nhập
-│   │   └── ...         # cloud sync, backup
-│   ├── features/       # dashboard, báo cáo, journal, parish, invite
-│   └── ui/
-│       ├── templates/  # login, app shell, feedback, modal
-│       ├── events/     # binding theo luồng nghiệp vụ UI
-│       ├── mount-templates.js
-│       └── ...         # render view + bootstrap gắn event
+│   └── vendor/             # xlsx, jszip (offline)
+├── legacy/                 # Code JS cũ (tham chiếu khi migration)
+│   ├── core/               # calc.js, state.js, auth.js ...
+│   ├── services/           # backup.js, export/, import/
+│   ├── features/           # dashboard.js, journal.js ...
+│   └── ui/                 # render.js, events/, templates/
+├── tests/
+│   ├── unit/               # Vitest unit tests
+│   └── e2e/                # Playwright E2E tests
 ├── docs/
 │   └── ARCHITECTURE.md
 ├── supabase/
 │   └── schema.sql
-└── backups/            # file sao lưu thật — không commit
+└── backups/                # File sao lưu thật — không commit
 ```
 
 ## Tài khoản mặc định
 
 - User: `admin` · PIN: `1234` (đổi ngay sau khi đăng nhập)
 
-## Namespace
+## Kiến trúc
 
-Mọi module gắn vào `window.GL`. Template UI được mount trước, sau đó thứ tự `<script>` phải giữ nguyên: `config` → `core` → `services` → `features` → `ui` → `app`.
+Xem chi tiết tại [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Xem thêm [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) trước khi thêm module mới.
+App sử dụng **TypeScript + Vite**. Toàn bộ logic được đóng gói dưới dạng ES Modules, không còn dùng mô hình toàn cục `window.GL`. Dữ liệu lưu trên **IndexedDB** thông qua `StorageAdapter`.

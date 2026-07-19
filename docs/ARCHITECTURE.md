@@ -1,76 +1,125 @@
-# Kiến trúc app
+# Kiến trúc app (TypeScript + Vite)
 
-App này vẫn là static web app, không cần build step. Các module dùng chung namespace `window.GL` và được load trực tiếp trong `index.html`.
+App chạy hoàn toàn trên trình duyệt. Build bằng **Vite**, viết bằng **TypeScript**, không có backend riêng. Dữ liệu lưu trên **IndexedDB** cục bộ và đồng bộ lên **Supabase** (tuỳ chọn).
 
-## Mục tiêu cấu trúc
+---
 
-- `index.html` chỉ giữ shell tối thiểu, điểm mount và thứ tự load script.
-- `assets/` chỉ chứa tài nguyên tĩnh: CSS, thư viện vendor, hình ảnh nếu có.
-- `src/` chứa toàn bộ logic app, chia theo trách nhiệm để dễ tìm và dễ review.
-- `supabase/` chứa tài nguyên phía database, không trộn vào code frontend.
-- `backups/` chứa dữ liệu sao lưu thật trên máy, không commit file JSON.
+## Luồng khởi động
+
+```
+index.html
+  └── src/main.ts           ← Entry point Vite
+        └── App.ts          ← Mount toàn bộ app
+              ├── StorageAdapter.init()   ← Mở IndexedDB
+              ├── AuthManager.init()      ← Load session
+              ├── StateManager.init()     ← Load state
+              └── AppView / LoginView     ← Render UI
+```
+
+---
 
 ## Nhóm module
 
-`src/platform/`
-: Code phải chạy rất sớm trước khi body/CSS hoàn tất, ví dụ khóa zoom mobile.
+### `src/config/`
+Hằng số nghiệp vụ, storage keys, định nghĩa cột điểm. **Không** chứa logic UI hay I/O.
 
-`src/config/`
-: Hằng số nghiệp vụ, storage keys, cấu hình public. Không đặt logic UI ở đây.
+- [`constants.ts`](../src/config/constants.ts): Định nghĩa `COLS` (cột điểm), `ColumnKey`, `ColumnWeights`, hàm `classifyStudent`, `displayName`, `generateId`.
 
-`src/core/`
-: Logic nền của app: helper chung, tính điểm, state/localStorage, auth, sinh trắc, lịch sử sửa điểm.
+### `src/core/`
+Logic tính toán và xác thực thuần túy, không phụ thuộc DOM.
 
-`src/services/`
-: Các tác vụ I/O hoặc tích hợp bên ngoài: Supabase sync, backup, import/export Excel/CSV/DOCX. Export được chia thành `export/workbook.js` và `export/ui.js`; import được chia thành `import/data.js`, `import/preview.js` và `import/parsers.js`.
+- [`calc.ts`](../src/core/calc.ts): Tính TB theo học kỳ (`studentTB`), TB cả năm có hệ số (`studentYearTB`, HK1×1 + HK2×2), xếp loại (`classify`), migration điểm phẳng sang `scoresByTerm`.
+- [`auth/AuthManager.ts`](../src/core/auth/AuthManager.ts): Đăng nhập PIN (bcrypt), WebAuthn sinh trắc học, quản lý session, phân quyền `ban_gl` / `glv`.
 
-`src/features/`
-: Tính năng độc lập theo domain: dashboard, báo cáo, journal, tổng hợp giáo xứ, thư mời phụ huynh.
+### `src/services/`
+Tầng I/O và tích hợp bên ngoài.
 
-`src/ui/`
-: Render HTML động, gắn sự kiện, điều hướng màn hình và bootstrap app. Markup tĩnh được chia trong `src/ui/templates/` và mount qua `src/ui/mount-templates.js`; event binding được chia theo luồng trong `src/ui/events/`.
+- [`storage/StorageAdapter.ts`](../src/services/storage/StorageAdapter.ts): Đọc/ghi IndexedDB (idb). Lưu `appState`, `authStore`, hàng đợi sync, backup.
+- [`storage/StorageAdapter.types.ts`](../src/services/storage/StorageAdapter.types.ts): Toàn bộ interface: `AppState`, `ClassData`, `StudentData`, `ColumnWeights`, `ScoresByTerm`, `TermScores`.
+- [`sync/SyncManager.ts`](../src/services/sync/SyncManager.ts): Đồng bộ state lên Supabase. Push/pull theo `updatedAt`.
+- [`NotificationManager.ts`](../src/services/NotificationManager.ts): Toast thông báo, hộp thoại confirm/prompt động.
 
-## Template giao diện
+### `src/ui/`
+Render HTML, gắn sự kiện, điều hướng màn hình và bootstrap app.
 
-- `templates/login.js`: màn hình đăng nhập.
-- `templates/app-shell.js`: khung điều hướng và các màn hình chính.
-- `templates/feedback.js`: toast, hướng dẫn và lớp phủ giao diện.
-- `templates/modals.js`: toàn bộ modal nhập liệu.
-- `templates/registry.js` và `mount-templates.js`: đăng ký, sau đó chèn template vào `#appMount` trước khi logic UI chạy.
+- [`App.ts`](../src/ui/App.ts): Khởi tạo tất cả manager, lắng nghe sự kiện đăng nhập/đăng xuất, mount view.
+- [`StateManager.ts`](../src/ui/StateManager.ts): Quản lý `AppState` bằng **Immer** (immutable). Hỗ trợ Undo/Redo bằng patch. Debounce lưu IndexedDB.
+- [`views/AppView.ts`](../src/ui/views/AppView.ts): Render sidebar, dashboard, danh sách lớp, hồ sơ cá nhân. Gắn toàn bộ sự kiện UI.
+- [`views/LoginView.ts`](../src/ui/views/LoginView.ts): Màn hình đăng nhập PIN và sinh trắc học.
+- [`views/modals/AddStudentModal.ts`](../src/ui/views/modals/AddStudentModal.ts): Modal thêm học viên mới.
 
-Template là JavaScript thay vì HTML partial để app vẫn mở được bằng `file://` mà không cần web server.
+---
 
-## Event UI
+## Quản lý State
 
-- `events/navigation.js`: điều hướng, dashboard, lớp và mobile shell.
-- `events/students.js`: nhập điểm, thông tin học viên, tìm kiếm và theo dõi.
-- `events/import-export.js`: thao tác modal import/export.
-- `events/operations.js`: backup, cloud sync, báo cáo, in và thư mời.
-- `events/security.js`: tài khoản, PIN, sinh trắc, chuyển lớp và đăng nhập.
+`StateManager` là nguồn dữ liệu duy nhất (single source of truth). Mọi thay đổi phải đi qua `mutate()`:
 
-`ui/app.js` chỉ cung cấp helper chung, khởi tạo app và gọi các binder theo thứ tự.
+```typescript
+this.stateManager.mutate('Thêm học viên', draft => {
+  const cls = draft.classes.find(c => c.id === classId)
+  cls?.students.push(newStudent)
+})
+```
 
-## Thứ tự load bắt buộc
+- **Immer** đảm bảo state bất biến (immutable).
+- Mỗi `mutate()` tạo `patches` / `inversePatches` để hỗ trợ **Undo/Redo**.
+- Sau mỗi thay đổi, state được debounce lưu xuống **IndexedDB** sau 300ms.
+- Các component đăng ký lắng nghe bằng `stateManager.subscribe(listener)`.
 
-Giữ thứ tự trong `index.html`:
+---
 
-1. Template registry, template UI và `mount-templates.js`
-2. `src/config/*`
-3. `src/core/utils.js`, `src/core/calc.js`, `src/core/state.js`
-4. Auth/biometric/cloud/backup/history
-5. `src/features/*`
-6. `src/ui/views.js`, `src/ui/render.js`
-7. `src/services/export/*`, rồi `src/services/import/*`
-8. `src/ui/events/*`
-9. `src/ui/app.js`
+## Cơ sở dữ liệu (IndexedDB)
 
-Nếu thêm module mới, đặt file vào nhóm đúng trách nhiệm và thêm `<script>` ở vị trí mà dependency của nó đã được load trước.
+Schema IndexedDB gồm 4 object store:
 
-## Quy tắc bảo trì
+| Store | Key | Nội dung |
+| :--- | :--- | :--- |
+| `appState` | `'state'` | Toàn bộ dữ liệu lớp và học viên |
+| `authStore` | `'auth'` | Danh sách người dùng, PIN hash, session |
+| `syncQueue` | `autoIncrement` | Hàng đợi chờ đồng bộ lên Supabase |
+| `backups` | `autoIncrement` | Lịch sử sao lưu JSON cục bộ |
 
-- Module mới vẫn bọc trong IIFE: `(function (GL) { ... })(window.GL = window.GL || {});`
-- Không đọc DOM trong `config` hoặc `core` nếu không thật cần thiết.
-- Feature chỉ nên gọi API public trên `GL`, hạn chế chọc trực tiếp DOM ngoài phần màn hình/modal của nó.
-- Thêm markup tĩnh vào template phù hợp, không đưa trở lại `index.html`; phần tử UI sinh theo dữ liệu tiếp tục thuộc `render.js`.
-- Vendor minified giữ trong `assets/vendor/`, không sửa tay.
-- CSS tổng quát ở `assets/css/main.css`; override riêng mobile ở `assets/css/mobile.css`.
+---
+
+## Tính điểm
+
+Logic tập trung tại [`src/core/calc.ts`](../src/core/calc.ts):
+
+- Mỗi học viên lưu `scoresByTerm: { hk1: TermScores, hk2: TermScores }`.
+- `studentTB(student, weights, 'hk1')`: TB học kỳ có hệ số cột.
+- `studentYearTB(student, weights)`: TB cả năm = **(TB HK1 × 1 + TB HK2 × 2) / 3**. Nếu thiếu 1 kỳ thì lấy TB kỳ còn lại.
+- `classify(avg)`: Xếp loại Xuất sắc / Giỏi / Khá / Trung bình / Yếu.
+
+---
+
+## Quy tắc thêm module mới
+
+1. Đặt file vào nhóm đúng trách nhiệm (`config/`, `core/`, `services/`, `ui/`).
+2. Export rõ ràng qua `export function` hoặc `export class` — **không dùng `window.GL`**.
+3. Import bằng đường dẫn tương đối có đuôi `.ts`, ví dụ:
+   ```typescript
+   import { studentYearTB } from '../../core/calc.ts'
+   ```
+4. Thêm unit test tương ứng trong `tests/unit/`.
+
+---
+
+## Code legacy
+
+Thư mục [`legacy/`](../legacy/) chứa toàn bộ 34 file `.js` cũ (kiến trúc `window.GL`) đã được tách ra khỏi `src/` để tham chiếu trong quá trình migration. Các file này **không được load** bởi Vite và sẽ được xóa dần khi từng tính năng được chuyển sang TypeScript hoàn chỉnh.
+
+Danh sách tính năng chưa migrate:
+- Xuất/Nhập điểm Excel (`legacy/services/export/`, `legacy/services/import/`)
+- Sao lưu JSON (`legacy/services/backup.js`)
+- Nhật ký học viên (`legacy/features/journal.js`)
+- Báo cáo giáo xứ (`legacy/features/reports.js`, `legacy/features/parish.js`)
+- Thư mời phụ huynh (`legacy/features/invite.js`)
+
+---
+
+## Kiểm thử
+
+```bash
+npm run test:run      # Vitest unit tests (tests/unit/)
+npx playwright test   # Playwright E2E tests (tests/e2e/)
+```

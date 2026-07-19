@@ -3,18 +3,14 @@
 // IndexedDB + localStorage fallback with migration
 // ============================================================
 
-import { openDB, DBSchema, IDBPDatabase } from 'idb'
+import { openDB, IDBPDatabase } from 'idb'
 import {
   AppState,
-  AuthStore,
   SyncQueueItem,
   BackupRecord,
-  AppDBSchema,
-  ClassData,
-  StudentData,
-  LearningLogEntry,
-  ColumnWeights
+  AppDBSchema
 } from './StorageAdapter.types'
+import { createEmptyTermScores } from '../../config/constants.ts'
 
 // ============================================================
 // Constants
@@ -29,21 +25,7 @@ const STORAGE_KEYS = {
   PRINT: 'so-diem-gl-print'
 } as const
 
-const DEFAULT_STATE = {
-  version: 4,
-  activeClassId: null,
-  classes: [],
-  yearFilter: null,
-  viewMode: 'cards',
-  activeTerm: 'hk1',
-  lastModified: Date.now()
-}
 
-const DEFAULT_AUTH = {
-  version: 1,
-  users: [],
-  activeUserId: null
-}
 
 // ============================================================
 // IndexedDB Schema & Instance
@@ -55,7 +37,7 @@ async function getDB(): Promise<IDBPDatabase<AppDBSchema>> {
   if (dbInstance) return dbInstance
 
   dbInstance = await openDB<AppDBSchema>(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion, newVersion, transaction) {
+    upgrade(db, oldVersion) {
       // Create stores
       if (!db.objectStoreNames.contains('appState')) {
         db.createObjectStore('appState')
@@ -151,7 +133,7 @@ export class StorageAdapter {
     if (this.useIndexedDB) {
       try {
         const db = await getDB()
-        await db.put('appState', state, 'main')
+        await db.put('appState', stateToSave, 'main')
         return
       } catch (e) {
         console.warn('IndexedDB write failed, falling back:', e)
@@ -159,7 +141,7 @@ export class StorageAdapter {
     }
 
     try {
-      localStorage.setItem('so-diem-gl-state', JSON.stringify(state))
+      localStorage.setItem('so-diem-gl-state', JSON.stringify(stateToSave))
     } catch (e) {
       if (e instanceof DOMException && e.name === 'QuotaExceededError') {
         console.error('Storage quota exceeded')
@@ -283,6 +265,20 @@ export class StorageAdapter {
       }
     } catch (e) {
       console.warn('Failed to mark sync failed:', e)
+    }
+  }
+
+  async updateSyncStatus(id: number, status: 'pending' | 'syncing' | 'failed' | 'completed'): Promise<void> {
+    if (!this.useIndexedDB) return
+    try {
+      const db = await getDB()
+      const item = await db.get('syncQueue', id)
+      if (item) {
+        item.status = status
+        await db.put('syncQueue', item)
+      }
+    } catch (e) {
+      console.warn('Failed to update sync status:', e)
     }
   }
 

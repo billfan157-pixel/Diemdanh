@@ -1,6 +1,4 @@
-// ============================================================
-// Sổ Điểm GL — Storage Adapter Types
-// ============================================================
+import { DBSchema } from 'idb'
 
 export interface AppState {
   version: number
@@ -8,7 +6,7 @@ export interface AppState {
   classes: ClassData[]
   yearFilter: string | null
   viewMode: string
-  activeTerm: 'hk1' | 'hk2'
+  activeTerm: 'hk1' | 'hk2' | 'year'
   lastModified: number
 }
 
@@ -114,4 +112,30 @@ export interface UserRecord {
   createdAt: number
   updatedAt: number
   lastLoginAt?: number
+}
+
+export interface AppDBSchema extends DBSchema {
+  appState: {
+    key: string
+    value: AppState
+  }
+  authStore: {
+    key: string
+    value: AuthStore
+  }
+  syncQueue: {
+    key: number
+    value: SyncQueueItem
+    indexes: {
+      'by-timestamp': number
+      'by-type': string
+    }
+  }
+  backups: {
+    key: number
+    value: BackupRecord
+    indexes: {
+      'by-timestamp': number
+    }
+  }
 }

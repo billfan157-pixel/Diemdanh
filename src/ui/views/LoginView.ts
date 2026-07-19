@@ -43,10 +43,10 @@ export class LoginView {
 
         <form id="loginForm" autocomplete="on">
           <label class="field-label" for="loginUser">Tài khoản</label>
-          <input id="loginUser" type="text" placeholder="admin" required autocomplete="username" />
+          <input id="loginUser" class="input" type="text" placeholder="admin" required autocomplete="username" />
 
           <label class="field-label" for="loginPin" style="margin-top:10px">PIN</label>
-          <input id="loginPin" type="password" placeholder="••••" required autocomplete="current-password" />
+          <input id="loginPin" class="input" type="password" placeholder="••••" required autocomplete="current-password" />
 
           <label class="check-all" style="margin-top:12px">
             <input type="checkbox" id="loginRemember" checked /> Ghi nhớ trên máy này
@@ -100,7 +100,7 @@ export class LoginView {
       }
 
       this.hideError(errorEl)
-      this.notificationManager.show(`Xin chào ${result.user.displayName || result.user.username}`, 'success')
+      this.notificationManager.show(`Xin chào ${result.user!.displayName || result.user!.username}`, 'success')
 
       // Trigger app to show main view
       window.dispatchEvent(new CustomEvent('gl:login', { detail: result }))
@@ -118,7 +118,7 @@ export class LoginView {
       return
     }
 
-    this.notificationManager.show(`Xin chào ${result.user.displayName || result.user.username}`, 'success')
+    this.notificationManager.show(`Xin chào ${result.user!.displayName || result.user!.username}`, 'success')
     window.dispatchEvent(new CustomEvent('gl:login', { detail: result }))
   }
 

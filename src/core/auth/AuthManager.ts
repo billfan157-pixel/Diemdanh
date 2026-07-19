@@ -4,7 +4,7 @@
 // ============================================================
 
 import { StorageAdapter } from '../../services/storage/StorageAdapter'
-import { generateId } from '../../config/constants'
+import { generateId } from '../../config/constants.ts'
 
 // ============================================================
 // Types
@@ -32,9 +32,11 @@ export interface AuthStore {
   activeUserId: string | null
 }
 
+export type SanitizedUser = Omit<UserRecord, 'pinHash' | 'pinSalt' | 'biometricCredentialId'>
+
 export interface AuthResult {
   ok: boolean
-  user?: UserRecord
+  user?: SanitizedUser
   error?: string
 }
 
@@ -60,32 +62,57 @@ const SESSION_NORMAL_DAYS = 1
 
 export class AuthManager {
   private storage: StorageAdapter
-  private stateManager: any = null
   private currentUser: UserRecord | null = null
   private session: SessionData | null = null
-  private initialized = false
+  private cachedUsers: UserRecord[] = []
 
   constructor(storage: StorageAdapter) {
     this.storage = storage
   }
 
-  setStateManager(stateManager: any): void {
-    this.stateManager = stateManager
+  setStateManager(_stateManager: any): void {
+    // Saved in case future features need it
   }
 
   async init(): Promise<void> {
+    let authStore = await this.storage.getAuthStore()
+
+    if (!authStore.users || authStore.users.length === 0) {
+      const pinHash = await this.hashPin('1234')
+      const adminUser: UserRecord = {
+        id: 'admin-init',
+        username: 'admin',
+        displayName: 'Ban Giáo lý',
+        pinHash,
+        pinSalt: '',
+        role: 'ban_gl',
+        classIds: [],
+        active: true,
+        biometricEnabled: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+      authStore = {
+        version: 1,
+        users: [adminUser],
+        activeUserId: null
+      }
+      await this.storage.setAuthStore(authStore)
+    }
+
+    this.cachedUsers = authStore.users || []
+
     // Restore session if exists
     await this.restoreSession()
     // Migrate users if needed
     await this.migrateUsersIfNeeded()
-    this.initialized = true
   }
 
   // ============================================================
   // Core Auth Operations
   // ============================================================
 
-  async login(username: string, pin: string, remember = false): Promise<{ ok: boolean; user?: UserRecord; error?: string }> {
+  async login(username: string, pin: string, remember = false): Promise<AuthResult> {
     const authStore = await this.storage.getAuthStore()
     const normalizedUser = username.trim().toLowerCase()
 
@@ -133,7 +160,7 @@ export class AuthManager {
     // Also clear from IndexedDB if needed
   }
 
-  getCurrentUser(): UserRecord | null {
+  getCurrentUser(): SanitizedUser | null {
     return this.currentUser ? this.sanitizeUser(this.currentUser) : null
   }
 
@@ -177,13 +204,7 @@ export class AuthManager {
   // User Management (Admin only)
   // ============================================================
 
-  async createUser(data: {
-    username: string
-    displayName: string
-    pin: string
-    role: 'ban_gl' | 'glv'
-    classIds?: string[]
-  }): Promise<{ ok: boolean; user?: UserRecord; error?: string }> {
+  async createUser(data: { username: string; displayName: string; role: 'ban_gl' | 'glv'; classIds?: string[]; pin: string }): Promise<AuthResult> {
     if (!this.isAdmin()) return { ok: false, error: 'Không có quyền tạo tài khoản.' }
 
     const authStore = await this.storage.getAuthStore()
@@ -212,7 +233,7 @@ export class AuthManager {
     }
 
     const users = [...this.getAllUsers(), user]
-    await this.saveAuthStore({ users, activeUserId: this.currentUser?.id })
+    await this.saveAuthStore({ users, activeUserId: this.currentUser?.id || null })
 
     return { ok: true, user: this.sanitizeUser(user) }
   }
@@ -225,7 +246,7 @@ export class AuthManager {
     if (idx === -1) return { ok: false, error: 'Người dùng không tồn tại.' }
 
     users[idx] = { ...users[idx], ...updates, updatedAt: Date.now() }
-    await this.saveAuthStore({ users, activeUserId: this.currentUser?.id })
+    await this.saveAuthStore({ users, activeUserId: this.currentUser?.id || null })
 
     // Update current user if self
     if (this.currentUser?.id === userId) {
@@ -253,7 +274,7 @@ export class AuthManager {
     user.pinSalt = '' // hashPin generates new salt
     user.updatedAt = Date.now()
 
-    await this.saveAuthStore({ users: this.getAllUsers(), activeUserId: this.currentUser?.id })
+    await this.saveAuthStore({ users: this.getAllUsers(), activeUserId: this.currentUser?.id || null })
 
     if (this.currentUser?.id === userId) {
       this.currentUser = { ...this.currentUser, pinHash: newHash, updatedAt: Date.now() }
@@ -274,8 +295,7 @@ export class AuthManager {
     const newHash = await this.hashPin(newPin)
     users[idx].pinHash = newHash
     users[idx].updatedAt = Date.now()
-
-    await this.saveAuthStore({ users, activeUserId: this.currentUser?.id })
+    await this.saveAuthStore({ users, activeUserId: this.currentUser?.id || null })
 
     if (this.currentUser?.id === userId) {
       this.currentUser = { ...this.currentUser, pinHash: newHash, updatedAt: Date.now() }
@@ -292,7 +312,7 @@ export class AuthManager {
     }
 
     const users = this.getAllUsers().filter(u => u.id !== userId)
-    await this.saveAuthStore({ users, activeUserId: this.currentUser?.id })
+    await this.saveAuthStore({ users, activeUserId: this.currentUser?.id || null })
     return { ok: true }
   }
 
@@ -305,7 +325,6 @@ export class AuthManager {
       ? this.base64ToBytes(salt)
       : crypto.getRandomValues(new Uint8Array(16))
 
-    const encoder = new TextEncoder()
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(pin),
@@ -317,7 +336,7 @@ export class AuthManager {
     const hash = await crypto.subtle.deriveBits(
       {
         name: 'PBKDF2',
-        salt: saltBytes,
+        salt: saltBytes as BufferSource,
         iterations: PIN_PBKDF2_ITERATIONS,
         hash: 'SHA-256'
       },
@@ -352,7 +371,7 @@ export class AuthManager {
       const hash = await crypto.subtle.deriveBits(
         {
           name: 'PBKDF2',
-          salt,
+          salt: salt as BufferSource,
           iterations,
           hash: 'SHA-256'
         },
@@ -386,21 +405,27 @@ export class AuthManager {
 
   private async restoreSession(): Promise<void> {
     try {
+      const authStore = await this.storage.getAuthStore()
       const data = sessionStorage.getItem(SESSION_KEY)
-      if (!data) return
-
-      const session: SessionData = JSON.parse(data)
-      if (session.expiresAt < Date.now()) {
-        this.clearSession()
-        return
+      if (data) {
+        const session: SessionData = JSON.parse(data)
+        if (session.expiresAt >= Date.now()) {
+          const user = authStore.users.find(u => u.id === session.userId)
+          if (user && user.active !== false) {
+            this.session = session
+            this.currentUser = user
+            return
+          }
+        }
       }
 
-      // Restore user
-      const authStore = await this.storage.getAuthStore()
-      const user = authStore.users.find(u => u.id === session.userId)
-      if (user) {
-        this.session = session
-        this.currentUser = user
+      // If no active session, but there is a last active user with biometric enabled,
+      // populate currentUser to allow biometric login on the login screen
+      if (authStore.activeUserId) {
+        const user = authStore.users.find(u => u.id === authStore.activeUserId)
+        if (user && user.active !== false && user.biometricEnabled) {
+          this.currentUser = user
+        }
       }
     } catch (e) {
       console.warn('Session restore failed:', e)
@@ -413,18 +438,12 @@ export class AuthManager {
   // ============================================================
 
   private getAllUsers(): UserRecord[] {
-    // We need to get from storage
-    // This is a sync call, so we need cached data
-    // For now, return empty - will be loaded from storage
-    return []
-  }
-
-  private async getAuthStore(): Promise<{ users: UserRecord[]; activeUserId: string | null }> {
-    return this.storage.getAuthStore()
+    return this.cachedUsers
   }
 
   private async saveAuthStore(store: { users: UserRecord[]; activeUserId: string | null }): Promise<void> {
     await this.storage.setAuthStore(store)
+    this.cachedUsers = store.users
   }
 
   private async migrateUsersIfNeeded(): Promise<void> {
@@ -439,6 +458,126 @@ export class AuthManager {
       }))
       authStore.version = 1
       await this.storage.setAuthStore(authStore)
+    }
+  }
+
+  // ============================================================
+  // Biometric Authentication (WebAuthn)
+  // ============================================================
+
+  async isBiometricAvailable(): Promise<boolean> {
+    try {
+      return !!(window.PublicKeyCredential && typeof PublicKeyCredential === 'function')
+    } catch {
+      return false
+    }
+  }
+
+  async isBiometricEnabled(): Promise<boolean> {
+    return this.currentUser?.biometricEnabled ?? false
+  }
+
+  async enableBiometric(): Promise<{ ok: boolean; error?: string }> {
+    if (!this.currentUser) return { ok: false, error: 'Chưa đăng nhập' }
+    if (!await this.isBiometricAvailable()) {
+      return { ok: false, error: 'Thiết bị không hỗ trợ sinh trắc học' }
+    }
+
+    try {
+      const challenge = crypto.getRandomValues(new Uint8Array(32))
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: { name: 'Sổ Điểm Giáo Lý', id: window.location.hostname },
+          user: {
+            id: new TextEncoder().encode(this.currentUser.id),
+            name: this.currentUser.username,
+            displayName: this.currentUser.displayName
+          },
+          pubKeyCredParams: [{ alg: -7, type: 'public-key' }], // ES256
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            userVerification: 'required',
+            requireResidentKey: false
+          },
+          timeout: 60000
+        }
+      }) as PublicKeyCredential
+
+      if (!credential) return { ok: false, error: 'Không thể tạo credential' }
+
+      const credentialId = this.bytesToBase64(new Uint8Array(credential.rawId))
+
+      const users = this.getAllUsers()
+      const idx = users.findIndex(u => u.id === this.currentUser!.id)
+      if (idx !== -1) {
+        users[idx] = {
+          ...users[idx],
+          biometricEnabled: true,
+          biometricCredentialId: credentialId,
+          updatedAt: Date.now()
+        }
+        await this.saveAuthStore({ users, activeUserId: this.currentUser!.id })
+      }
+
+      return { ok: true }
+    } catch (e: any) {
+      console.error('Biometric enable failed:', e)
+      return { ok: false, error: e.name === 'NotAllowedError' ? 'Đã hủy kích hoạt' : 'Lỗi không xác định' }
+    }
+  }
+
+  async disableBiometric(): Promise<{ ok: boolean }> {
+    const users = this.getAllUsers()
+    const idx = users.findIndex(u => u.id === this.currentUser?.id)
+    if (idx !== -1) {
+      users[idx] = {
+        ...users[idx],
+        biometricEnabled: false,
+        biometricCredentialId: undefined,
+        updatedAt: Date.now()
+      }
+      await this.saveAuthStore({ users, activeUserId: this.currentUser?.id || null })
+    }
+    return { ok: true }
+  }
+
+  async loginWithBiometric(): Promise<AuthResult> {
+    if (!this.currentUser?.biometricEnabled || !this.currentUser.biometricCredentialId) {
+      return { ok: false, error: 'Chưa bật sinh trắc học' }
+    }
+
+    try {
+      const challenge = crypto.getRandomValues(new Uint8Array(32))
+      const credentialIdBytes = this.base64ToBytes(this.currentUser.biometricCredentialId)
+
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          allowCredentials: [{
+            id: credentialIdBytes as BufferSource,
+            type: 'public-key',
+            transports: ['internal']
+          }],
+          userVerification: 'required',
+          timeout: 60000
+        }
+      })
+
+      if (!assertion) return { ok: false, error: 'Xác thực thất bại' }
+
+      const authStore = await this.storage.getAuthStore()
+      const user = authStore.users.find(u => u.id === this.currentUser!.id)
+
+      if (!user) return { ok: false, error: 'Người dùng không tồn tại' }
+
+      this.currentUser = user
+      this.session = { userId: user.id, remember: true, expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 }
+      this.saveSession()
+
+      return { ok: true, user: this.sanitizeUser(user) }
+    } catch (e: any) {
+      return { ok: false, error: e.name === 'NotAllowedError' ? 'Đã hủy xác thực' : 'Xác thực thất bại' }
     }
   }
 

@@ -6,6 +6,8 @@ import { StateManager } from '../StateManager'
 import { AuthManager } from '../../core/auth/AuthManager'
 import { SyncManager } from '../../services/sync/SyncManager'
 import { NotificationManager } from '../../services/NotificationManager'
+import { COLS, displayName, classifyStudent } from '../../config/constants.ts'
+import { studentYearTB } from '../../core/calc.ts'
 
 export class AppView {
   private stateManager: StateManager
@@ -45,7 +47,7 @@ export class AppView {
     this.element.querySelectorAll('.m-nav-item').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const target = e.currentTarget as HTMLElement
-        const view = target.dataset.view
+        const view = target.dataset.mNav
         if (view) this.switchView(view as any)
       })
     })
@@ -65,6 +67,9 @@ export class AppView {
     const moreSheetTrigger = this.element.querySelector('#mViewMoreTrigger')
     moreSheetTrigger?.addEventListener('click', () => this.openViewMoreSheet())
 
+    const moreSheetClose = this.element.querySelector('#mViewMoreClose')
+    moreSheetClose?.addEventListener('click', () => this.closeViewMoreSheet())
+
     // Search
     const searchInput = this.element.querySelector('#searchInput') as HTMLInputElement
     searchInput?.addEventListener('input', this.debounce((e: Event) => {
@@ -72,13 +77,131 @@ export class AppView {
       this.handleSearch(target.value)
     }, 150))
 
+    // Class list click delegation (select, rename, delete)
+    const classList = this.element.querySelector('#classList')
+    classList?.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement
+      
+      // Delete class
+      const delBtn = target.closest('[data-del-class]')
+      if (delBtn) {
+        e.stopPropagation()
+        const id = delBtn.getAttribute('data-del-class')!
+        const cls = this.stateManager.getClass(id)
+        if (!cls) return
+        
+        const ok = await this.notificationManager.confirm(`Xóa lớp "${cls.name}" và toàn bộ điểm học viên?\n\nCó thể Hoàn tác (Ctrl+Z) trong phiên này.`, {
+          title: 'Xóa lớp?',
+          type: 'danger',
+          confirmText: 'Xóa',
+          cancelText: 'Hủy'
+        })
+        if (ok) {
+          this.stateManager.deleteClass(id)
+          this.notificationManager.show('Đã xóa lớp.')
+        }
+        return
+      }
+
+      // Rename class
+      const renameBtn = target.closest('[data-rename-class]')
+      if (renameBtn) {
+        e.stopPropagation()
+        const id = renameBtn.getAttribute('data-rename-class')!
+        const cls = this.stateManager.getClass(id)
+        if (!cls) return
+        
+        const newName = await this.promptDialog('Đổi tên lớp', 'Nhập tên mới:', cls.name)
+        if (newName) {
+          this.stateManager.updateClass(id, { name: newName })
+          this.notificationManager.show('Đã đổi tên lớp.')
+        }
+        return
+      }
+
+      // Select class
+      const selectClass = target.closest('[data-select-class]')
+      if (selectClass) {
+        const id = selectClass.getAttribute('data-select-class')!
+        this.selectClass(id)
+        const sidebar = this.element!.querySelector('#sidebar')
+        sidebar?.classList.remove('open')
+        const scrim = this.element!.querySelector('#sidebarScrim')
+        scrim?.setAttribute('hidden', 'true')
+      }
+    })
+
+    // Create class
+    const createClassBtn = this.element.querySelector('#createClassBtn')
+    createClassBtn?.addEventListener('click', () => {
+      const nameInput = this.element!.querySelector('#newClassName') as HTMLInputElement
+      const yearInput = this.element!.querySelector('#newClassYear') as HTMLInputElement
+      const name = nameInput.value.trim()
+      const year = yearInput.value.trim()
+
+      if (!name) {
+        this.notificationManager.show('Vui lòng nhập tên lớp', 'error')
+        return
+      }
+
+      this.stateManager.createClass(name, year)
+      nameInput.value = ''
+      yearInput.value = ''
+      this.notificationManager.show('Đã tạo lớp thành công', 'success')
+      this.renderCurrentView()
+      this.updateClassSelector()
+    })
+
+    // Mobile sidebar toggle
+    const openDrawerBtn = this.element.querySelector('#mOpenDrawer')
+    const closeDrawerBtn = this.element.querySelector('#mCloseDrawer')
+    const sidebar = this.element.querySelector('#sidebar')
+    const scrim = this.element.querySelector('#sidebarScrim')
+
+    openDrawerBtn?.addEventListener('click', () => {
+      sidebar?.classList.add('open')
+      scrim?.removeAttribute('hidden')
+    })
+
+    closeDrawerBtn?.addEventListener('click', () => {
+      sidebar?.classList.remove('open')
+      scrim?.setAttribute('hidden', 'true')
+    })
+
+    scrim?.addEventListener('click', () => {
+      sidebar?.classList.remove('open')
+      scrim?.setAttribute('hidden', 'true')
+    })
+
+    // Profile menu actions click delegation
+    const meView = this.element.querySelector('#meView')
+    meView?.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement
+      const row = target.closest('[data-me-action]')
+      if (!row) return
+
+      const action = row.getAttribute('data-me-action')
+      if (action === 'logout') {
+        const ok = await this.notificationManager.confirm('Bạn có chắc chắn muốn đăng xuất?', {
+          title: 'Đăng xuất?',
+          type: 'warning',
+          confirmText: 'Đăng xuất',
+          cancelText: 'Hủy'
+        })
+        if (ok) {
+          await this.authManager.logout()
+          window.dispatchEvent(new CustomEvent('gl:logout'))
+        }
+      }
+    })
+
     // Listen for state changes
     this.stateManager.subscribe(() => this.renderCurrentView())
 
     // Listen for sync status
-    document.addEventListener('syncstatuschange', (e: CustomEvent) => {
+    document.addEventListener('syncstatuschange', ((e: CustomEvent) => {
       this.updateSyncUI(e.detail)
-    })
+    }) as EventListener)
 
     // Initial render
     this.updateClassSelector()
@@ -156,9 +279,9 @@ export class AppView {
             <div class="sidebar-acc-panel" id="classesPanel">
               <div class="class-list" id="classList"></div>
               <div class="new-class-form">
-                <input type="text" id="newClassName" placeholder="Tên lớp (vd: Ấu Nhi 1A)" maxlength="60" />
+                <input type="text" id="newClassName" class="input" placeholder="Tên lớp (vd: Ấu Nhi 1A)" maxlength="60" />
                 <div style="display:flex;gap:8px;margin-top:8px">
-                  <input type="text" id="newClassYear" placeholder="Năm học (để trống nếu giữ nguyên)" maxlength="20" style="flex:1" />
+                  <input type="text" id="newClassYear" class="input" placeholder="Năm học (để trống nếu giữ nguyên)" maxlength="20" style="flex:1" />
                   <button type="button" class="btn btn-primary btn-sm" id="createClassBtn">Tạo</button>
                 </div>
               </div>
@@ -246,20 +369,7 @@ export class AppView {
       <!-- Toast Host -->
       <div class="toast-host" id="toastHost" aria-live="polite" aria-relevant="additions"></div>
 
-      <!-- Dialog Overlay -->
-      <div class="modal-overlay dialog-overlay hidden" id="appDialog" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle">
-        <div class="modal-panel dialog-panel">
-          <div class="dialog-icon-wrap" id="appDialogIconWrap" aria-hidden="true">
-            <span class="dialog-icon" id="appDialogIcon">ℹ️</span>
-          </div>
-          <h3 class="dialog-title" id="appDialogTitle">Xác nhận</h3>
-          <p class="dialog-message" id="appDialogMessage"></p>
-          <div class="dialog-actions">
-            <button type="button" class="btn btn-ghost" id="appDialogCancel">Hủy</button>
-            <button type="button" class="btn btn-primary" id="appDialogOk">Đồng ý</button>
-          </div>
-        </div>
-      </div>
+
 
       <!-- Sync Status Indicator -->
       <div class="sync-indicator hidden" id="syncIndicator" aria-live="polite">
@@ -281,7 +391,7 @@ export class AppView {
     // Update nav buttons
     this.element?.querySelectorAll('.m-nav-item').forEach(btn => {
       btn.classList.toggle('active', (btn as HTMLElement).dataset.mNav === view)
-      btn.setAttribute('aria-current', btn.dataset.mNav === view ? 'page' : 'false')
+      btn.setAttribute('aria-current', (btn as HTMLElement).dataset.mNav === view ? 'page' : 'false')
     })
 
     // Update view panels
@@ -362,6 +472,8 @@ export class AppView {
   private renderCurrentView(): void {
     if (!this.element) return
 
+    this.updateClassList()
+
     switch (this.currentView) {
       case 'dashboard':
         this.renderDashboard()
@@ -378,9 +490,6 @@ export class AppView {
   private renderDashboard(): void {
     const container = this.element?.querySelector('#dashboardView') as HTMLElement
     if (!container) return
-
-    const activeClass = this.stateManager.getActiveClass()
-    const years = this.stateManager.getYears()
 
     container.innerHTML = `
       <div class="dashboard">
@@ -453,7 +562,7 @@ export class AppView {
 
           <div class="m-search-bar toolbar">
             <div class="search-wrap" style="flex:1">
-              <input type="search" id="searchInput" placeholder="Tìm học viên..." aria-label="Tìm học viên" />
+              <input type="search" id="searchInput" class="input" placeholder="Tìm học viên..." aria-label="Tìm học viên" />
             </div>
           </div>
         </div>
@@ -582,50 +691,34 @@ export class AppView {
   private getAvgYearTB(): number {
     const classes = this.stateManager.getAllClasses()
     if (!classes.length) return 0
-    const totals = classes.map(c => this.computeClassYearTB(c))
+    const totals = classes.map(c => {
+      const students = c.students
+      if (!students.length) return 0
+      const tbs = students.map(s => studentYearTB(s, c.weights)).filter((tb): tb is number => tb !== null)
+      return tbs.length ? tbs.reduce((a, b) => a + b, 0) / tbs.length : 0
+    })
     return totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0
   }
 
   private getGoodPercent(): number {
-    const students = this.stateManager.getAllClasses().flatMap(c => c.students)
+    const classes = this.stateManager.getAllClasses()
+    const students = classes.flatMap(c => c.students.map(s => ({ ...s, classWeights: c.weights })))
     if (!students.length) return 0
-    const good = students.filter(s => this.computeStudentYearTB(s) >= 8).length
+    const good = students.filter(s => {
+      const tb = studentYearTB(s, s.classWeights)
+      return tb !== null && tb >= 8
+    }).length
     return Math.round((good / students.length) * 100)
-  }
-
-  private computeClassYearTB(cls: any): number {
-    const students = cls.students
-    if (!students.length) return 0
-    const tbs = students.map((s: any) => this.computeStudentYearTB(s)).filter(tb => tb !== null)
-    return tbs.length ? tbs.reduce((a: number, b: number) => a + b, 0) / tbs.length : 0
-  }
-
-  private computeStudentYearTB(student: any): number | null {
-    const w = student.scoresByTerm
-    if (!w) return null
-    const hk1 = this.computeTermTB(w.hk1)
-    const hk2 = this.computeTermTB(w.hk2)
-    if (hk1 === null || hk2 === null) return null
-    return (hk1 + hk2) / 2
-  }
-
-  private computeTermTB(termScores: any): number | null {
-    let sum = 0, weightSum = 0
-    for (const col of COLS) {
-      const scores = termScores[col.key] || []
-      if (scores.length) {
-        const avg = scores.reduce((a: number, b: number) => a + b, 0) / scores.length
-        sum += avg * (termScores.weights?.[col.key] || 1)
-        weightSum += (termScores.weights?.[col.key] || 1)
-      }
-    }
-    return weightSum ? sum / weightSum : null
   }
 
   private renderTopStudents(limit: number): string {
     const students = this.stateManager.getAllClasses()
-      .flatMap(c => c.students.map(s => ({ ...s, className: c.name, classId: c.id })))
-      .map(s => ({ ...s, yearTB: this.computeStudentYearTB(s) }))
+      .flatMap(c => c.students.map(s => ({
+        ...s,
+        className: c.name,
+        classId: c.id,
+        yearTB: studentYearTB(s, c.weights)
+      })))
       .filter(s => s.yearTB !== null)
       .sort((a, b) => (b.yearTB || 0) - (a.yearTB || 0))
       .slice(0, limit)
@@ -634,18 +727,21 @@ export class AppView {
       <div class="dash-student ${i < 3 ? 'top-' + (i + 1) : ''}">
         <span class="rank">${i + 1}</span>
         <div class="info">
-          <strong>${displayName(s)}</strong>
+          <strong>${displayName(s as any)}</strong>
           <small>${s.className}</small>
         </div>
-        <span class="tb score-${s.yearTB !== null ? this.classifyStudent(s.yearTB || 0).rank : 'none'}">${s.yearTB !== null ? s.yearTB.toFixed(2) : '—'}</span>
+        <span class="tb score-${s.yearTB !== null ? classifyStudent(s.yearTB || 0).rank : 'none'}">${s.yearTB !== null ? s.yearTB.toFixed(2) : '—'}</span>
       </div>
     `).join('')
   }
 
   private renderAttentionStudents(): string {
     const students = this.stateManager.getAllClasses()
-      .flatMap(c => c.students.map(s => ({ ...s, className: c.name })))
-      .map(s => ({ ...s, yearTB: this.computeStudentYearTB(s) }))
+      .flatMap(c => c.students.map(s => ({
+        ...s,
+        className: c.name,
+        yearTB: studentYearTB(s, c.weights)
+      })))
       .filter(s => s.yearTB !== null && s.yearTB >= 5 && s.yearTB < 6.5)
       .sort((a, b) => (a.yearTB || 0) - (b.yearTB || 0))
       .slice(0, 10)
@@ -653,18 +749,21 @@ export class AppView {
     return students.map(s => `
       <div class="dash-student">
         <div class="info">
-          <strong>${displayName(s)}</strong>
+          <strong>${displayName(s as any)}</strong>
           <small>${s.className}</small>
         </div>
-        <span class="tb score-${this.classifyStudent(s.yearTB || 0).rank}">${s.yearTB?.toFixed(2)}</span>
+        <span class="tb score-${classifyStudent(s.yearTB || 0).rank}">${s.yearTB?.toFixed(2)}</span>
       </div>
     `).join('')
   }
 
   private renderWeakStudents(): string {
     const students = this.stateManager.getAllClasses()
-      .flatMap(c => c.students.map(s => ({ ...s, className: c.name })))
-      .map(s => ({ ...s, yearTB: this.computeStudentYearTB(s) }))
+      .flatMap(c => c.students.map(s => ({
+        ...s,
+        className: c.name,
+        yearTB: studentYearTB(s, c.weights)
+      })))
       .filter(s => s.yearTB !== null && s.yearTB < 5)
       .sort((a, b) => (a.yearTB || 0) - (b.yearTB || 0))
       .slice(0, 10)
@@ -672,10 +771,10 @@ export class AppView {
     return students.map(s => `
       <div class="dash-student weak">
         <div class="info">
-          <strong>${displayName(s)}</strong>
+          <strong>${displayName(s as any)}</strong>
           <small>${s.className}</small>
         </div>
-        <span class="tb score-${this.classifyStudent(s.yearTB || 0).rank}">${s.yearTB?.toFixed(2)}</span>
+        <span class="tb score-${classifyStudent(s.yearTB || 0).rank}">${s.yearTB?.toFixed(2)}</span>
       </div>
     `).join('')
   }
@@ -689,7 +788,7 @@ export class AppView {
     return students.map(s => `
       <div class="dash-student missing">
         <div class="info">
-          <strong>${displayName(s)}</strong>
+          <strong>${displayName(s as any)}</strong>
           <small>${s.className}</small>
         </div>
         <button class="btn btn-ghost btn-sm" data-missing-class="${s.classId}" data-missing-student="${s.id}">Xem</button>
@@ -701,12 +800,105 @@ export class AppView {
     const term = this.stateManager.getState().activeTerm
     const scores = student.scoresByTerm?.[term]
     if (!scores) return false
-    return COLS.some(col => !scores[col.key]?.length)
+    return COLS.some((col: any) => !scores[col.key]?.length)
   }
 
   // ============================================================
   // UI Update Helpers
   // ============================================================
+
+  private updateClassList(): void {
+    const el = this.element?.querySelector('#classList') as HTMLElement
+    if (!el) return
+
+    const classes = this.stateManager.getAllClasses()
+    if (!classes.length) {
+      el.innerHTML = `
+        <div class="class-item empty hidden" style="display:none"></div>
+        <div class="empty" style="padding:16px 8px;font-size:0.85rem">
+          Chưa có lớp được giao.<br>
+          ${this.authManager.isAdmin() ? 'Tạo lớp bên dưới 👇' : 'Liên hệ Ban GL để được gán lớp.'}
+        </div>
+      `
+      return
+    }
+
+    const sorted = [...classes].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    const activeId = this.stateManager.getState().activeClassId
+    const canDel = this.authManager.isAdmin()
+
+    el.innerHTML = sorted.map(c => `
+      <div class="class-item ${c.id === activeId ? 'active' : ''}" data-select-class="${c.id}" role="button" tabindex="0">
+        <span class="class-dot" style="background:#2563eb"></span>
+        <div class="class-info">
+          <div class="class-name">${this.escapeHtml(c.name)}</div>
+          <div class="class-meta">
+            ${c.students.length} học viên ${c.year ? `· ${this.escapeHtml(c.year)}` : ''}
+          </div>
+        </div>
+        <div class="class-actions">
+          <button type="button" class="icon-btn" data-rename-class="${c.id}" title="Đổi tên">✏️</button>
+          ${canDel ? `<button type="button" class="icon-btn danger" data-del-class="${c.id}" title="Xóa lớp">🗑️</button>` : ''}
+        </div>
+      </div>
+    `).join('')
+  }
+
+  private escapeHtml(s: string): string {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
+  private promptDialog(title: string, message: string, defaultValue: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      // Ensure dynamic dialog is created in NotificationManager if not already there
+      this.notificationManager.init()
+
+      const overlay = document.getElementById('appDialog')!
+      const titleEl = document.getElementById('appDialogTitle')!
+      const messageEl = document.getElementById('appDialogMessage')!
+      const okBtn = document.getElementById('appDialogOk')!
+      const cancelBtn = document.getElementById('appDialogCancel')!
+
+      titleEl.textContent = title
+      messageEl.innerHTML = `
+        <div style="margin-bottom:8px">${message}</div>
+        <input type="text" id="dialogPromptInput" value="${defaultValue}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;box-sizing:border-box" />
+      `
+      okBtn.textContent = 'Đồng ý'
+      cancelBtn.textContent = 'Hủy'
+
+      overlay.classList.remove('hidden')
+      const input = document.getElementById('dialogPromptInput') as HTMLInputElement
+      input?.focus()
+      input?.select()
+
+      const cleanup = (result: string | null) => {
+        overlay.classList.add('hidden')
+        resolve(result)
+      }
+
+      const onOk = () => cleanup(input.value.trim())
+      const onCancel = () => cleanup(null)
+
+      okBtn.replaceWith(okBtn.cloneNode(true))
+      cancelBtn.replaceWith(cancelBtn.cloneNode(true))
+
+      const newOkBtn = document.getElementById('appDialogOk')!
+      const newCancelBtn = document.getElementById('appDialogCancel')!
+
+      newOkBtn.addEventListener('click', onOk)
+      newCancelBtn.addEventListener('click', onCancel)
+    })
+  }
+
+  private handleSearch(_query: string): void {
+    this.renderCurrentView()
+  }
 
   private updateClassSelector(): void {
     const select = this.element?.querySelector('#mClassSelect') as HTMLSelectElement

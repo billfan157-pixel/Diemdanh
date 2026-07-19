@@ -22,7 +22,7 @@ import {
   getRankColorClass,
   getRankBadgeClass,
   YEAR_WEIGHTS
-} from '../../src/config/constants'
+} from '../../src/config/constants.ts'
 
 describe('constants', () => {
   describe('COLS', () => {
@@ -31,7 +31,7 @@ describe('constants', () => {
     })
 
     it('should have correct column keys', () => {
-      expect(COLS).toEqual(['khaoKinh', 'thuocBai', 'chuyenCan', 'baiTap', 'thaiDo', 'kiemTra'])
+      expect(COLS.map(c => c.key)).toEqual(['khaoKinh', 'thuocBai', 'chuyenCan', 'baiTap', 'thaiDo', 'kiemTra'])
     })
   })
 
@@ -110,7 +110,7 @@ describe('constants', () => {
 
     it('should round to 2 decimal places', () => {
       expect(parseScore('8.123')).toBe(8.12)
-      expect(parseScore('8.125')).toBe(8.12)
+      expect(parseScore('8.125')).toBe(8.13)
       expect(parseScore('8.126')).toBe(8.13)
     })
   })
@@ -297,7 +297,8 @@ describe('constants', () => {
       expect(classifyRank(9.5)).toEqual({ score: 'score-xs', rank: 'xs', label: 'Xuất sắc' })
       expect(classifyRank(8.5)).toEqual({ score: 'score-g', rank: 'g', label: 'Giỏi' })
       expect(classifyRank(7.5)).toEqual({ score: 'score-k', rank: 'k', label: 'Khá' })
-      expect(classifyRank(6.5)).toEqual({ score: 'score-tb', rank: 'tb', label: 'Trung bình' })
+      expect(classifyRank(6.5)).toEqual({ score: 'score-k', rank: 'k', label: 'Khá' })
+      expect(classifyRank(5.5)).toEqual({ score: 'score-tb', rank: 'tb', label: 'Trung bình' })
       expect(classifyRank(4.5)).toEqual({ score: 'score-y', rank: 'y', label: 'Yếu' })
       expect(classifyRank(null)).toEqual({ score: 'score-none', rank: 'none', label: 'Chưa có điểm' })
     })

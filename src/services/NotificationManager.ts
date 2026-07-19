@@ -16,7 +16,7 @@ export interface ToastOptions {
 
 export interface ConfirmOptions {
   title?: string
-  message: string
+  message?: string
   type?: 'confirm' | 'warning' | 'danger' | 'info'
   confirmText?: string
   cancelText?: string
@@ -24,7 +24,6 @@ export interface ConfirmOptions {
 
 export class NotificationManager {
   private container: HTMLElement | null = null
-  private toastQueue: HTMLElement[] = []
   private maxToasts = 4
   private dialogResolve: ((value: boolean) => void) | null = null
 
@@ -46,26 +45,26 @@ export class NotificationManager {
     if (!document.getElementById('appDialog')) {
       const dialog = document.createElement('div')
       dialog.id = 'appDialog'
-      dialog.className = 'dialog-overlay'
+      dialog.className = 'modal-overlay dialog-overlay hidden'
       dialog.setAttribute('role', 'dialog')
       dialog.setAttribute('aria-modal', 'true')
       dialog.innerHTML = `
         <div class="dialog-panel">
-          <div class="dialog-icon-wrap" id="dialogIconWrap">
-            <span class="dialog-icon" id="dialogIcon"></span>
+          <div class="dialog-icon-wrap" id="appDialogIconWrap">
+            <span class="dialog-icon" id="appDialogIcon"></span>
           </div>
-          <h3 class="dialog-title" id="dialogTitle">Xác nhận</h3>
-          <p class="dialog-message" id="dialogMessage"></p>
+          <h3 class="dialog-title" id="appDialogTitle">Xác nhận</h3>
+          <p class="dialog-message" id="appDialogMessage"></p>
           <div class="dialog-actions">
-            <button type="button" class="btn btn-ghost" id="dialogCancel">Hủy</button>
-            <button type="button" class="btn btn-primary" id="dialogOk">Đồng ý</button>
+            <button type="button" class="btn btn-ghost" id="appDialogCancel">Hủy</button>
+            <button type="button" class="btn btn-primary" id="appDialogOk">Đồng ý</button>
           </div>
         </div>
       `
       document.body.appendChild(dialog)
 
-      const cancelBtn = document.getElementById('dialogCancel')!
-      const okBtn = document.getElementById('dialogOk')!
+      const cancelBtn = document.getElementById('appDialogCancel')!
+      const okBtn = document.getElementById('appDialogOk')!
       const overlay = document.getElementById('appDialog')!
 
       const closeDialog = (result: boolean) => {
@@ -96,7 +95,7 @@ export class NotificationManager {
     if (!this.container) this.init()
 
     const toast = this.createToast(message, type, options)
-    this.container.appendChild(toast)
+    this.container!.appendChild(toast)
 
     requestAnimationFrame(() => {
       toast.classList.add('show')
@@ -115,8 +114,8 @@ export class NotificationManager {
       })
     }
 
-    while (this.container.children.length > this.maxToasts) {
-      this.dismiss(this.container.firstElementChild as HTMLElement)
+    while (this.container!.children.length > this.maxToasts) {
+      this.dismiss(this.container!.firstElementChild as HTMLElement)
     }
   }
 
@@ -169,15 +168,15 @@ export class NotificationManager {
       this.dialogResolve = resolve
 
       const overlay = document.getElementById('appDialog')!
-      const iconWrap = document.getElementById('dialogIconWrap')!
-      const icon = document.getElementById('dialogIcon')!
-      const title = document.getElementById('dialogTitle')!
-      const message = document.getElementById('dialogMessage')!
-      const okBtn = document.getElementById('dialogOk')!
-      const cancelBtn = document.getElementById('dialogCancel')!
+      const iconWrap = document.getElementById('appDialogIconWrap')!
+      const icon = document.getElementById('appDialogIcon')!
+      const title = document.getElementById('appDialogTitle')!
+      const messageEl = document.getElementById('appDialogMessage')!
+      const okBtn = document.getElementById('appDialogOk')!
+      const cancelBtn = document.getElementById('appDialogCancel')!
 
       title.textContent = options.title || 'Xác nhận'
-      message.textContent = message
+      messageEl.textContent = message
       okBtn.textContent = options.confirmText || (options.type === 'danger' ? 'Xóa' : 'Đồng ý')
       cancelBtn.textContent = options.cancelText || 'Hủy'
 

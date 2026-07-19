@@ -3,7 +3,7 @@
 // ============================================================
 
 // Config
-export * from './config/constants'
+export * from './config/constants.ts'
 
 // Core
 export { EventEmitter } from './core/events'
@@ -22,4 +22,4 @@ export { LoginView } from './ui/views/LoginView'
 export { AppView } from './ui/views/AppView'
 
 // Utils
-export * from './config/constants'
+export * from './config/constants.ts'

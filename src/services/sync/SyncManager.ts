@@ -3,9 +3,9 @@
 // Supabase sync with offline queue
 // ============================================================
 
-import { StorageAdapter } from '../services/storage/StorageAdapter'
-import { StateManager } from './StateManager'
-import { AuthManager } from './AuthManager'
+import { StorageAdapter } from '../storage/StorageAdapter'
+import { StateManager } from '../../ui/StateManager'
+import { AuthManager } from '../../core/auth/AuthManager'
 
 export interface SyncStatus {
   status: 'idle' | 'syncing' | 'error' | 'offline'
