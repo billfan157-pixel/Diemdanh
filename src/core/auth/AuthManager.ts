@@ -5,6 +5,7 @@
 
 import { StorageAdapter } from '../../services/storage/StorageAdapter'
 import { generateId } from '../../config/constants.ts'
+import { supabaseService } from '../../services/SupabaseClient'
 
 // ============================================================
 // Types
@@ -153,11 +154,88 @@ export class AuthManager {
     return { ok: true, user: this.sanitizeUser(user) }
   }
 
+  async loginWithEmail(email: string, pin: string, remember = false): Promise<AuthResult> {
+    const supabase = supabaseService.getClient()
+    if (!supabase) {
+      return { ok: false, error: 'Chưa cấu hình kết nối đám mây.' }
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: pin.trim()
+      })
+
+      if (error) {
+        return { ok: false, error: error.message }
+      }
+
+      if (!data.user) {
+        return { ok: false, error: 'Xác thực thất bại.' }
+      }
+
+      // Fetch member profile
+      const { data: member, error: memberError } = await supabase
+        .from('parish_members')
+        .select('*')
+        .eq('user_id', data.user.id)
+        .single()
+
+      if (memberError || !member) {
+        return { ok: false, error: 'Tài khoản chưa được phân quyền trong Giáo xứ.' }
+      }
+
+      // Sync member locally as a UserRecord
+      const localUser: UserRecord = {
+        id: member.id,
+        username: member.username,
+        displayName: member.display_name,
+        pinHash: member.pin_hash || '',
+        pinSalt: member.pin_salt || '',
+        role: member.role as 'ban_gl' | 'glv',
+        classIds: member.class_ids || [],
+        active: member.active,
+        biometricEnabled: false,
+        createdAt: new Date(member.created_at).getTime(),
+        updatedAt: new Date(member.updated_at).getTime()
+      }
+
+      // Save to local cache
+      const authStore = await this.storage.getAuthStore()
+      const users = authStore.users.filter(u => u.username !== localUser.username)
+      users.push(localUser)
+      await this.saveAuthStore({ users, activeUserId: localUser.id })
+
+      this.currentUser = localUser
+      this.session = {
+        userId: localUser.id,
+        remember,
+        expiresAt: remember
+          ? Date.now() + SESSION_REMEMBER_DAYS * 24 * 60 * 60 * 1000
+          : Date.now() + SESSION_NORMAL_DAYS * 24 * 60 * 60 * 1000
+      }
+      this.saveSession()
+
+      return { ok: true, user: this.sanitizeUser(localUser) }
+    } catch (e: any) {
+      return { ok: false, error: e.message }
+    }
+  }
+
   async logout(): Promise<void> {
     this.currentUser = null
     this.session = null
     this.clearSession()
-    // Also clear from IndexedDB if needed
+    
+    // Sign out from Supabase if connected
+    const supabase = supabaseService.getClient()
+    if (supabase) {
+      try {
+        await supabase.auth.signOut()
+      } catch (e) {
+        console.warn('Supabase sign out failed:', e)
+      }
+    }
   }
 
   getCurrentUser(): SanitizedUser | null {

@@ -32,6 +32,57 @@ export class LoginView {
 
     form?.addEventListener('submit', this.handleLogin.bind(this))
     bioBtn?.addEventListener('click', this.handleBioLogin.bind(this))
+
+    // Tab switching logic
+    const tabPinBtn = this.element.querySelector('#tabPinBtn') as HTMLButtonElement
+    const tabEmailBtn = this.element.querySelector('#tabEmailBtn') as HTMLButtonElement
+    const pinFields = this.element.querySelector('#pinFields') as HTMLElement
+    const emailFields = this.element.querySelector('#emailFields') as HTMLElement
+    
+    const userInput = this.element.querySelector('#loginUser') as HTMLInputElement
+    const pinInput = this.element.querySelector('#loginPin') as HTMLInputElement
+    const emailInput = this.element.querySelector('#loginEmail') as HTMLInputElement
+    const passwordInput = this.element.querySelector('#loginPassword') as HTMLInputElement
+
+    tabPinBtn?.addEventListener('click', () => {
+      tabPinBtn.classList.add('active')
+      tabPinBtn.style.color = 'var(--accent)'
+      tabPinBtn.style.borderBottom = '2px solid var(--accent)'
+      tabPinBtn.style.fontWeight = '600'
+      
+      tabEmailBtn.classList.remove('active')
+      tabEmailBtn.style.color = 'var(--text2)'
+      tabEmailBtn.style.borderBottom = '2px solid transparent'
+      tabEmailBtn.style.fontWeight = '500'
+
+      pinFields.classList.remove('hidden')
+      emailFields.classList.add('hidden')
+
+      userInput.required = true
+      pinInput.required = true
+      emailInput.required = false
+      passwordInput.required = false
+    })
+
+    tabEmailBtn?.addEventListener('click', () => {
+      tabEmailBtn.classList.add('active')
+      tabEmailBtn.style.color = 'var(--accent)'
+      tabEmailBtn.style.borderBottom = '2px solid var(--accent)'
+      tabEmailBtn.style.fontWeight = '600'
+
+      tabPinBtn.classList.remove('active')
+      tabPinBtn.style.color = 'var(--text2)'
+      tabPinBtn.style.borderBottom = '2px solid transparent'
+      tabPinBtn.style.fontWeight = '500'
+
+      emailFields.classList.remove('hidden')
+      pinFields.classList.add('hidden')
+
+      userInput.required = false
+      pinInput.required = false
+      emailInput.required = true
+      passwordInput.required = true
+    })
   }
 
   private getTemplate(): string {
@@ -41,12 +92,27 @@ export class LoginView {
         <h1>Sổ Điểm Giáo Lý</h1>
         <p class="login-sub">Đăng nhập để tiếp tục</p>
 
-        <form id="loginForm" autocomplete="on">
-          <label class="field-label" for="loginUser">Tài khoản</label>
-          <input id="loginUser" class="input" type="text" placeholder="admin" required autocomplete="username" />
+        <div class="login-tabs" style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:8px">
+          <button type="button" id="tabPinBtn" class="tab-btn active" style="flex:1;background:none;border:none;padding:8px 12px;font-size:14px;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);cursor:pointer;transition:all 0.2s">Mã PIN (Offline)</button>
+          <button type="button" id="tabEmailBtn" class="tab-btn" style="flex:1;background:none;border:none;padding:8px 12px;font-size:14px;font-weight:500;color:var(--text2);border-bottom:2px solid transparent;cursor:pointer;transition:all 0.2s">Email Cloud</button>
+        </div>
 
-          <label class="field-label" for="loginPin" style="margin-top:10px">PIN</label>
-          <input id="loginPin" class="input" type="password" placeholder="••••" required autocomplete="current-password" />
+        <form id="loginForm" autocomplete="on">
+          <div id="pinFields">
+            <label class="field-label" for="loginUser">Tài khoản</label>
+            <input id="loginUser" class="input" type="text" placeholder="admin" required autocomplete="username" />
+
+            <label class="field-label" for="loginPin" style="margin-top:10px">PIN</label>
+            <input id="loginPin" class="input" type="password" placeholder="••••" required autocomplete="current-password" />
+          </div>
+
+          <div id="emailFields" class="hidden">
+            <label class="field-label" for="loginEmail">Email</label>
+            <input id="loginEmail" class="input" type="email" placeholder="giao.ly.vien@example.com" autocomplete="email" />
+
+            <label class="field-label" for="loginPassword" style="margin-top:10px">Mật khẩu</label>
+            <input id="loginPassword" class="input" type="password" placeholder="••••••••" autocomplete="current-password" />
+          </div>
 
           <label class="check-all" style="margin-top:12px">
             <input type="checkbox" id="loginRemember" checked /> Ghi nhớ trên máy này
@@ -67,8 +133,8 @@ export class LoginView {
         </div>
 
         <p class="hint" style="margin-top:14px;text-align:center">
-          Mặc định: <strong>admin</strong> / PIN <strong>1234</strong><br>
-          (Ban Giáo lý — vào app bấm <strong>Đổi PIN</strong> ngay)
+          Mặc định PIN: <strong>admin</strong> / PIN <strong>1234</strong><br>
+          (Vào app bấm <strong>Đổi PIN</strong> hoặc <strong>Cấu hình Cloud</strong>)
         </p>
 
         <p id="loginError" class="login-error hidden"></p>
@@ -78,25 +144,59 @@ export class LoginView {
 
   private async handleLogin(e: Event): Promise<void> {
     e.preventDefault()
-    const form = e.target as HTMLFormElement
-    const userInput = form.querySelector('#loginUser') as HTMLInputElement
-    const pinInput = form.querySelector('#loginPin') as HTMLInputElement
-    const remember = (form.querySelector('#loginRemember') as HTMLInputElement).checked
-    const errorEl = this.element?.querySelector('#loginError') as HTMLElement
+    if (!this.element) return
 
-    const username = userInput.value.trim()
-    const pin = pinInput.value
+    const tabPinBtn = this.element.querySelector('#tabPinBtn') as HTMLButtonElement
+    const isPinMode = tabPinBtn.classList.contains('active')
 
-    if (!username || !pin) return
+    const remember = (this.element.querySelector('#loginRemember') as HTMLInputElement).checked
+    const errorEl = this.element.querySelector('#loginError') as HTMLElement
 
     try {
-      const result = await this.authManager.login(username, pin, remember)
+      let result
+      if (isPinMode) {
+        const userInput = this.element.querySelector('#loginUser') as HTMLInputElement
+        const pinInput = this.element.querySelector('#loginPin') as HTMLInputElement
+        const username = userInput.value.trim()
+        const pin = pinInput.value
 
-      if (!result.ok) {
-        this.showError(errorEl, result.error || 'Sai tài khoản hoặc PIN.')
-        pinInput.value = ''
-        pinInput.focus()
-        return
+        if (!username || !pin) return
+        result = await this.authManager.login(username, pin, remember)
+
+        if (!result.ok) {
+          this.showError(errorEl, result.error || 'Sai tài khoản hoặc PIN.')
+          pinInput.value = ''
+          pinInput.focus()
+          return
+        }
+      } else {
+        const emailInput = this.element.querySelector('#loginEmail') as HTMLInputElement
+        const passwordInput = this.element.querySelector('#loginPassword') as HTMLInputElement
+        const email = emailInput.value.trim()
+        const password = passwordInput.value
+
+        if (!email || !password) return
+        
+        // Show loading state
+        const submitBtn = this.element.querySelector('button[type="submit"]') as HTMLButtonElement
+        const origText = submitBtn.textContent || ''
+        submitBtn.disabled = true
+        submitBtn.textContent = 'Đang đăng nhập...'
+        this.hideError(errorEl)
+
+        try {
+          result = await this.authManager.loginWithEmail(email, password, remember)
+        } finally {
+          submitBtn.disabled = false
+          submitBtn.textContent = origText
+        }
+
+        if (!result.ok) {
+          this.showError(errorEl, result.error || 'Đăng nhập Cloud thất bại.')
+          passwordInput.value = ''
+          passwordInput.focus()
+          return
+        }
       }
 
       this.hideError(errorEl)

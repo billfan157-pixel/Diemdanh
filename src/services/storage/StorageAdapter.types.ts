@@ -18,6 +18,7 @@ export interface ClassData {
   students: StudentData[]
   createdAt: number
   updatedAt: number
+  rev?: number
 }
 
 export interface ColumnWeights {
@@ -47,6 +48,7 @@ export interface StudentData {
   learningLog: LearningLogEntry[]
   createdAt: number
   updatedAt: number
+  rev?: number
 }
 
 export interface ScoresByTerm {
@@ -76,7 +78,7 @@ export interface LearningLogEntry {
 
 export interface SyncQueueItem {
   id?: number
-  type: 'state' | 'auth' | 'full'
+  type: 'state' | 'auth' | 'full' | 'sync_op'
   data: any
   timestamp: number
   retries: number

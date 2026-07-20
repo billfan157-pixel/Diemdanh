@@ -1,11 +1,13 @@
 // ============================================================
-// Sổ Điểm GL — Sync Manager
-// Supabase sync with offline queue
+// Sổ Điểm GL — Sync Manager (Phase 2 Wrapper)
 // ============================================================
 
 import { StorageAdapter } from '../storage/StorageAdapter'
 import { StateManager } from '../../ui/StateManager'
 import { AuthManager } from '../../core/auth/AuthManager'
+import { supabaseService } from '../SupabaseClient'
+import { SyncEngine } from './SyncEngine'
+import { AppState } from '../storage/StorageAdapter.types'
 
 export interface SyncStatus {
   status: 'idle' | 'syncing' | 'error' | 'offline'
@@ -15,46 +17,45 @@ export interface SyncStatus {
 }
 
 export class SyncManager extends EventTarget {
-  private storage: StorageAdapter
   private stateManager: StateManager | null = null
-  private authManager: AuthManager | null = null
-  private supabase: any = null
-  private supabaseUrl = ''
-  private supabaseKey = ''
-
+  private syncEngine: SyncEngine
+  private syncInterval: ReturnType<typeof setInterval> | null = null
   private status: SyncStatus = {
     status: 'idle',
     lastSync: null,
     pendingCount: 0
   }
 
-  private syncInProgress = false
-  private syncInterval: ReturnType<typeof setInterval> | null = null
-  private retryTimeout: ReturnType<typeof setTimeout> | null = null
-
   constructor(storage: StorageAdapter) {
     super()
-    this.storage = storage
+    this.syncEngine = new SyncEngine(storage)
+
+    // Bubble up status change events from SyncEngine
+    this.syncEngine.addEventListener('statuschange', (e: any) => {
+      this.status.status = e.detail.status
+      this.emitStatusChange()
+    })
+
+    // Handle conflict resolution
+    this.syncEngine.addEventListener('conflict', (e: any) => {
+      this.dispatchEvent(new CustomEvent('conflict', { detail: e.detail }))
+    })
   }
 
   setStateManager(sm: StateManager): void {
     this.stateManager = sm
+    this.syncEngine.setStateManager(sm)
   }
 
-  setAuthManager(am: AuthManager): void {
-    this.authManager = am
+  setAuthManager(_am: AuthManager): void {
+    // Left for backward compatibility
   }
 
   async init(): Promise<void> {
-    // Load saved supabase config
-    const settings = await this.storage.getSettings()
-    if (settings.supabaseUrl && settings.supabaseKey) {
-      this.supabaseUrl = settings.supabaseUrl
-      this.supabaseKey = settings.supabaseKey
-      await this.initSupabase()
-    }
+    // Configure client
+    supabaseService.loadSettings()
 
-    // Load last sync time
+    // Restore last sync time
     const lastSync = localStorage.getItem('so-diem-gl-last-sync')
     if (lastSync) {
       this.status.lastSync = parseInt(lastSync, 10)
@@ -65,176 +66,132 @@ export class SyncManager extends EventTarget {
       this.startAutoSync()
     }
 
-    // Process pending sync queue
-    this.processSyncQueue()
-  }
-
-  private async initSupabase(): Promise<void> {
-    if (!this.supabaseUrl || !this.supabaseKey) return
-
-    try {
-      const { createClient } = await import('@supabase/supabase-js')
-      this.supabase = createClient(this.supabaseUrl, this.supabaseKey)
-      this.status.status = 'idle'
-      this.emitStatusChange()
-    } catch (e) {
-      console.warn('Supabase init failed:', e)
-      this.supabase = null
-    }
+    await this.syncEngine.init()
   }
 
   configureSupabase(url: string, key: string): void {
-    this.supabaseUrl = url
-    this.supabaseKey = key
+    supabaseService.configure(url, key)
     localStorage.setItem('so-diem-gl-supabase', JSON.stringify({ url, key }))
-    this.initSupabase()
-  }
-
-  private async processSyncQueue(): Promise<void> {
-    if (!this.supabase) return
-
-    const pending = await this.storage.getPendingSyncItems()
-    if (pending.length === 0) return
-
-    for (const item of pending) {
-      await this.processSyncItem(item)
-    }
-  }
-
-  private async processSyncItem(item: any): Promise<void> {
-    if (!this.supabase) return
-
-    await this.storage.updateSyncStatus(item.id, 'syncing')
-
-    try {
-      if (item.type === 'state') {
-        await this.supabase
-          .from('app_cloud')
-          .upsert({
-            id: 'main',
-            state: item.data,
-            updated_at: new Date().toISOString()
-          })
-      } else if (item.type === 'auth') {
-        await this.supabase
-          .from('app_cloud')
-          .upsert({
-            id: 'auth',
-            auth: item.data,
-            updated_at: new Date().toISOString()
-          })
-      }
-
-      await this.storage.markSyncItemCompleted(item.id)
-    } catch (e: any) {
-      console.warn('Sync item failed:', e)
-      await this.storage.markSyncItemFailed(item.id)
-      this.scheduleRetry()
-    }
   }
 
   async sync(): Promise<{ ok: boolean; error?: string }> {
-    if (!this.supabase) {
+    if (!supabaseService.isConfigured()) {
       this.status.status = 'offline'
       this.emitStatusChange()
       return { ok: false, error: 'Chưa cấu hình Supabase' }
     }
 
-    if (this.syncInProgress) return { ok: false, error: 'Đang đồng bộ' }
-
-    this.syncInProgress = true
     this.status.status = 'syncing'
     this.emitStatusChange()
 
     try {
-      const stateManager = this.stateManager
-      const authManager = this.authManager
+      // 1. Process all pending queue items first
+      await this.syncEngine.processQueue()
 
-      if (!stateManager || !authManager) {
-        throw new Error('Managers not initialized')
-      }
-
-      // Push state
-      const state = stateManager.getState()
-      await this.supabase
-        .from('app_cloud')
-        .upsert({
-          id: 'main',
-          state,
-          updated_at: new Date().toISOString()
-        })
-
-      // Push auth
-      const authStore = await this.storage.getAuthStore()
-      await this.supabase
-        .from('app_cloud')
-        .upsert({
-          id: 'auth',
-          auth: authStore,
-          updated_at: new Date().toISOString()
-        })
-
-      // Pull latest (in case of conflicts)
-      const { data: stateData } = await this.supabase
-        .from('app_cloud')
-        .select('state')
-        .eq('id', 'main')
-        .single()
-
-      if (stateData?.state) {
-        await this.storage.setState(stateData.state)
-      }
-
-      const { data: authData } = await this.supabase
-        .from('app_cloud')
-        .select('auth')
-        .eq('id', 'auth')
-        .single()
-
-      if (authData?.auth) {
-        await this.storage.setAuthStore(authData.auth)
-      }
+      // 2. Pull all relational data from the cloud
+      const res = await this.pull()
+      if (!res.ok) throw new Error(res.error)
 
       this.status.lastSync = Date.now()
       this.status.status = 'idle'
       this.status.error = undefined
       localStorage.setItem('so-diem-gl-last-sync', String(this.status.lastSync))
-
       this.emitStatusChange()
+
       return { ok: true }
     } catch (e: any) {
-      console.error('Sync failed:', e)
       this.status.status = 'error'
       this.status.error = e.message
       this.emitStatusChange()
       return { ok: false, error: e.message }
-    } finally {
-      this.syncInProgress = false
     }
   }
 
   async pull(): Promise<{ ok: boolean; error?: string }> {
-    if (!this.supabase) return { ok: false, error: 'Chưa cấu hình Supabase' }
+    const supabase = supabaseService.getClient()
+    if (!supabase) return { ok: false, error: 'Chưa cấu hình Supabase' }
 
     try {
-      const { data: stateData } = await this.supabase
-        .from('app_cloud')
-        .select('state')
-        .eq('id', 'main')
-        .single()
+      // 1. Fetch classes
+      const { data: dbClasses, error: errC } = await supabase.from('classes').select('*')
+      if (errC) throw errC
 
-      if (stateData?.state) {
-        await this.storage.setState(stateData.state)
-      }
+      // 2. Fetch students
+      const { data: dbStudents, error: errS } = await supabase.from('students').select('*')
+      if (errS) throw errS
 
-      const { data: authData } = await this.supabase
-        .from('app_cloud')
-        .select('auth')
-        .eq('id', 'auth')
-        .single()
+      // 3. Fetch scores
+      const { data: dbScores, error: errSc } = await supabase.from('scores').select('*')
+      if (errSc) throw errSc
 
-      if (authData?.auth) {
-        await this.storage.setAuthStore(authData.auth)
+      // 4. Fetch logs
+      const { data: dbLogs, error: errL } = await supabase.from('learning_logs').select('*')
+      if (errL) throw errL
+
+      // 5. Merge all into local StateManager
+      if (this.stateManager) {
+        const sm = this.stateManager
+        ;(sm as any).mutate('Tải dữ liệu từ đám mây', (draft: AppState) => {
+          draft.classes = (dbClasses || []).map((c: any) => {
+            const students = (dbStudents || [])
+              .filter((s: any) => s.class_id === c.id)
+              .map((s: any) => {
+                const scoresByTerm: any = {
+                  hk1: { khaoKinh: [], thuocBai: [], chuyenCan: [], baiTap: [], thaiDo: [], kiemTra: [] },
+                  hk2: { khaoKinh: [], thuocBai: [], chuyenCan: [], baiTap: [], thaiDo: [], kiemTra: [] }
+                }
+
+                const studentScores = (dbScores || []).filter((sc: any) => sc.student_id === s.id)
+                for (const sc of studentScores) {
+                  scoresByTerm[sc.term as 'hk1'|'hk2'][sc.col_key] = sc.values
+                }
+
+                const logs = (dbLogs || [])
+                  .filter((l: any) => l.student_id === s.id)
+                  .map((l: any) => ({
+                    id: l.id,
+                    date: l.date,
+                    type: l.type,
+                    level: l.level,
+                    text: l.text,
+                    byUserId: l.by_user_id,
+                    byName: l.by_name,
+                    at: Number(l.at)
+                  }))
+                  .sort((a, b) => b.at - a.at)
+
+                return {
+                  id: s.id,
+                  tenThanh: s.ten_thanh || '',
+                  hoDem: s.ho_dem || '',
+                  ten: s.ten || '',
+                  name: s.name || '',
+                  maHV: s.ma_hv || '',
+                  ngaySinh: s.ngay_sinh || '',
+                  gioiTinh: s.gioi_tinh || '',
+                  tenPhuHuynh: s.ten_phu_huynh || '',
+                  sdPhuHuynh: s.sd_phu_huynh || '',
+                  diaChi: s.dia_chi || '',
+                  email: s.email || '',
+                  ghiChu: s.ghi_chu || '',
+                  scoresByTerm,
+                  learningLog: logs,
+                  createdAt: new Date(s.created_at).getTime(),
+                  updatedAt: new Date(s.updated_at).getTime()
+                }
+              })
+
+            return {
+              id: c.id,
+              name: c.name,
+              year: c.year,
+              weights: c.weights,
+              students,
+              createdAt: new Date(c.created_at).getTime(),
+              updatedAt: new Date(c.updated_at).getTime()
+            }
+          })
+        }, { fromNetwork: true })
       }
 
       return { ok: true }
@@ -245,46 +202,19 @@ export class SyncManager extends EventTarget {
   }
 
   async push(): Promise<{ ok: boolean; error?: string }> {
-    if (!this.supabase) return { ok: false, error: 'Chưa cấu hình Supabase' }
-
+    if (!supabaseService.isConfigured()) return { ok: false, error: 'Chưa cấu hình Supabase' }
+    
+    // per-record model pushes mutation logs automatically in background.
+    // Manual push calls processQueue.
     try {
-      const state = this.stateManager?.getState()
-      const authStore = await this.storage.getAuthStore()
-
-      if (state) {
-        await this.supabase
-          .from('app_cloud')
-          .upsert({
-            id: 'main',
-            state,
-            updated_at: new Date().toISOString()
-          })
-      }
-
-      await this.supabase
-        .from('app_cloud')
-        .upsert({
-          id: 'auth',
-          auth: authStore,
-          updated_at: new Date().toISOString()
-        })
-
+      await this.syncEngine.processQueue()
       return { ok: true }
     } catch (e: any) {
-      console.error('Push failed:', e)
       return { ok: false, error: e.message }
     }
   }
 
-  private scheduleRetry(): void {
-    if (this.retryTimeout) return
-    this.retryTimeout = setTimeout(() => {
-      this.retryTimeout = null
-      this.processSyncQueue()
-    }, 30000) // 30s retry
-  }
-
-  startAutoSync(intervalMs = 300000): void { // 5 minutes default
+  startAutoSync(intervalMs = 300000): void {
     if (this.syncInterval) return
     this.syncInterval = setInterval(() => this.sync(), intervalMs)
   }
@@ -301,11 +231,11 @@ export class SyncManager extends EventTarget {
   }
 
   getSupabaseUrl(): string {
-    return this.supabaseUrl
+    return supabaseService.getUrl()
   }
 
   isConfigured(): boolean {
-    return !!this.supabaseUrl && !!this.supabaseKey
+    return supabaseService.isConfigured()
   }
 
   private emitStatusChange(): void {
