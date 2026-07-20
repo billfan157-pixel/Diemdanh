@@ -213,6 +213,14 @@ export class AppView {
       this.updateSyncUI(e.detail)
     }) as EventListener)
 
+    // Listen for sync conflicts
+    this.syncManager.addEventListener('conflict', ((e: Event) => {
+      import('./modals/ConflictModal').then(({ ConflictModal }) => {
+        const modal = new ConflictModal(this.notificationManager)
+        modal.open((e as CustomEvent).detail)
+      })
+    }) as EventListener)
+
     // Initial render
     this.updateClassSelector()
     this.updateSyncUI(this.syncManager.getStatus())
