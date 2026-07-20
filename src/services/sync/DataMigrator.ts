@@ -21,6 +21,7 @@ export class DataMigrator {
         name: c.name,
         year: c.year,
         weights: c.weights,
+        columns: c.columns,
         rev: c.rev || 1,
         created_at: new Date(c.createdAt || Date.now()).toISOString(),
         updated_at: new Date(c.updatedAt || Date.now()).toISOString()

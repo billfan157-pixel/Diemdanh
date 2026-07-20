@@ -110,9 +110,9 @@ export function parsePatchesToOps(oldState: AppState, newState: AppState, patche
 
     // 2. Class field update
     if (path.length === 3) {
-      // Path: ["classes", classIdx, "name"|"year"|"weights"]
+      // Path: ["classes", classIdx, "name"|"year"|"weights"|"columns"]
       const field = path[2]
-      if (field === 'name' || field === 'year' || field === 'weights') {
+      if (field === 'name' || field === 'year' || field === 'weights' || field === 'columns') {
         const updatedCls = newState.classes[classIdx]
         if (updatedCls) {
           ops.push({
@@ -123,6 +123,7 @@ export function parsePatchesToOps(oldState: AppState, newState: AppState, patche
               name: updatedCls.name,
               year: updatedCls.year,
               weights: updatedCls.weights,
+              columns: updatedCls.columns,
               rev: (updatedCls.rev || 1) + 1
             }
           })

@@ -10,7 +10,13 @@ import {
   BackupRecord,
   AppDBSchema
 } from './StorageAdapter.types'
-import { createEmptyTermScores } from '../../config/constants.ts'
+import {
+  cloneDefaultCols,
+  createEmptyScoresByTerm,
+  createEmptyTermScores,
+  ensureScoresMatchColumns,
+  weightsFromColumns
+} from '../../config/columns.ts'
 
 // ============================================================
 // Constants
@@ -386,40 +392,61 @@ export class StorageAdapter {
 
   private getDefaultState(): AppState {
     return {
-      version: 4,
+      version: 5,
       activeClassId: null,
       classes: [],
       yearFilter: null,
+      archivedYears: [],
       viewMode: 'cards',
       activeTerm: 'hk1',
+      parentTokens: [],
       lastModified: Date.now()
     }
   }
 
   private migrateState(state: any): AppState {
-    // Ensure all required fields exist
-    const migrated = {
-      version: state.version || 1,
-      activeClassId: state.activeClassId ?? null,
-      classes: (Array.isArray(state.classes) ? state.classes : []).map((c: any) => ({
+    const classes = (Array.isArray(state.classes) ? state.classes : []).map((c: any) => {
+      const columns = Array.isArray(c.columns) && c.columns.length
+        ? c.columns.map((col: any) => ({
+            key: String(col.key || ''),
+            short: String(col.short || col.key || '').slice(0, 4),
+            label: String(col.label || col.key || ''),
+            defaultWeight: typeof col.defaultWeight === 'number' && col.defaultWeight > 0 ? col.defaultWeight : 1
+          })).filter((col: any) => col.key)
+        : cloneDefaultCols()
+
+      return {
         id: c.id || `cls_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name: c.name || '',
         year: c.year || '',
-        weights: c.weights || { khaoKinh: 1, thuocBai: 1, chuyenCan: 1, baiTap: 1, thaiDo: 1, kiemTra: 1 },
-        students: Array.isArray(c.students) ? c.students.map((s: any) => this.migrateStudent(s)) : [],
+        columns,
+        weights: weightsFromColumns(columns, c.weights),
+        students: Array.isArray(c.students)
+          ? c.students.map((s: any) => this.migrateStudent(s, columns))
+          : [],
         createdAt: c.createdAt || Date.now(),
-        updatedAt: c.updatedAt || Date.now()
-      })),
+        updatedAt: c.updatedAt || Date.now(),
+        rev: c.rev
+      }
+    })
+
+    return {
+      version: Math.max(Number(state.version) || 1, 5),
+      activeClassId: state.activeClassId ?? null,
+      classes,
       yearFilter: state.yearFilter ?? null,
+      archivedYears: Array.isArray(state.archivedYears)
+        ? state.archivedYears.map(String).filter(Boolean)
+        : [],
       viewMode: state.viewMode || 'cards',
       activeTerm: state.activeTerm || 'hk1',
+      parentTokens: Array.isArray(state.parentTokens) ? state.parentTokens : [],
       lastModified: state.lastModified || Date.now()
     }
-
-    return migrated
   }
 
-  private migrateStudent(s: any): any {
+  private migrateStudent(s: any, columns = cloneDefaultCols()): any {
+    const scoresByTerm = s.scoresByTerm || createEmptyScoresByTerm(columns)
     return {
       id: s.id || `st_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       tenThanh: s.tenThanh || '',
@@ -434,7 +461,10 @@ export class StorageAdapter {
       diaChi: s.diaChi || '',
       email: s.email || '',
       ghiChu: s.ghiChu || '',
-      scoresByTerm: s.scoresByTerm || { hk1: createEmptyTermScores(), hk2: createEmptyTermScores() },
+      scoresByTerm: {
+        hk1: ensureScoresMatchColumns(scoresByTerm.hk1 || createEmptyTermScores(columns), columns),
+        hk2: ensureScoresMatchColumns(scoresByTerm.hk2 || createEmptyTermScores(columns), columns)
+      },
       learningLog: Array.isArray(s.learningLog) ? s.learningLog : [],
       createdAt: s.createdAt || Date.now(),
       updatedAt: s.updatedAt || Date.now()

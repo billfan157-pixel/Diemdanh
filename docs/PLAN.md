@@ -135,34 +135,34 @@ Nhiều máy/nhiều người, bảo mật thật, sync ổn định
 Sản phẩm "đủ nghề": năm học, parish report, PH link
 
 ### 3.1 Cột điểm cấu hình động (Tuần 21-23)
-- [ ] Cấu hình cột điểm theo lớp / theo năm học
-- [ ] Không hardcode cột điểm
-- [ ] UI để GLV cấu hình cột điểm
-- [ ] Test với nhiều cấu hình khác nhau
+- [x] Cấu hình cột điểm theo lớp / theo năm học
+- [x] Không hardcode cột điểm
+- [x] UI để GLV cấu hình cột điểm (ColumnsModal)
+- [x] Test với nhiều cấu hình khác nhau (phase3.test.ts)
 
 ### 3.2 Năm học + archive + so sánh năm (Tuần 24-26)
-- [ ] Multi-year: 2025-2026, 2026-2027
-- [ ] Archive năm cũ
-- [ ] So sánh năm học (TB, xếp loại)
-- [ ] UI chuyển đổi năm học
+- [x] Multi-year: 2025-2026, 2026-2027
+- [x] Archive năm cũ (archiveYear / isClassArchived check)
+- [x] So sánh năm học (TB, xếp loại - compareYears)
+- [x] UI chuyển đổi năm học
 
 ### 3.3 Parish report + dashboard Ban GL (Tuần 27-28)
-- [ ] Dashboard Ban GL: % đủ điểm, TB từng lớp, lớp "đỏ"
-- [ ] Bảng xếp hạng liên lớp
-- [ ] Lọc khối/lớp
-- [ ] Xuất báo cáo họp Ban (PDF/Excel chuẩn in)
+- [x] Dashboard Ban GL: % đủ điểm, TB từng lớp, lớp "đỏ"
+- [x] Bảng xếp hạng liên lớp (rankings)
+- [x] Lọc khối/lớp (scoped classes by year)
+- [x] Xuất báo cáo họp Ban (PDF/Excel chuẩn in)
 
 ### 3.4 Phiếu PH read-only (Tuần 29-30)
-- [ ] Thư mời / phiếu điểm với token hết hạn
-- [ ] Link xem read-only
-- [ ] Không cho PH sửa điểm
-- [ ] Test token expiration
+- [x] Thư mời / phiếu điểm với token hết hạn (ParentInviteModal)
+- [x] Link xem read-only (ParentReportView)
+- [x] Không cho PH sửa điểm (read-only view)
+- [x] Test token expiration (phase3.test.ts)
 
 **Done khi:**
-- Cột điểm cấu hình được, không hardcode
-- Năm học hoạt động, archive được
-- Parish report xuất được
-- Phiếu PH read-only hoạt động
+- [x] Cột điểm cấu hình được, không hardcode
+- [x] Năm học hoạt động, archive được
+- [x] Parish report xuất được
+- [x] Phiếu PH read-only hoạt động
 
 ---
 
@@ -408,10 +408,10 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 - [x] Sync 2 máy ổn định
 
 ### Phase 3
-- [ ] Cột điểm cấu hình được
-- [ ] Năm học hoạt động
-- [ ] Parish report xuất được
-- [ ] Phiếu PH read-only
+- [x] Cột điểm cấu hình được
+- [x] Năm học hoạt động
+- [x] Parish report xuất được
+- [x] Phiếu PH read-only
 
 ### Phase 4
 - [ ] Design system thống nhất

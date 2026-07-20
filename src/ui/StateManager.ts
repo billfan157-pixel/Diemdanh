@@ -5,8 +5,26 @@
 
 import { produce, produceWithPatches, enablePatches, Patch } from 'immer'
 import { StorageAdapter } from '../services/storage/StorageAdapter'
-import { AppState, ClassData, StudentData, ColumnWeights } from '../services/storage/StorageAdapter.types'
-import { COLS, DEFAULT_WEIGHTS, ColumnKey, generateId, createEmptyScoresByTerm } from '../config/constants.ts'
+import {
+  AppState,
+  ClassData,
+  StudentData,
+  ColumnWeights,
+  ScoreColumnDef,
+  ParentToken
+} from '../services/storage/StorageAdapter.types'
+import {
+  DEFAULT_WEIGHTS,
+  ColumnKey,
+  generateId,
+  createEmptyScoresByTerm,
+  cloneDefaultCols,
+  weightsFromColumns,
+  ensureScoresMatchColumns,
+  makeColumnDef,
+  resolveClassColumns,
+  colLabel
+} from '../config/constants.ts'
 
 // Enable Immer patches for undo/redo
 enablePatches()
@@ -133,13 +151,15 @@ export class StateManager {
   // Class Operations
   // ============================================================
 
-  createClass(name: string, year: string, weights?: Partial<ColumnWeights>): string {
+  createClass(name: string, year: string, weights?: Partial<ColumnWeights>, columns?: ScoreColumnDef[]): string {
     const id = generateId('cls')
+    const cols = columns?.length ? columns.map(c => ({ ...c })) : cloneDefaultCols()
     const newClass: ClassData = {
       id,
       name: name.trim(),
       year: year.trim(),
-      weights: { ...DEFAULT_WEIGHTS, ...weights },
+      columns: cols,
+      weights: weightsFromColumns(cols, { ...DEFAULT_WEIGHTS, ...weights }),
       students: [],
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -153,7 +173,7 @@ export class StateManager {
     return id
   }
 
-  updateClass(id: string, updates: Partial<Pick<ClassData, 'name' | 'year' | 'weights'>>): boolean {
+  updateClass(id: string, updates: Partial<Pick<ClassData, 'name' | 'year' | 'weights' | 'columns'>>): boolean {
     const idx = this.state.classes.findIndex(c => c.id === id)
     if (idx === -1) return false
 
@@ -206,6 +226,46 @@ export class StateManager {
       .sort((a, b) => b.localeCompare(a)) as string[]
   }
 
+  getVisibleClasses(): ClassData[] {
+    const year = this.state.yearFilter
+    if (!year) return this.getAllClasses()
+    return this.getClassesByYear(year)
+  }
+
+  isYearArchived(year: string): boolean {
+    return (this.state.archivedYears || []).includes(year)
+  }
+
+  isClassArchived(classId: string): boolean {
+    const cls = this.getClass(classId)
+    if (!cls?.year) return false
+    return this.isYearArchived(cls.year)
+  }
+
+  archiveYear(year: string): boolean {
+    const y = year.trim()
+    if (!y) return false
+    if (this.isYearArchived(y)) return true
+    this.mutate(`Lưu trữ năm học ${y}`, (draft) => {
+      if (!draft.archivedYears) draft.archivedYears = []
+      draft.archivedYears.push(y)
+    })
+    return true
+  }
+
+  unarchiveYear(year: string): boolean {
+    const y = year.trim()
+    if (!y || !this.isYearArchived(y)) return false
+    this.mutate(`Mở lại năm học ${y}`, (draft) => {
+      draft.archivedYears = (draft.archivedYears || []).filter(x => x !== y)
+    })
+    return true
+  }
+
+  getClassColumns(classId: string): ScoreColumnDef[] {
+    return resolveClassColumns(this.getClass(classId))
+  }
+
   // ============================================================
   // Student Operations
   // ============================================================
@@ -214,11 +274,12 @@ export class StateManager {
     const classIdx = this.state.classes.findIndex(c => c.id === classId)
     if (classIdx === -1) throw new Error('Class not found')
 
+    const cols = resolveClassColumns(this.state.classes[classIdx])
     const id = generateId('st')
     const newStudent: StudentData = {
       ...student,
       id,
-      scoresByTerm: createEmptyScoresByTerm(),
+      scoresByTerm: createEmptyScoresByTerm(cols),
       learningLog: [],
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -279,10 +340,11 @@ export class StateManager {
       draft.classes[fromIdx].updatedAt = Date.now()
 
       // Add to destination (reset scores)
+      const destCols = resolveClassColumns(draft.classes[toIdx])
       const transferredStudent = {
         ...student,
         id: generateId('st'),
-        scoresByTerm: createEmptyScoresByTerm(),
+        scoresByTerm: createEmptyScoresByTerm(destCols),
         learningLog: [],
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -304,15 +366,18 @@ export class StateManager {
     value: number,
     term: 'hk1' | 'hk2' = 'hk1'
   ): boolean {
+    if (this.isClassArchived(classId)) return false
     const classIdx = this.state.classes.findIndex(c => c.id === classId)
     if (classIdx === -1) return false
 
     const studentIdx = this.state.classes[classIdx].students.findIndex(s => s.id === studentId)
     if (studentIdx === -1) return false
 
-    this.mutate(`Thêm điểm ${COLS.find(c => c.key === column)?.label || column}`, (draft) => {
-      const scores = draft.classes[classIdx].students[studentIdx].scoresByTerm[term][column]
-      scores.push(value)
+    const cols = resolveClassColumns(this.state.classes[classIdx])
+    this.mutate(`Thêm điểm ${colLabel(cols, column)}`, (draft) => {
+      const termScores = draft.classes[classIdx].students[studentIdx].scoresByTerm[term]
+      if (!Array.isArray(termScores[column])) termScores[column] = []
+      termScores[column].push(value)
       draft.classes[classIdx].students[studentIdx].updatedAt = Date.now()
     })
     return true
@@ -325,6 +390,7 @@ export class StateManager {
     index: number,
     term: 'hk1' | 'hk2' = 'hk1'
   ): boolean {
+    if (this.isClassArchived(classId)) return false
     const classIdx = this.state.classes.findIndex(c => c.id === classId)
     if (classIdx === -1) return false
 
@@ -332,9 +398,10 @@ export class StateManager {
     if (studentIdx === -1) return false
 
     const scores = this.state.classes[classIdx].students[studentIdx].scoresByTerm[term][column]
-    if (index < 0 || index >= scores.length) return false
+    if (!scores || index < 0 || index >= scores.length) return false
 
-    this.mutate(`Xóa điểm ${COLS.find(c => c.key === column)?.label || column}`, (draft) => {
+    const cols = resolveClassColumns(this.state.classes[classIdx])
+    this.mutate(`Xóa điểm ${colLabel(cols, column)}`, (draft) => {
       draft.classes[classIdx].students[studentIdx].scoresByTerm[term][column].splice(index, 1)
       draft.classes[classIdx].students[studentIdx].updatedAt = Date.now()
     })
@@ -348,13 +415,15 @@ export class StateManager {
     values: number[],
     term: 'hk1' | 'hk2' = 'hk1'
   ): boolean {
+    if (this.isClassArchived(classId)) return false
     const classIdx = this.state.classes.findIndex(c => c.id === classId)
     if (classIdx === -1) return false
 
     const studentIdx = this.state.classes[classIdx].students.findIndex(s => s.id === studentId)
     if (studentIdx === -1) return false
 
-    this.mutate(`Cập nhật điểm ${COLS.find(c => c.key === column)?.label || column}`, (draft) => {
+    const cols = resolveClassColumns(this.state.classes[classIdx])
+    this.mutate(`Cập nhật điểm ${colLabel(cols, column)}`, (draft) => {
       draft.classes[classIdx].students[studentIdx].scoresByTerm[term][column] = values
       draft.classes[classIdx].students[studentIdx].updatedAt = Date.now()
     })
@@ -362,18 +431,165 @@ export class StateManager {
   }
 
   // ============================================================
-  // Weight Operations
+  // Weight & Column Operations
   // ============================================================
 
   updateWeights(classId: string, weights: Partial<ColumnWeights>): boolean {
+    if (this.isClassArchived(classId)) return false
     const classIdx = this.state.classes.findIndex(c => c.id === classId)
     if (classIdx === -1) return false
 
     this.mutate('Cập nhật trọng số', (draft) => {
-      draft.classes[classIdx].weights = { ...draft.classes[classIdx].weights, ...weights }
+      const cols = resolveClassColumns(draft.classes[classIdx])
+      draft.classes[classIdx].weights = weightsFromColumns(cols, {
+        ...draft.classes[classIdx].weights,
+        ...weights
+      })
       draft.classes[classIdx].updatedAt = Date.now()
     })
     return true
+  }
+
+  /**
+   * Replace the full column set for a class. Migrates student scores and weights.
+   */
+  setClassColumns(classId: string, columns: ScoreColumnDef[]): boolean {
+    if (this.isClassArchived(classId)) return false
+    const classIdx = this.state.classes.findIndex(c => c.id === classId)
+    if (classIdx === -1) return false
+    if (!columns.length) return false
+
+    const cleaned = columns
+      .map(c => ({
+        key: String(c.key).trim(),
+        short: String(c.short || c.key).trim().slice(0, 4),
+        label: String(c.label || c.key).trim(),
+        defaultWeight: typeof c.defaultWeight === 'number' && c.defaultWeight > 0 ? c.defaultWeight : 1
+      }))
+      .filter(c => c.key && c.label)
+
+    if (!cleaned.length) return false
+
+    this.mutate('Cấu hình cột điểm', (draft) => {
+      const cls = draft.classes[classIdx]
+      cls.columns = cleaned
+      cls.weights = weightsFromColumns(cleaned, cls.weights)
+      for (const st of cls.students) {
+        st.scoresByTerm = {
+          hk1: ensureScoresMatchColumns(st.scoresByTerm?.hk1, cleaned),
+          hk2: ensureScoresMatchColumns(st.scoresByTerm?.hk2, cleaned)
+        }
+        st.updatedAt = Date.now()
+      }
+      cls.updatedAt = Date.now()
+    })
+    return true
+  }
+
+  addClassColumn(
+    classId: string,
+    input: { label: string; short?: string; defaultWeight?: number }
+  ): ScoreColumnDef | null {
+    if (this.isClassArchived(classId)) return null
+    const cls = this.getClass(classId)
+    if (!cls) return null
+    const cols = resolveClassColumns(cls)
+    const def = makeColumnDef(
+      input.label,
+      input.short || '',
+      cols.map(c => c.key),
+      input.defaultWeight ?? 1
+    )
+    const ok = this.setClassColumns(classId, [...cols, def])
+    return ok ? def : null
+  }
+
+  removeClassColumn(classId: string, key: ColumnKey): boolean {
+    const cols = this.getClassColumns(classId)
+    if (cols.length <= 1) return false
+    return this.setClassColumns(classId, cols.filter(c => c.key !== key))
+  }
+
+  renameClassColumn(
+    classId: string,
+    key: ColumnKey,
+    updates: Partial<Pick<ScoreColumnDef, 'label' | 'short' | 'defaultWeight'>>
+  ): boolean {
+    const cols = this.getClassColumns(classId)
+    const next = cols.map(c => (c.key === key ? { ...c, ...updates } : c))
+    return this.setClassColumns(classId, next)
+  }
+
+  // ============================================================
+  // Parent tokens (PH read-only)
+  // ============================================================
+
+  createParentToken(
+    classId: string,
+    studentId: string,
+    options: { expiresInDays?: number; label?: string; createdBy: string }
+  ): ParentToken | null {
+    const cls = this.getClass(classId)
+    if (!cls) return null
+    if (!cls.students.some(s => s.id === studentId)) return null
+
+    const days = options.expiresInDays ?? 30
+    const token: ParentToken = {
+      id: generateId('ptk'),
+      token: generateId('ph').replace(/[^a-z0-9]/gi, '').slice(0, 24) + Date.now().toString(36),
+      studentId,
+      classId,
+      expiresAt: Date.now() + days * 24 * 60 * 60 * 1000,
+      createdAt: Date.now(),
+      createdBy: options.createdBy,
+      label: options.label,
+      revoked: false
+    }
+
+    this.mutate('Tạo phiếu phụ huynh', (draft) => {
+      if (!draft.parentTokens) draft.parentTokens = []
+      draft.parentTokens.push(token)
+    })
+    return token
+  }
+
+  revokeParentToken(tokenId: string): boolean {
+    const idx = (this.state.parentTokens || []).findIndex(t => t.id === tokenId)
+    if (idx === -1) return false
+    this.mutate('Thu hồi phiếu phụ huynh', (draft) => {
+      draft.parentTokens[idx].revoked = true
+    })
+    return true
+  }
+
+  getParentToken(token: string): ParentToken | null {
+    return (this.state.parentTokens || []).find(t => t.token === token) || null
+  }
+
+  resolveParentTokenView(token: string): {
+    ok: boolean
+    error?: string
+    token?: ParentToken
+    classData?: ClassData
+    student?: StudentData
+  } {
+    const pt = this.getParentToken(token)
+    if (!pt) return { ok: false, error: 'Link không hợp lệ' }
+    if (pt.revoked) return { ok: false, error: 'Link đã bị thu hồi' }
+    if (pt.expiresAt < Date.now()) return { ok: false, error: 'Link đã hết hạn' }
+
+    const cls = this.getClass(pt.classId)
+    if (!cls) return { ok: false, error: 'Không tìm thấy lớp' }
+    const student = cls.students.find(s => s.id === pt.studentId)
+    if (!student) return { ok: false, error: 'Không tìm thấy học viên' }
+
+    return { ok: true, token: pt, classData: cls, student }
+  }
+
+  getParentTokensForStudent(classId: string, studentId: string): ParentToken[] {
+    return (this.state.parentTokens || []).filter(
+      t => t.classId === classId && t.studentId === studentId && !t.revoked
+    )
   }
 
   // ============================================================
@@ -443,7 +659,7 @@ export class StateManager {
     }, { skipUndo: true })
   }
 
-  setActiveTerm(term: 'hk1' | 'hk2'): void {
+  setActiveTerm(term: 'hk1' | 'hk2' | 'year'): void {
     this.mutate('Chuyển học kỳ', (draft) => {
       draft.activeTerm = term
     }, { skipUndo: true })
@@ -541,18 +757,37 @@ export class StateManager {
   // ============================================================
 
   private async migrateIfNeeded(): Promise<void> {
-    // Migration from v1-3 to v4
-    if (this.state.version < 4) {
-      // Ensure all students have learningLog
+    let changed = false
+
+    if (!Array.isArray(this.state.archivedYears)) {
+      this.state.archivedYears = []
+      changed = true
+    }
+    if (!Array.isArray(this.state.parentTokens)) {
+      this.state.parentTokens = []
+      changed = true
+    }
+
+    // v4 → v5: seed columns on each class + align scores/weights
+    if (this.state.version < 5) {
       for (const cls of this.state.classes) {
+        if (!cls.columns?.length) {
+          cls.columns = cloneDefaultCols()
+        }
+        cls.weights = weightsFromColumns(cls.columns, cls.weights)
         for (const student of cls.students) {
           if (!student.learningLog) student.learningLog = []
-          if (!student.scoresByTerm) student.scoresByTerm = createEmptyScoresByTerm()
+          student.scoresByTerm = {
+            hk1: ensureScoresMatchColumns(student.scoresByTerm?.hk1, cls.columns),
+            hk2: ensureScoresMatchColumns(student.scoresByTerm?.hk2, cls.columns)
+          }
         }
       }
-      this.state.version = 4
-      await this.forcePersist()
+      this.state.version = 5
+      changed = true
     }
+
+    if (changed) await this.forcePersist()
   }
 
   // ============================================================

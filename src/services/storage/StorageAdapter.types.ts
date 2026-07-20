@@ -1,12 +1,19 @@
 import { DBSchema } from 'idb'
+import type { ColumnWeights, ScoreColumnDef, TermScores } from '../../config/columns.ts'
+
+export type { ColumnWeights, ScoreColumnDef, TermScores }
 
 export interface AppState {
   version: number
   activeClassId: string | null
   classes: ClassData[]
   yearFilter: string | null
+  /** Years marked archived (read-only scores). */
+  archivedYears: string[]
   viewMode: string
   activeTerm: 'hk1' | 'hk2' | 'year'
+  /** Parent read-only report tokens (local + optional cloud sync). */
+  parentTokens: ParentToken[]
   lastModified: number
 }
 
@@ -14,20 +21,13 @@ export interface ClassData {
   id: string
   name: string
   year: string
+  /** Per-class score column definitions (dynamic). */
+  columns: ScoreColumnDef[]
   weights: ColumnWeights
   students: StudentData[]
   createdAt: number
   updatedAt: number
   rev?: number
-}
-
-export interface ColumnWeights {
-  khaoKinh: number
-  thuocBai: number
-  chuyenCan: number
-  baiTap: number
-  thaiDo: number
-  kiemTra: number
 }
 
 export interface StudentData {
@@ -56,15 +56,6 @@ export interface ScoresByTerm {
   hk2: TermScores
 }
 
-export interface TermScores {
-  khaoKinh: number[]
-  thuocBai: number[]
-  chuyenCan: number[]
-  baiTap: number[]
-  thaiDo: number[]
-  kiemTra: number[]
-}
-
 export interface LearningLogEntry {
   id: string
   date: string
@@ -74,6 +65,19 @@ export interface LearningLogEntry {
   byUserId: string
   byName: string
   at: number
+}
+
+/** Expiring read-only link for phụ huynh. */
+export interface ParentToken {
+  id: string
+  token: string
+  studentId: string
+  classId: string
+  expiresAt: number
+  createdAt: number
+  createdBy: string
+  label?: string
+  revoked?: boolean
 }
 
 export interface SyncQueueItem {

@@ -7,6 +7,7 @@ import { StorageAdapter } from '../storage/StorageAdapter'
 import { StateManager } from '../../ui/StateManager'
 import { parsePatchesToOps, SyncOp } from './PatchSyncParser'
 import { AppState } from '../storage/StorageAdapter.types'
+import { cloneDefaultCols } from '../../config/columns.ts'
 
 export interface ConflictData {
   op: SyncOp
@@ -278,6 +279,9 @@ export class SyncEngine extends EventTarget {
             id: record.id,
             name: record.name,
             year: record.year,
+            columns: Array.isArray(record.columns) && record.columns.length
+              ? record.columns
+              : cloneDefaultCols(),
             weights: record.weights,
             students: [],
             createdAt: new Date(record.created_at).getTime(),
@@ -289,6 +293,9 @@ export class SyncEngine extends EventTarget {
         ;(sm as any).mutate(label, (draft: AppState) => {
           draft.classes[idx].name = record.name
           draft.classes[idx].year = record.year
+          if (Array.isArray(record.columns) && record.columns.length) {
+            draft.classes[idx].columns = record.columns
+          }
           draft.classes[idx].weights = record.weights
           draft.classes[idx].updatedAt = new Date(record.updated_at).getTime()
         }, { fromNetwork: true })

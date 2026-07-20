@@ -3,8 +3,17 @@
 // Average scores, weighting, and grade classifications
 // ============================================================
 
-import { COLS, ColumnKey } from '../config/constants.ts'
-import { StudentData, ColumnWeights } from '../services/storage/StorageAdapter.types'
+import {
+  DEFAULT_COLS,
+  type ColumnKey,
+  type ColumnWeights,
+  type ScoreColumnDef,
+  type TermScores,
+  defaultWeights as defaultColumnWeights,
+  createEmptyTermScores,
+  ensureScoresMatchColumns
+} from '../config/columns.ts'
+import { StudentData } from '../services/storage/StorageAdapter.types'
 
 export const YEAR_WEIGHTS = { hk1: 1, hk2: 2 }
 
@@ -15,76 +24,62 @@ export interface Classification {
 }
 
 /**
- * Return default weights dictionary
+ * Return default weights dictionary for given columns (or DEFAULT_COLS).
  */
-export function defaultWeights(): ColumnWeights {
-  const w = {} as Record<ColumnKey, number>
-  for (const c of COLS) {
-    w[c.key] = c.defaultWeight
-  }
-  return w as unknown as ColumnWeights
+export function defaultWeights(cols: readonly ScoreColumnDef[] = DEFAULT_COLS): ColumnWeights {
+  return defaultColumnWeights(cols)
 }
 
 /**
- * Return empty scores structure
+ * Return empty scores structure for given columns.
  */
-export function emptyScores(): Record<ColumnKey, number[]> {
-  const s = {} as Record<ColumnKey, number[]>
-  for (const c of COLS) {
-    s[c.key] = []
-  }
-  return s
+export function emptyScores(cols: readonly ScoreColumnDef[] = DEFAULT_COLS): TermScores {
+  return createEmptyTermScores(cols)
 }
 
 /**
- * Deep clone score data structure
+ * Deep clone score data structure, keeping only keys in cols.
  */
-export function cloneScores(src?: Record<string, number[]>): Record<ColumnKey, number[]> {
-  const out = emptyScores()
-  if (!src) return out
-  for (const c of COLS) {
-    out[c.key] = Array.isArray(src[c.key]) ? [...src[c.key]] : []
-  }
-  return out
+export function cloneScores(
+  src?: Record<string, number[]>,
+  cols: readonly ScoreColumnDef[] = DEFAULT_COLS
+): TermScores {
+  return ensureScoresMatchColumns(src as TermScores | undefined, cols)
 }
 
 /**
- * Ensure student terms scores are properly formatted and migrates legacy flat scores if needed
+ * Ensure student terms scores are properly formatted and migrates legacy flat scores if needed.
  */
-export function ensureStudentTerms(st: StudentData): StudentData {
+export function ensureStudentTerms(
+  st: StudentData,
+  cols: readonly ScoreColumnDef[] = DEFAULT_COLS
+): StudentData {
   if (!st) return st
 
   if (!st.scoresByTerm || typeof st.scoresByTerm !== 'object') {
     st.scoresByTerm = {
-      hk1: emptyScores() as any,
-      hk2: emptyScores() as any
+      hk1: emptyScores(cols),
+      hk2: emptyScores(cols)
     }
   }
 
-  if (!st.scoresByTerm.hk1) st.scoresByTerm.hk1 = emptyScores() as any
-  if (!st.scoresByTerm.hk2) st.scoresByTerm.hk2 = emptyScores() as any
+  if (!st.scoresByTerm.hk1) st.scoresByTerm.hk1 = emptyScores(cols)
+  if (!st.scoresByTerm.hk2) st.scoresByTerm.hk2 = emptyScores(cols)
 
   // Migrate flat legacy scores -> HK1 (run once)
   const rawSt = st as any
   if (rawSt.scores && typeof rawSt.scores === 'object') {
-    const hasFlat = COLS.some(c => rawSt.scores?.[c.key] && rawSt.scores[c.key].length)
-    const hk1Empty = !COLS.some(c => st.scoresByTerm?.hk1?.[c.key] && st.scoresByTerm.hk1[c.key].length)
+    const hasFlat = cols.some(c => rawSt.scores?.[c.key] && rawSt.scores[c.key].length)
+    const hk1Empty = !cols.some(c => st.scoresByTerm?.hk1?.[c.key] && st.scoresByTerm.hk1[c.key].length)
 
     if (hasFlat && hk1Empty) {
-      st.scoresByTerm.hk1 = cloneScores(rawSt.scores) as any
+      st.scoresByTerm.hk1 = cloneScores(rawSt.scores, cols)
     }
     delete rawSt.scores
   }
 
-  // Ensure each column has an array
   for (const term of ['hk1', 'hk2'] as const) {
-    const termData = st.scoresByTerm[term] || emptyScores()
-    for (const c of COLS) {
-      if (!Array.isArray((termData as any)[c.key])) {
-        (termData as any)[c.key] = []
-      }
-    }
-    st.scoresByTerm[term] = termData as any
+    st.scoresByTerm[term] = ensureScoresMatchColumns(st.scoresByTerm[term], cols)
   }
 
   return st
@@ -93,9 +88,13 @@ export function ensureStudentTerms(st: StudentData): StudentData {
 /**
  * Get term scores safely, ensuring the structure is correct
  */
-export function getScores(st: StudentData, term: 'hk1' | 'hk2'): Record<ColumnKey, number[]> {
-  ensureStudentTerms(st)
-  return (st.scoresByTerm?.[term] || emptyScores()) as unknown as Record<ColumnKey, number[]>
+export function getScores(
+  st: StudentData,
+  term: 'hk1' | 'hk2',
+  cols: readonly ScoreColumnDef[] = DEFAULT_COLS
+): TermScores {
+  ensureStudentTerms(st, cols)
+  return st.scoresByTerm?.[term] || emptyScores(cols)
 }
 
 /**
@@ -109,16 +108,21 @@ export function colAvg(scores?: number[]): number | null {
 /**
  * Compute student term average based on column weights
  */
-export function studentTB(student: StudentData, weights: ColumnWeights = defaultWeights(), term: 'hk1' | 'hk2'): number | null {
-  const bag = getScores(student, term)
+export function studentTB(
+  student: StudentData,
+  weights: ColumnWeights = defaultWeights(),
+  term: 'hk1' | 'hk2',
+  cols: readonly ScoreColumnDef[] = DEFAULT_COLS
+): number | null {
+  const bag = getScores(student, term, cols)
   let sum = 0
   let wSum = 0
 
-  for (const col of COLS) {
+  for (const col of cols) {
     const avg = colAvg(bag[col.key])
     if (avg === null) continue
 
-    const w = Number((weights as any)[col.key]) || 0
+    const w = Number(weights[col.key]) || 0
     if (w <= 0) continue
 
     sum += avg * w
@@ -131,9 +135,13 @@ export function studentTB(student: StudentData, weights: ColumnWeights = default
 /**
  * Compute student year average, handling fallbacks if a term is missing
  */
-export function studentYearTB(student: StudentData, weights: ColumnWeights = defaultWeights()): number | null {
-  const t1 = studentTB(student, weights, 'hk1')
-  const t2 = studentTB(student, weights, 'hk2')
+export function studentYearTB(
+  student: StudentData,
+  weights: ColumnWeights = defaultWeights(),
+  cols: readonly ScoreColumnDef[] = DEFAULT_COLS
+): number | null {
+  const t1 = studentTB(student, weights, 'hk1', cols)
+  const t2 = studentTB(student, weights, 'hk2', cols)
 
   const w1 = Number(YEAR_WEIGHTS.hk1) || 1
   const w2 = Number(YEAR_WEIGHTS.hk2) || 2
@@ -151,10 +159,11 @@ export function studentYearTB(student: StudentData, weights: ColumnWeights = def
 export function studentTBContext(
   student: StudentData,
   weights: ColumnWeights = defaultWeights(),
-  term: 'hk1' | 'hk2' | 'year'
+  term: 'hk1' | 'hk2' | 'year',
+  cols: readonly ScoreColumnDef[] = DEFAULT_COLS
 ): number | null {
-  if (term === 'year') return studentYearTB(student, weights)
-  return studentTB(student, weights, term)
+  if (term === 'year') return studentYearTB(student, weights, cols)
+  return studentTB(student, weights, term, cols)
 }
 
 /**
@@ -179,3 +188,15 @@ export function classify(avg: number | null): Classification {
   if (avg >= 5) return { label: 'Trung bình', rank: 'rank-tb', score: 'score-tb' }
   return { label: 'Yếu', rank: 'rank-y', score: 'score-y' }
 }
+
+/** True if student is missing any column score for the term. */
+export function hasMissingColumnScores(
+  student: StudentData,
+  term: 'hk1' | 'hk2',
+  cols: readonly ScoreColumnDef[] = DEFAULT_COLS
+): boolean {
+  const scores = getScores(student, term, cols)
+  return cols.some(c => !scores[c.key]?.length)
+}
+
+export type { ColumnKey, ScoreColumnDef }

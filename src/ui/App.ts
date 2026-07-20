@@ -45,6 +45,22 @@ export class App extends EventEmitter {
     // Setup global error handlers
     this.setupGlobalHandlers()
 
+    // Parent read-only report card via #/ph/{token} (no login)
+    const { parseParentTokenFromHash } = await import('../features/parentReport.ts')
+    const parentToken = parseParentTokenFromHash()
+    if (parentToken) {
+      await this.showParentReport(parentToken)
+      this.emit('ready')
+      return
+    }
+
+    window.addEventListener('hashchange', () => {
+      const token = parseParentTokenFromHash()
+      if (token) {
+        this.showParentReport(token)
+      }
+    })
+
     // Listen for login/logout events to switch views
     window.addEventListener('gl:login', () => {
       this.showApp()
@@ -62,6 +78,13 @@ export class App extends EventEmitter {
     }
 
     this.emit('ready')
+  }
+
+  private async showParentReport(token: string): Promise<void> {
+    const { ParentReportView } = await import('./views/ParentReportView')
+    const view = new ParentReportView(this.stateManager, token)
+    this.mountPoint.innerHTML = ''
+    this.mountPoint.appendChild(view.render())
   }
 
   private setupGlobalHandlers(): void {

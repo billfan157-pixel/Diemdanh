@@ -23,7 +23,7 @@ describe('StorageAdapter State Migration', () => {
 
   it('should return default state when no state exists', async () => {
     const state = await storage.getState()
-    expect(state.version).toBe(4)
+    expect(state.version).toBe(5)
     expect(state.classes).toEqual([])
     expect(state.activeClassId).toBeNull()
   })
@@ -48,7 +48,7 @@ describe('StorageAdapter State Migration', () => {
     localStorage.setItem('so-diem-gl-state', JSON.stringify(oldRawState))
 
     const migratedState = await storage.getState()
-    expect(migratedState.version).toBe(2)
+    expect(migratedState.version).toBe(5)
     expect(migratedState.classes.length).toBe(1)
     
     const cls = migratedState.classes[0]

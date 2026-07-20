@@ -7,8 +7,10 @@ import { AuthManager } from '../../core/auth/AuthManager'
 import { SyncManager } from '../../services/sync/SyncManager'
 import { NotificationManager } from '../../services/NotificationManager'
 import { BackupService } from '../../services/BackupService'
-import { COLS, displayName, classifyStudent } from '../../config/constants.ts'
-import { studentYearTB } from '../../core/calc.ts'
+import { displayName, classifyStudent, resolveClassColumns } from '../../config/constants.ts'
+import { studentYearTB, hasMissingColumnScores } from '../../core/calc.ts'
+import { buildParishDashboard, downloadTextFile, buildParishReportCsv, printParishReport } from '../../features/parishReport.ts'
+import { compareYears, summarizeYear } from '../../features/years.ts'
 
 export class AppView {
   private stateManager: StateManager
@@ -181,6 +183,35 @@ export class AppView {
     const backupBtn = this.element.querySelector('#backupBtn')
     backupBtn?.addEventListener('click', () => this.openBackupModal())
 
+    // Year filter
+    const yearSelect = this.element.querySelector('#yearFilterSelect') as HTMLSelectElement
+    yearSelect?.addEventListener('change', () => {
+      const v = yearSelect.value
+      this.stateManager.setYearFilter(v || null)
+      this.renderCurrentView()
+    })
+
+    // Dashboard / parish tools
+    this.element.querySelector('#openDashboardBtn')?.addEventListener('click', () => {
+      this.switchView('dashboard')
+      const sidebar = this.element?.querySelector('#sidebar')
+      sidebar?.classList.remove('open')
+      this.element?.querySelector('#sidebarScrim')?.setAttribute('hidden', 'true')
+    })
+
+    this.element.querySelector('#inviteBtn')?.addEventListener('click', () => this.openParentInvite())
+    this.element.querySelector('#reportsBtn')?.addEventListener('click', () => this.exportParishReport())
+
+    // View-more sheet actions
+    this.element.querySelector('#mViewMoreSheet')?.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null
+      if (!btn) return
+      const action = btn.dataset.action
+      this.closeViewMoreSheet()
+      if (action === 'weights') this.openColumnsModal()
+      if (action === 'reports') this.exportParishReport()
+    })
+
     // Profile menu actions click delegation
     const meView = this.element.querySelector('#meView')
     meView?.addEventListener('click', async (e) => {
@@ -191,6 +222,16 @@ export class AppView {
       const action = row.getAttribute('data-me-action')
       if (action === 'backup' || action === 'restore') {
         this.openBackupModal()
+      } else if (action === 'invite') {
+        this.openParentInvite()
+      } else if (action === 'columns') {
+        this.openColumnsModal()
+      } else if (action === 'parish-report') {
+        this.exportParishReport()
+      } else if (action === 'year-compare') {
+        this.openYearCompare()
+      } else if (action === 'archive-year') {
+        this.toggleArchiveCurrentYear()
       } else if (action === 'logout') {
         const ok = await this.notificationManager.confirm('Bạn có chắc chắn muốn đăng xuất?', {
           title: 'Đăng xuất?',
@@ -222,6 +263,7 @@ export class AppView {
     }) as EventListener)
 
     // Initial render
+    this.updateYearFilterSelect()
     this.updateClassSelector()
     this.updateSyncUI(this.syncManager.getStatus())
     this.renderCurrentView()
@@ -488,9 +530,93 @@ export class AppView {
     const modal = new BackupModal(this.backupService, this.notificationManager)
     modal.open(async () => {
       // Refresh view upon backup restore
+      this.updateYearFilterSelect()
       this.updateClassSelector()
       this.renderCurrentView()
     })
+  }
+
+  private async openColumnsModal(): Promise<void> {
+    const classId = this.activeClassId || this.stateManager.getState().activeClassId
+    if (!classId) {
+      this.notificationManager.show('Chọn lớp trước khi cấu hình cột điểm', 'warning')
+      return
+    }
+    const { ColumnsModal } = await import('./modals/ColumnsModal')
+    const modal = new ColumnsModal(this.stateManager, this.notificationManager)
+    modal.open(classId, () => this.renderCurrentView())
+  }
+
+  private async openParentInvite(): Promise<void> {
+    const { ParentInviteModal } = await import('./modals/ParentInviteModal')
+    const modal = new ParentInviteModal(this.stateManager, this.authManager, this.notificationManager)
+    modal.open(this.activeClassId || this.stateManager.getState().activeClassId)
+  }
+
+  private exportParishReport(): void {
+    const year = this.stateManager.getState().yearFilter
+    const data = buildParishDashboard(this.stateManager.getAllClasses(), year)
+    const stamp = (year || 'all').replace(/\s+/g, '-')
+    downloadTextFile(
+      `bao-cao-ban-gl-${stamp}.csv`,
+      buildParishReportCsv(data),
+      'text/csv;charset=utf-8'
+    )
+    printParishReport(data)
+    this.notificationManager.show('Đã xuất báo cáo Ban GL (CSV + bản in)', 'success')
+  }
+
+  private openYearCompare(): void {
+    const years = this.stateManager.getYears()
+    if (years.length < 2) {
+      this.notificationManager.show('Cần ít nhất 2 năm học để so sánh', 'warning')
+      return
+    }
+    const yearA = years[1]
+    const yearB = years[0]
+    const rows = compareYears(this.stateManager.getAllClasses(), yearA, yearB)
+    const lines = [
+      `So sánh ${yearA} ↔ ${yearB}`,
+      ...rows.map(r => `${r.metric}: ${r.yearA} → ${r.yearB}`)
+    ]
+    this.notificationManager.alert(lines.join('\n'), 'So sánh năm học')
+  }
+
+  private async toggleArchiveCurrentYear(): Promise<void> {
+    const year = this.stateManager.getState().yearFilter || this.stateManager.getYears()[0]
+    if (!year) {
+      this.notificationManager.show('Chưa có năm học', 'warning')
+      return
+    }
+    if (this.stateManager.isYearArchived(year)) {
+      this.stateManager.unarchiveYear(year)
+      this.notificationManager.show(`Đã mở lại năm ${year}`, 'success')
+    } else {
+      const ok = await this.notificationManager.confirm(
+        `Lưu trữ năm học ${year}? Điểm các lớp năm này sẽ chỉ xem, không sửa.`,
+        { title: 'Lưu trữ năm học?', type: 'warning', confirmText: 'Lưu trữ', cancelText: 'Hủy' }
+      )
+      if (ok) {
+        this.stateManager.archiveYear(year)
+        this.notificationManager.show(`Đã lưu trữ năm ${year}`, 'success')
+      }
+    }
+    this.updateYearFilterSelect()
+    this.renderCurrentView()
+  }
+
+  private updateYearFilterSelect(): void {
+    const select = this.element?.querySelector('#yearFilterSelect') as HTMLSelectElement
+    if (!select) return
+    const years = this.stateManager.getYears()
+    const current = this.stateManager.getState().yearFilter
+    const archived = this.stateManager.getState().archivedYears || []
+    select.innerHTML =
+      `<option value="">Tất cả năm</option>` +
+      years.map(y => {
+        const tag = archived.includes(y) ? ' (đã lưu trữ)' : ''
+        return `<option value="${this.escapeHtml(y)}" ${current === y ? 'selected' : ''}>${this.escapeHtml(y)}${tag}</option>`
+      }).join('')
   }
 
   // ============================================================
@@ -519,21 +645,74 @@ export class AppView {
     const container = this.element?.querySelector('#dashboardView') as HTMLElement
     if (!container) return
 
+    const yearFilter = this.stateManager.getState().yearFilter
+    const data = buildParishDashboard(this.stateManager.getAllClasses(), yearFilter)
+    const archived = yearFilter ? this.stateManager.isYearArchived(yearFilter) : false
+    const yearInfo = yearFilter ? summarizeYear(this.stateManager.getAllClasses(), yearFilter) : null
+
     container.innerHTML = `
       <div class="dashboard">
         <div class="dash-header">
-          <h2>Tổng quan${this.stateManager.getState().yearFilter ? ` · ${this.stateManager.getState().yearFilter}` : ''}</h2>
-          ${this.authManager.isAdmin() ? `
-            <button class="btn btn-ghost btn-sm" id="dashRefreshBtn">🔄 Làm mới</button>
-          ` : ''}
+          <h2>Tổng quan Ban GL${yearFilter ? ` · ${yearFilter}` : ''}${archived ? ' · đã lưu trữ' : ''}</h2>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${this.authManager.isAdmin() ? `
+              <button class="btn btn-ghost btn-sm" id="dashExportBtn">📄 Xuất báo cáo</button>
+              <button class="btn btn-ghost btn-sm" id="dashCompareBtn">📊 So sánh năm</button>
+              <button class="btn btn-ghost btn-sm" id="dashArchiveBtn">${archived ? 'Mở lại năm' : 'Lưu trữ năm'}</button>
+            ` : ''}
+          </div>
         </div>
 
         <div class="dash-stats">
-          <div class="stat"><span class="stat-label">Lớp</span><span class="stat-value">${this.stateManager.getAllClasses().length}</span></div>
-          <div class="stat"><span class="stat-label">Học viên</span><span class="stat-value">${this.getTotalStudents()}</span></div>
-          <div class="stat"><span class="stat-label">TB cả năm</span><span class="stat-value">${this.getAvgYearTB().toFixed(2)}</span></div>
-          <div class="stat"><span class="stat-label">Tốt</span><span class="stat-value">${this.getGoodPercent()}%</span></div>
+          <div class="stat"><span class="stat-label">Lớp</span><span class="stat-value">${data.classCount}</span></div>
+          <div class="stat"><span class="stat-label">Học viên</span><span class="stat-value">${data.studentCount}</span></div>
+          <div class="stat"><span class="stat-label">TB cả năm</span><span class="stat-value">${data.avgTB != null ? data.avgTB.toFixed(2) : '—'}</span></div>
+          <div class="stat"><span class="stat-label">% đủ điểm</span><span class="stat-value">${data.completePercent}%</span></div>
         </div>
+
+        <section class="dash-section">
+          <h3>🏅 Xếp hạng liên lớp</h3>
+          ${data.rankings.length ? `
+            <div class="dash-rank-table" style="overflow:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+                <thead>
+                  <tr>
+                    <th style="text-align:left;padding:6px">#</th>
+                    <th style="text-align:left;padding:6px">Lớp</th>
+                    <th style="text-align:right;padding:6px">TB</th>
+                    <th style="text-align:right;padding:6px">% đủ</th>
+                    <th style="text-align:left;padding:6px">TT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${data.rankings.map((c, i) => `
+                    <tr style="${c.isRed ? 'background:#fff1f1' : ''}">
+                      <td style="padding:6px">${i + 1}</td>
+                      <td style="padding:6px"><button type="button" class="btn btn-ghost btn-sm" data-dash-class="${c.classId}">${this.escapeHtml(c.className)}</button></td>
+                      <td style="padding:6px;text-align:right">${c.avgTB != null ? c.avgTB.toFixed(2) : '—'}</td>
+                      <td style="padding:6px;text-align:right">${c.completePercent}%</td>
+                      <td style="padding:6px">${c.isRed ? '🔴' : '🟢'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : '<p class="hint">Chưa có lớp</p>'}
+        </section>
+
+        <section class="dash-section">
+          <h3>🔴 Lớp cần quan tâm</h3>
+          ${data.redClasses.length
+            ? data.redClasses.map(c => `
+              <div class="dash-student weak">
+                <div class="info">
+                  <strong>${this.escapeHtml(c.className)}</strong>
+                  <small>TB ${c.avgTB != null ? c.avgTB.toFixed(2) : '—'} · đủ điểm ${c.completePercent}%</small>
+                </div>
+              </div>
+            `).join('')
+            : '<p class="hint">Không có lớp đỏ</p>'}
+        </section>
 
         <section class="dash-section">
           <h3>🏆 Xuất sắc</h3>
@@ -541,12 +720,12 @@ export class AppView {
         </section>
 
         <section class="dash-section">
-          <h3>📉 Cần quan tâm</h3>
+          <h3>📉 Cần quan tâm (HV)</h3>
           ${this.renderAttentionStudents()}
         </section>
 
         <section class="dash-section">
-          <h3>⚠️ Yếu (TB < 5)</h3>
+          <h3>⚠️ Yếu (TB &lt; 5)</h3>
           ${this.renderWeakStudents()}
         </section>
 
@@ -554,8 +733,19 @@ export class AppView {
           <h3>📋 Thiếu điểm</h3>
           ${this.renderMissingScores()}
         </section>
+        ${yearInfo ? `<p class="hint" style="margin-top:12px">Năm ${yearInfo.year}: ${yearInfo.redClasses} lớp cần quan tâm</p>` : ''}
       </div>
     `
+
+    container.querySelector('#dashExportBtn')?.addEventListener('click', () => this.exportParishReport())
+    container.querySelector('#dashCompareBtn')?.addEventListener('click', () => this.openYearCompare())
+    container.querySelector('#dashArchiveBtn')?.addEventListener('click', () => this.toggleArchiveCurrentYear())
+    container.querySelectorAll('[data-dash-class]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = (btn as HTMLElement).dataset.dashClass!
+        this.selectClass(id)
+      })
+    })
   }
 
   private renderClassView(): void {
@@ -568,10 +758,11 @@ export class AppView {
     container.innerHTML = `
       <div class="class-view">
         <div class="class-header">
-          <h2>${cls.name} ${cls.year ? `· ${cls.year}` : ''}</h2>
+          <h2>${cls.name} ${cls.year ? `· ${cls.year}` : ''}${this.stateManager.isYearArchived(cls.year) ? ' · lưu trữ' : ''}</h2>
           <div class="class-actions">
-            <button class="btn btn-secondary btn-sm" id="addStudentBtn">➕ Thêm HV</button>
-            <button class="btn btn-ghost btn-sm" id="classSettingsBtn">⚙️ Cài đặt</button>
+            <button class="btn btn-secondary btn-sm" id="addStudentBtn" ${this.stateManager.isClassArchived(cls.id) ? 'disabled' : ''}>➕ Thêm HV</button>
+            <button class="btn btn-ghost btn-sm" id="classColumnsBtn">⚖️ Cột điểm</button>
+            <button class="btn btn-ghost btn-sm" id="classInviteBtn">📝 Phiếu PH</button>
           </div>
         </div>
 
@@ -597,9 +788,26 @@ export class AppView {
 
         <div class="m-stat-strip" id="classStats"></div>
 
-        <div id="studentsContainer"></div>
+        <div id="studentsContainer">
+          <p class="hint" style="padding:12px 0">
+            Cột điểm lớp này:
+            ${resolveClassColumns(cls).map(c => `<code style="margin-right:4px">${this.escapeHtml(c.short)}</code>`).join('')}
+            · hệ số ${resolveClassColumns(cls).map(c => `${c.short}×${cls.weights[c.key] ?? 1}`).join(', ')}
+          </p>
+        </div>
       </div>
     `
+
+    container.querySelector('#addStudentBtn')?.addEventListener('click', () => this.openAddStudent())
+    container.querySelector('#classColumnsBtn')?.addEventListener('click', () => this.openColumnsModal())
+    container.querySelector('#classInviteBtn')?.addEventListener('click', () => this.openParentInvite())
+    container.querySelectorAll('[data-term]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const term = (btn as HTMLElement).dataset.term as 'hk1' | 'hk2' | 'year'
+        this.stateManager.setActiveTerm(term)
+        this.renderClassView()
+      })
+    })
   }
 
   private renderProfile(): void {
@@ -650,10 +858,38 @@ export class AppView {
             </div>
             <span class="me-chevron">▸</span>
           </div>
-          <div class="me-row" data-me-action="export">
+          <div class="me-row" data-me-action="parish-report">
             <div class="me-info">
-              <strong>Xuất Excel</strong>
-              <small>Xuất điểm ra file Excel</small>
+              <strong>Báo cáo Ban GL</strong>
+              <small>Xuất CSV / bản in họp Ban</small>
+            </div>
+            <span class="me-chevron">▸</span>
+          </div>
+          <div class="me-row" data-me-action="year-compare">
+            <div class="me-info">
+              <strong>So sánh năm học</strong>
+              <small>TB và % đủ điểm giữa các năm</small>
+            </div>
+            <span class="me-chevron">▸</span>
+          </div>
+          <div class="me-row" data-me-action="archive-year">
+            <div class="me-info">
+              <strong>Lưu trữ / mở năm học</strong>
+              <small>Khóa sửa điểm năm đã chọn</small>
+            </div>
+            <span class="me-chevron">▸</span>
+          </div>
+          <div class="me-row" data-me-action="columns">
+            <div class="me-info">
+              <strong>Cột điểm lớp</strong>
+              <small>Thêm / sửa / hệ số cột điểm</small>
+            </div>
+            <span class="me-chevron">▸</span>
+          </div>
+          <div class="me-row" data-me-action="invite">
+            <div class="me-info">
+              <strong>Phiếu phụ huynh</strong>
+              <small>Tạo link chỉ xem, có hết hạn</small>
             </div>
             <span class="me-chevron">▸</span>
           </div>
@@ -712,44 +948,27 @@ export class AppView {
   // Dashboard Render Helpers
   // ============================================================
 
-  private getTotalStudents(): number {
-    return this.stateManager.getAllClasses().reduce((sum, c) => sum + c.students.length, 0)
+  private scopedClasses() {
+    return this.stateManager.getVisibleClasses()
   }
 
-  private getAvgYearTB(): number {
-    const classes = this.stateManager.getAllClasses()
-    if (!classes.length) return 0
-    const totals = classes.map(c => {
-      const students = c.students
-      if (!students.length) return 0
-      const tbs = students.map(s => studentYearTB(s, c.weights)).filter((tb): tb is number => tb !== null)
-      return tbs.length ? tbs.reduce((a, b) => a + b, 0) / tbs.length : 0
-    })
-    return totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0
-  }
-
-  private getGoodPercent(): number {
-    const classes = this.stateManager.getAllClasses()
-    const students = classes.flatMap(c => c.students.map(s => ({ ...s, classWeights: c.weights })))
-    if (!students.length) return 0
-    const good = students.filter(s => {
-      const tb = studentYearTB(s, s.classWeights)
-      return tb !== null && tb >= 8
-    }).length
-    return Math.round((good / students.length) * 100)
-  }
 
   private renderTopStudents(limit: number): string {
-    const students = this.stateManager.getAllClasses()
-      .flatMap(c => c.students.map(s => ({
-        ...s,
-        className: c.name,
-        classId: c.id,
-        yearTB: studentYearTB(s, c.weights)
-      })))
+    const students = this.scopedClasses()
+      .flatMap(c => {
+        const cols = resolveClassColumns(c)
+        return c.students.map(s => ({
+          ...s,
+          className: c.name,
+          classId: c.id,
+          yearTB: studentYearTB(s, c.weights, cols)
+        }))
+      })
       .filter(s => s.yearTB !== null)
       .sort((a, b) => (b.yearTB || 0) - (a.yearTB || 0))
       .slice(0, limit)
+
+    if (!students.length) return '<p class="hint">Chưa có điểm</p>'
 
     return students.map((s, i) => `
       <div class="dash-student ${i < 3 ? 'top-' + (i + 1) : ''}">
@@ -764,15 +983,20 @@ export class AppView {
   }
 
   private renderAttentionStudents(): string {
-    const students = this.stateManager.getAllClasses()
-      .flatMap(c => c.students.map(s => ({
-        ...s,
-        className: c.name,
-        yearTB: studentYearTB(s, c.weights)
-      })))
+    const students = this.scopedClasses()
+      .flatMap(c => {
+        const cols = resolveClassColumns(c)
+        return c.students.map(s => ({
+          ...s,
+          className: c.name,
+          yearTB: studentYearTB(s, c.weights, cols)
+        }))
+      })
       .filter(s => s.yearTB !== null && s.yearTB >= 5 && s.yearTB < 6.5)
       .sort((a, b) => (a.yearTB || 0) - (b.yearTB || 0))
       .slice(0, 10)
+
+    if (!students.length) return '<p class="hint">Không có</p>'
 
     return students.map(s => `
       <div class="dash-student">
@@ -786,15 +1010,20 @@ export class AppView {
   }
 
   private renderWeakStudents(): string {
-    const students = this.stateManager.getAllClasses()
-      .flatMap(c => c.students.map(s => ({
-        ...s,
-        className: c.name,
-        yearTB: studentYearTB(s, c.weights)
-      })))
+    const students = this.scopedClasses()
+      .flatMap(c => {
+        const cols = resolveClassColumns(c)
+        return c.students.map(s => ({
+          ...s,
+          className: c.name,
+          yearTB: studentYearTB(s, c.weights, cols)
+        }))
+      })
       .filter(s => s.yearTB !== null && s.yearTB < 5)
       .sort((a, b) => (a.yearTB || 0) - (b.yearTB || 0))
       .slice(0, 10)
+
+    if (!students.length) return '<p class="hint">Không có</p>'
 
     return students.map(s => `
       <div class="dash-student weak">
@@ -808,10 +1037,17 @@ export class AppView {
   }
 
   private renderMissingScores(): string {
-    const students = this.stateManager.getAllClasses()
-      .flatMap(c => c.students.map(s => ({ ...s, className: c.name, classId: c.id })))
+    const students = this.scopedClasses()
+      .flatMap(c => c.students.map(s => ({
+        ...s,
+        className: c.name,
+        classId: c.id,
+        columns: resolveClassColumns(c)
+      })))
       .filter(s => this.hasMissingScores(s))
       .slice(0, 10)
+
+    if (!students.length) return '<p class="hint">Không thiếu điểm</p>'
 
     return students.map(s => `
       <div class="dash-student missing">
@@ -826,9 +1062,11 @@ export class AppView {
 
   private hasMissingScores(student: any): boolean {
     const term = this.stateManager.getState().activeTerm
-    const scores = student.scoresByTerm?.[term]
-    if (!scores) return false
-    return COLS.some((col: any) => !scores[col.key]?.length)
+    if (term === 'year') {
+      return hasMissingColumnScores(student, 'hk1', student.columns) ||
+        hasMissingColumnScores(student, 'hk2', student.columns)
+    }
+    return hasMissingColumnScores(student, term, student.columns)
   }
 
   // ============================================================
@@ -839,12 +1077,12 @@ export class AppView {
     const el = this.element?.querySelector('#classList') as HTMLElement
     if (!el) return
 
-    const classes = this.stateManager.getAllClasses()
+    const classes = this.stateManager.getVisibleClasses()
     if (!classes.length) {
       el.innerHTML = `
         <div class="class-item empty hidden" style="display:none"></div>
         <div class="empty" style="padding:16px 8px;font-size:0.85rem">
-          Chưa có lớp được giao.<br>
+          Chưa có lớp${this.stateManager.getState().yearFilter ? ' trong năm đã chọn' : ''}.<br>
           ${this.authManager.isAdmin() ? 'Tạo lớp bên dưới 👇' : 'Liên hệ Ban GL để được gán lớp.'}
         </div>
       `
@@ -857,11 +1095,11 @@ export class AppView {
 
     el.innerHTML = sorted.map(c => `
       <div class="class-item ${c.id === activeId ? 'active' : ''}" data-select-class="${c.id}" role="button" tabindex="0">
-        <span class="class-dot" style="background:#2563eb"></span>
+        <span class="class-dot" style="background:${this.stateManager.isYearArchived(c.year) ? '#94a3b8' : '#2563eb'}"></span>
         <div class="class-info">
           <div class="class-name">${this.escapeHtml(c.name)}</div>
           <div class="class-meta">
-            ${c.students.length} học viên ${c.year ? `· ${this.escapeHtml(c.year)}` : ''}
+            ${c.students.length} học viên ${c.year ? `· ${this.escapeHtml(c.year)}` : ''}${this.stateManager.isYearArchived(c.year) ? ' · lưu trữ' : ''}
           </div>
         </div>
         <div class="class-actions">

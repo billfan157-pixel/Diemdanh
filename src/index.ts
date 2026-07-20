@@ -14,7 +14,7 @@ export { SyncManager } from './services/sync/SyncManager'
 export { NotificationManager } from './services/NotificationManager'
 
 // Types
-export type { AppState, ClassData, StudentData, ColumnWeights, AuthStore, UserRecord, SyncQueueItem, BackupRecord } from './services/storage/StorageAdapter.types'
+export type { AppState, ClassData, StudentData, ColumnWeights, ScoreColumnDef, ParentToken, AuthStore, UserRecord, SyncQueueItem, BackupRecord } from './services/storage/StorageAdapter.types'
 
 // UI
 export { App } from './ui/App'

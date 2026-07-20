@@ -2,27 +2,33 @@
 // Sổ Điểm GL — Constants
 // ============================================================
 
-// Score columns
-export const COLS = [
-  { key: 'khaoKinh' as const, short: 'KK', label: 'Khảo kinh', defaultWeight: 1 },
-  { key: 'thuocBai' as const, short: 'TB', label: 'Thuộc bài', defaultWeight: 1 },
-  { key: 'chuyenCan' as const, short: 'CC', label: 'Chuyên cần', defaultWeight: 1 },
-  { key: 'baiTap' as const, short: 'BT', label: 'Bài tập', defaultWeight: 1 },
-  { key: 'thaiDo' as const, short: 'TĐ', label: 'Thái độ', defaultWeight: 1 },
-  { key: 'kiemTra' as const, short: 'KT', label: 'Kiểm tra', defaultWeight: 1 }
-] as const
+export {
+  COLS,
+  DEFAULT_COLS,
+  DEFAULT_WEIGHTS,
+  type ColumnKey,
+  type ScoreColumnDef,
+  type ColumnWeights,
+  type TermScores,
+  cloneDefaultCols,
+  defaultWeights as defaultColumnWeights,
+  weightsFromColumns,
+  validateWeights,
+  createEmptyTermScores,
+  createEmptyScoresByTerm,
+  ensureScoresMatchColumns,
+  columnKeyFromLabel,
+  makeColumnDef,
+  resolveClassColumns,
+  colLabel,
+  colShort
+} from './columns.ts'
+
+import { COLS, type ColumnKey } from './columns.ts'
 
 export const COL_KEYS: ColumnKey[] = COLS.map(c => c.key)
-export const COL_SHORTS = Object.fromEntries(COLS.map(c => [c.key, c.short]))
-export const COL_LABELS = Object.fromEntries(COLS.map(c => [c.key, c.label]))
-
-export type ColumnKey =
-  | 'khaoKinh'
-  | 'thuocBai'
-  | 'chuyenCan'
-  | 'baiTap'
-  | 'thaiDo'
-  | 'kiemTra'
+export const COL_SHORTS: Record<string, string> = Object.fromEntries(COLS.map(c => [c.key, c.short]))
+export const COL_LABELS: Record<string, string> = Object.fromEntries(COLS.map(c => [c.key, c.label]))
 
 // Name fields
 export const NAME_FIELDS = ['tenThanh', 'hoDem', 'ten'] as const
@@ -115,54 +121,6 @@ export function getRankBadgeClass(rank: string): string {
   return classes[rank] || classes.none
 }
 
-// Column weights
-export interface ColumnWeights {
-  khaoKinh: number
-  thuocBai: number
-  chuyenCan: number
-  baiTap: number
-  thaiDo: number
-  kiemTra: number
-}
-
-export const DEFAULT_WEIGHTS: ColumnWeights = {
-  khaoKinh: 1,
-  thuocBai: 1,
-  chuyenCan: 1,
-  baiTap: 1,
-  thaiDo: 1,
-  kiemTra: 1
-}
-
-export function validateWeights(weights: Partial<ColumnWeights>): ColumnWeights {
-  const result = { ...DEFAULT_WEIGHTS }
-  for (const col of COLS) {
-    if (weights[col.key] !== undefined && typeof weights[col.key] === 'number' && weights[col.key]! > 0) {
-      result[col.key] = weights[col.key]!
-    }
-  }
-  return result
-}
-
-// Score helpers
-export function createEmptyTermScores(): Record<ColumnKey, number[]> {
-  return {
-    khaoKinh: [],
-    thuocBai: [],
-    chuyenCan: [],
-    baiTap: [],
-    thaiDo: [],
-    kiemTra: []
-  }
-}
-
-export function createEmptyScoresByTerm(): { hk1: Record<ColumnKey, number[]>; hk2: Record<ColumnKey, number[]> } {
-  return {
-    hk1: createEmptyTermScores(),
-    hk2: createEmptyTermScores()
-  }
-}
-
 // Parsing
 export function parseScore(raw: string): number | null {
   if (!raw || !raw.trim()) return null
@@ -251,9 +209,8 @@ export function sortName(a: string, b: string): number {
   return a.localeCompare(b, 'vi')
 }
 
-export function generateId(prefix = 'id'): string {
-  return `${prefix}_${Math.random().toString(36).substring(2, 9)}_${Date.now().toString(36)}`
-}
+import { generateId } from '../utils/id.ts'
+export { generateId }
 
 export function deepClone<T>(obj: T): T {
   if (obj === null || typeof obj !== 'object') {

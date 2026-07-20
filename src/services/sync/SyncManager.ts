@@ -185,6 +185,7 @@ export class SyncManager extends EventTarget {
               id: c.id,
               name: c.name,
               year: c.year,
+              columns: c.columns,
               weights: c.weights,
               students,
               createdAt: new Date(c.created_at).getTime(),
