@@ -6,6 +6,7 @@ import { StateManager } from '../StateManager'
 import { AuthManager } from '../../core/auth/AuthManager'
 import { SyncManager } from '../../services/sync/SyncManager'
 import { NotificationManager } from '../../services/NotificationManager'
+import { BackupService } from '../../services/BackupService'
 import { COLS, displayName, classifyStudent } from '../../config/constants.ts'
 import { studentYearTB } from '../../core/calc.ts'
 
@@ -14,6 +15,7 @@ export class AppView {
   private authManager: AuthManager
   private syncManager: SyncManager
   private notificationManager: NotificationManager
+  private backupService: BackupService
 
   private element: HTMLElement | null = null
   private currentView: 'dashboard' | 'class' | 'profile' = 'dashboard'
@@ -23,12 +25,14 @@ export class AppView {
     stateManager: StateManager,
     authManager: AuthManager,
     syncManager: SyncManager,
-    notificationManager: NotificationManager
+    notificationManager: NotificationManager,
+    backupService: BackupService
   ) {
     this.stateManager = stateManager
     this.authManager = authManager
     this.syncManager = syncManager
     this.notificationManager = notificationManager
+    this.backupService = backupService
   }
 
   render(): HTMLElement {
@@ -173,6 +177,10 @@ export class AppView {
       scrim?.setAttribute('hidden', 'true')
     })
 
+    // Backup & Restore
+    const backupBtn = this.element.querySelector('#backupBtn')
+    backupBtn?.addEventListener('click', () => this.openBackupModal())
+
     // Profile menu actions click delegation
     const meView = this.element.querySelector('#meView')
     meView?.addEventListener('click', async (e) => {
@@ -181,7 +189,9 @@ export class AppView {
       if (!row) return
 
       const action = row.getAttribute('data-me-action')
-      if (action === 'logout') {
+      if (action === 'backup' || action === 'restore') {
+        this.openBackupModal()
+      } else if (action === 'logout') {
         const ok = await this.notificationManager.confirm('Bạn có chắc chắn muốn đăng xuất?', {
           title: 'Đăng xuất?',
           type: 'warning',
@@ -463,6 +473,16 @@ export class AppView {
     const sheet = this.element?.querySelector('#mViewMoreSheet') as HTMLElement
     sheet?.classList.add('hidden')
     document.body.style.overflow = ''
+  }
+
+  private async openBackupModal(): Promise<void> {
+    const { BackupModal } = await import('./modals/BackupModal')
+    const modal = new BackupModal(this.backupService, this.notificationManager)
+    modal.open(async () => {
+      // Refresh view upon backup restore
+      this.updateClassSelector()
+      this.renderCurrentView()
+    })
   }
 
   // ============================================================

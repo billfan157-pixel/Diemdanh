@@ -8,6 +8,7 @@ import { StateManager } from './StateManager'
 import { AuthManager } from '../core/auth/AuthManager'
 import { SyncManager } from '../services/sync/SyncManager'
 import { NotificationManager } from '../services/NotificationManager'
+import { BackupService } from '../services/BackupService'
 
 export class App extends EventEmitter {
   private mountPoint!: HTMLElement
@@ -16,6 +17,7 @@ export class App extends EventEmitter {
   private authManager!: AuthManager
   private syncManager!: SyncManager
   private notificationManager!: NotificationManager
+  private backupService!: BackupService
   async mount(mountPoint: HTMLElement): Promise<void> {
     this.mountPoint = mountPoint
 
@@ -28,6 +30,9 @@ export class App extends EventEmitter {
     // Initialize state manager with storage
     this.stateManager = new StateManager(this.storage)
     await this.stateManager.init()
+
+    this.backupService = new BackupService(this.storage, this.notificationManager)
+    this.backupService.setStateManager(this.stateManager)
 
     this.authManager = new AuthManager(this.storage)
     this.authManager.setStateManager(this.stateManager)
@@ -99,7 +104,8 @@ export class App extends EventEmitter {
         this.stateManager,
         this.authManager,
         this.syncManager,
-        this.notificationManager
+        this.notificationManager,
+        this.backupService
       )
       this.mountPoint.innerHTML = ''
       this.mountPoint.appendChild(view.render())
@@ -113,4 +119,5 @@ export class App extends EventEmitter {
   getAuthManager(): AuthManager { return this.authManager }
   getSyncManager(): SyncManager { return this.syncManager }
   getNotificationManager(): NotificationManager { return this.notificationManager }
+  getBackupService(): BackupService { return this.backupService }
 }

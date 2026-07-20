@@ -273,13 +273,15 @@ export class BackupService {
 
       // If directory is not attached and browser supports Picker, trigger folder picker prompt
       if (folderWrite.reason === 'no-folder' && this.canUseBackupFolder()) {
-        const pick = await this.notification.confirm({
-          title: 'Chọn thư mục sao lưu?',
-          message: 'Lần đầu: chọn (hoặc tạo) thư mục backups trong project.\n\nVí dụ: tinh-diem/backups\n\nLần sau sẽ tự lưu vào đó. Hủy = tải về thư mục Tải xuống như cũ.',
-          type: 'info',
-          okText: 'Chọn thư mục',
-          cancelText: 'Tải về Downloads'
-        })
+        const pick = await this.notification.confirm(
+          'Lần đầu: chọn (hoặc tạo) thư mục backups trong project.\n\nVí dụ: tinh-diem/backups\n\nLần sau sẽ tự lưu vào đó. Hủy = tải về thư mục Tải xuống như cũ.',
+          {
+            title: 'Chọn thư mục sao lưu?',
+            type: 'info',
+            confirmText: 'Chọn thư mục',
+            cancelText: 'Tải về Downloads'
+          }
+        )
         if (pick) {
           const dir = await this.pickBackupFolder()
           if (dir) {
@@ -324,7 +326,7 @@ export class BackupService {
     }
   }
 
-  async importBackupFile(file: File, mode: 'replace' | 'merge'): Promise<boolean> {
+  async importBackupFile(file: File, _mode: 'replace' | 'merge'): Promise<boolean> {
     try {
       const text = await file.text()
       const res = await this.storage.importAll(text)
@@ -335,7 +337,7 @@ export class BackupService {
 
       // Clear undo/redo stacks and re-initialize state if manager is present
       if (this.stateManager) {
-        this.stateManager.clearUndoStacks()
+        this.stateManager.clearUndoRedo()
         await this.stateManager.init()
       }
 
