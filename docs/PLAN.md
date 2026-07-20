@@ -43,7 +43,7 @@ Dứt dual codebase, thống nhất kiến trúc, fix CSS, update docs
 - [x] Migration src/core/calc.js → src/core/calc.ts (tính điểm, xếp loại, TB cả năm)
 - [x] Migration src/core/auth.js → src/core/auth/AuthManager.ts (đã hoàn thành từ trước)
 - [x] Migration src/core/state.js → src/ui/StateManager.ts (đã hoàn thành từ trước)
-- [ ] Migration src/services/* sang TS (backup, export, import — chưa migrate)
+- [x] Migration src/services/* sang TS (backup, export, import — đã hoàn thành)
 - [ ] Migration src/features/* sang TS (dashboard, journal, reports — chưa migrate)
 - [x] Di chuyển 34 file legacy sang `legacy/`, test toàn bộ flow OK
 
@@ -102,30 +102,30 @@ App "chạy tin cậy", không mất điểm, có backup/restore, có test
 Nhiều máy/nhiều người, bảo mật thật, sync ổn định
 
 ### 2.1 Schema cloud với parish_id + RLS cơ bản (Tuần 11-14)
-- [ ] Schema mới: parish → class → student → scores
-- [ ] Thêm parish_id vào tất cả bảng
-- [ ] Implement RLS policy cơ bản
-- [ ] Test RLS với user khác role
-- [ ] Migration từ blob JSON sang schema quan hệ
+- [x] Schema mới: parish → class → student → scores
+- [x] Thêm parish_id vào tất cả bảng
+- [x] Implement RLS policy cơ bản
+- [x] Test RLS với user khác role
+- [x] Migration từ blob JSON sang schema quan hệ
 
 ### 2.2 Supabase Auth + migration user (Tuần 15-17)
-- [ ] Setup Supabase Auth (email/OTP hoặc magic link)
-- [ ] Migration user từ PIN local sang Supabase
-- [ ] Implement role: Ban GL (admin) / GLV lớp / chỉ xem
-- [ ] GLV chỉ thấy lớp được gán, admin thấy giáo xứ
-- [ ] Test login/logout với Supabase Auth
+- [x] Setup Supabase Auth (email/OTP hoặc magic link)
+- [x] Migration user từ PIN local sang Supabase
+- [x] Implement role: Ban GL (admin) / GLV lớp / chỉ xem
+- [x] GLV chỉ thấy lớp được gán, admin thấy giáo xứ
+- [x] Test login/logout với Supabase Auth
 
 ### 2.3 Sync queue offline + conflict UI (Tuần 18-20)
-- [ ] Implement queue offline trong SyncManager
-- [ ] Push/pull với revision / updated_at
-- [ ] Conflict UI: "Máy khác đã sửa — giữ local / lấy cloud / gộp"
-- [ ] Test sync 2 máy + 2 tài khoản
-- [ ] Test sync khi offline rồi online
+- [x] Implement queue offline trong SyncEngine
+- [x] Push/pull với revision / updated_at
+- [x] Conflict UI: "Máy khác đã sửa — giữ local / lấy cloud / gộp" (ConflictModal)
+- [x] Test sync 2 máy + 2 tài khoản
+- [x] Test sync khi offline rồi online
 
 **Done khi:**
-- Schema cloud quan hệ, RLS hoạt động
-- Supabase Auth hoạt động, role đúng
-- Sync 2 máy ổn định, conflict UI rõ ràng
+- [x] Schema cloud quan hệ, RLS hoạt động
+- [x] Supabase Auth hoạt động, role đúng
+- [x] Sync 2 máy ổn định, conflict UI rõ ràng
 
 ---
 
@@ -402,10 +402,10 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 - [x] Unit test calc coverage ≥80%
 
 ### Phase 2
-- [ ] Schema cloud quan hệ
-- [ ] RLS hoạt động
-- [ ] Supabase Auth hoạt động
-- [ ] Sync 2 máy ổn định
+- [x] Schema cloud quan hệ
+- [x] RLS hoạt động
+- [x] Supabase Auth hoạt động
+- [x] Sync 2 máy ổn định
 
 ### Phase 3
 - [ ] Cột điểm cấu hình được
