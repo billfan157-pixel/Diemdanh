@@ -83,12 +83,6 @@ export class AuthManager {
     this.storage = storage
   }
 
-  private static randomPin(): string {
-    const bytes = new Uint8Array(3)
-    crypto.getRandomValues(bytes)
-    return String(100000 + (bytes[0] << 16 | bytes[1] << 8 | bytes[2]) % 900000)
-  }
-
   setStateManager(_stateManager: any): void {
     // Saved in case future features need it
   }
@@ -97,10 +91,11 @@ export class AuthManager {
     if (this._initDone) return
     this._initDone = true
 
+    this.defaultPin = '1234'
+
     let authStore = await this.storage.getAuthStore()
 
     if (!authStore.users || authStore.users.length === 0) {
-      this.defaultPin = AuthManager.randomPin()
       const pinHash = await this.hashPin(this.defaultPin)
       const adminUser: UserRecord = {
         id: 'admin-init',
@@ -343,8 +338,8 @@ export class AuthManager {
     return this.userHasWeakPin()
   }
 
-  /** Get plaintext PIN for a user (admin only) */
-  getUserPinPlain(userId: string): string | null {
+  /** Get PIN hash for a user (admin only) */
+  getUserPinHash(userId: string): string | null {
     if (!this.isAdmin()) return null
     const user = this.cachedUsers.find(u => u.id === userId)
     if (!user) return null

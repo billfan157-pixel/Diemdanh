@@ -131,6 +131,9 @@ export class App extends EventEmitter {
       this.mountPoint.innerHTML = ''
       this.mountPoint.appendChild(view.render())
       view.bindEvents()
+    }).catch(e => {
+      console.error('Failed to load view:', e)
+      this.mountPoint.innerHTML = '<p class="text-center mt-4">Không thể tải giao diện. Vui lòng thử lại.</p>'
     })
   }
 
@@ -146,6 +149,9 @@ export class App extends EventEmitter {
       this.mountPoint.innerHTML = ''
       this.mountPoint.appendChild(view.render())
       view.bindEvents()
+    }).catch(e => {
+      console.error('Failed to load view:', e)
+      this.mountPoint.innerHTML = '<p class="text-center mt-4">Không thể tải giao diện. Vui lòng thử lại.</p>'
     })
   }
 

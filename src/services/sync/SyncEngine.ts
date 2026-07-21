@@ -31,16 +31,8 @@ export class SyncEngine extends EventTarget {
 
   setStateManager(sm: StateManager): void {
     this.stateManager = sm
-    
+
     if (!this.onMutationAttached) {
-      // Cache state before mutation to detect changes
-      let cachedState: any = null
-      
-      // Subscribe to state changes to cache current state
-      sm.subscribe((state) => {
-        cachedState = JSON.parse(JSON.stringify(state))
-      })
-      
       // Use event-based tracking instead of intercepting private methods
       sm.onMutation((_label: string, fromNetwork: boolean) => {
         // If this mutation was loaded from sync/network, do not loop-sync it
@@ -49,9 +41,14 @@ export class SyncEngine extends EventTarget {
         // Parse changes into sync ops and enqueue them
         const undoStack = sm.getUndoStack()
         const latestEntry = undoStack[undoStack.length - 1]
-        if (latestEntry && latestEntry.patches && cachedState) {
+        if (latestEntry && latestEntry.patches) {
           const newState = sm.getState()
-          const ops = parsePatchesToOps(cachedState, newState, latestEntry.patches)
+          // Reconstruct old state by applying inverse patches to new state
+          const oldState = JSON.parse(JSON.stringify(newState))
+          for (const p of latestEntry.inversePatches) {
+            (applyPatch as any)(oldState, p)
+          }
+          const ops = parsePatchesToOps(oldState, newState, latestEntry.patches)
           for (const op of ops) {
             this.enqueueOp(op)
           }
@@ -116,7 +113,7 @@ export class SyncEngine extends EventTarget {
           break
         }
       }
-      
+
       const remaining = await this.storage.getPendingSyncItems(1)
       this.dispatchEvent(new CustomEvent('statuschange', { 
         detail: { status: remaining.length > 0 ? 'error' : 'idle' } 
@@ -138,8 +135,8 @@ export class SyncEngine extends EventTarget {
       const { error } = await supabase.from(op.table).insert(op.data)
       if (error) throw error
     } else if (op.action === 'update') {
-      // 1. Check revision on Classes or Students for conflict detection
-      if (op.table === 'classes' || op.table === 'students') {
+      // 1. Check revision for conflict detection
+      if (op.table === 'classes' || op.table === 'students' || op.table === 'scores') {
         const { data: cloudRec, error: fetchErr } = await supabase
           .from(op.table)
           .select('rev')
@@ -184,7 +181,9 @@ export class SyncEngine extends EventTarget {
 
             // Auto-resolve with keep_local after timeout to prevent queue deadlock
             const fallbackTimer = setTimeout(() => {
-              resolveOnce('keep_local').catch(() => {})
+              resolveOnce('keep_local').catch((e) => {
+              console.warn('Conflict resolution failed:', e)
+            })
             }, CONFLICT_TIMEOUT)
 
             const conflictEvent = new CustomEvent('conflict', {
@@ -200,7 +199,7 @@ export class SyncEngine extends EventTarget {
       }
 
       // 2. Normal upsert
-      const { error } = await supabase.from(op.table).upsert(op.data)
+      const { error } = await supabase.from(op.table).upsert({ id: op.id, ...op.data })
       if (error) throw error
     } else if (op.action === 'delete') {
       const { error } = await supabase.from(op.table).delete().eq('id', op.id)
@@ -212,14 +211,25 @@ export class SyncEngine extends EventTarget {
     const supabase = supabaseService.getClient()
     if (!supabase) return
 
+    // Migration 003 renames app_cloud → app_cloud_legacy.
+    // Try legacy table first, fall back to app_cloud for fresh deployments.
+    const tables = ['app_cloud_legacy', 'app_cloud']
+    let payload: Record<string, any> = { updated_at: new Date().toISOString() }
+
     if (item.type === 'state') {
-      await supabase
-        .from('app_cloud')
-        .upsert({ id: 'main', state: item.data, updated_at: new Date().toISOString() })
+      payload = { id: 'main', state: item.data, ...payload }
     } else if (item.type === 'auth') {
-      await supabase
-        .from('app_cloud')
-        .upsert({ id: 'auth', auth: item.data, updated_at: new Date().toISOString() })
+      payload = { id: 'auth', auth: item.data, ...payload }
+    } else {
+      return
+    }
+
+    for (const table of tables) {
+      const { error } = await supabase.from(table).upsert(payload)
+      if (!error || !error.message?.includes('relation') || !error.message?.includes('does not exist')) {
+        if (!error) return // success
+        // Non-relation error, try next table
+      }
     }
   }
 
@@ -269,9 +279,8 @@ export class SyncEngine extends EventTarget {
   }
 
   private handleCloudChange(table: string, payload: any): void {
-    // If we initiated this change, ignore it
-    if (payload.errors) return
-
+    // Self-initiated changes are already filtered: mergeRecordLocally uses
+    // applyFromNetwork which sets fromNetwork=true, preventing re-sync loops.
     const { eventType, new: newRec, old: oldRec } = payload
 
     if (eventType === 'INSERT' || eventType === 'UPDATE') {
@@ -289,6 +298,11 @@ export class SyncEngine extends EventTarget {
 
     if (table === 'classes') {
       const idx = sm.getState().classes.findIndex(c => c.id === record.id)
+      if (idx !== -1) {
+        const existing = sm.getState().classes[idx]
+        if (existing && (existing.rev || 0) >= (record.rev || 0)) return
+      }
+
       if (idx === -1) {
         // Class not found locally, create it
         sm.applyFromNetwork(label, (draft: AppState) => {
@@ -301,6 +315,7 @@ export class SyncEngine extends EventTarget {
               : cloneDefaultCols(),
             weights: record.weights,
             students: [],
+            rev: record.rev || 1,
             createdAt: new Date(record.created_at).getTime(),
             updatedAt: new Date(record.updated_at).getTime()
           })
@@ -314,6 +329,7 @@ export class SyncEngine extends EventTarget {
             draft.classes[idx].columns = record.columns
           }
           draft.classes[idx].weights = record.weights
+          draft.classes[idx].rev = record.rev || 1
           draft.classes[idx].updatedAt = new Date(record.updated_at).getTime()
         })
       }
@@ -323,6 +339,11 @@ export class SyncEngine extends EventTarget {
       if (classIdx === -1) return // Can't add student to non-existent class yet
 
       const sIdx = sm.getState().classes[classIdx].students.findIndex(s => s.id === record.id)
+      if (sIdx !== -1) {
+        const existing = sm.getState().classes[classIdx].students[sIdx]
+        if (existing && (existing.rev || 0) >= (record.rev || 0)) return
+      }
+
       if (sIdx === -1) {
         const classColumns = resolveClassColumns(sm.getState().classes[classIdx])
         sm.applyFromNetwork(label, (draft: AppState) => {
@@ -331,7 +352,7 @@ export class SyncEngine extends EventTarget {
             hk1: {} as any,
             hk2: {} as any
           }
-          
+
           // Initialize empty arrays for each column
           for (const col of classColumns) {
             scoresByTerm.hk1[col.key] = []
@@ -354,6 +375,7 @@ export class SyncEngine extends EventTarget {
             ghiChu: record.ghi_chu || '',
             scoresByTerm,
             learningLog: [],
+            rev: record.rev || 1,
             createdAt: new Date(record.created_at).getTime(),
             updatedAt: new Date(record.updated_at).getTime()
           })
@@ -373,6 +395,7 @@ export class SyncEngine extends EventTarget {
           s.diaChi = record.dia_chi || ''
           s.email = record.email || ''
           s.ghiChu = record.ghi_chu || ''
+          s.rev = record.rev || 1
           s.updatedAt = new Date(record.updated_at).getTime()
         })
       }
@@ -449,5 +472,54 @@ export class SyncEngine extends EventTarget {
         }
       }
     }
+  }
+}
+
+// ============================================================
+// Helper: Apply JSON Patch to object
+// ============================================================
+
+function applyPatch(obj: any, patch: { op: string; path: string[]; value?: any }): void {
+  const { op, path, value } = patch
+  if (path.length === 0) return
+
+  let target = obj
+  for (let i = 0; i < path.length - 1; i++) {
+    const key = path[i]
+    if (!(key in target)) {
+      // Create missing path
+      target[key] = isNaN(Number(path[i + 1])) ? {} : []
+    }
+    target = target[key]
+  }
+
+  const lastKey = path[path.length - 1]
+
+  switch (op) {
+    case 'add':
+      if (Array.isArray(target)) {
+        const idx = parseInt(String(lastKey), 10)
+        if (idx >= 0 && idx <= target.length) {
+          target.splice(idx, 0, value)
+        }
+      } else {
+        target[lastKey] = value
+      }
+      break
+
+    case 'remove':
+      if (Array.isArray(target)) {
+        const idx = parseInt(String(lastKey), 10)
+        if (idx >= 0 && idx < target.length) {
+          target.splice(idx, 1)
+        }
+      } else {
+        delete target[lastKey]
+      }
+      break
+
+    case 'replace':
+      target[lastKey] = value
+      break
   }
 }

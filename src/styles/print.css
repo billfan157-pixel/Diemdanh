@@ -1,0 +1,42 @@
+/* ============================================================
+   Print Styles
+   ============================================================ */
+
+@media print {
+  .skip-link,
+  .btn,
+  .modal-overlay,
+  .toast-host,
+  header,
+  nav,
+  footer,
+  .sidebar,
+  .toolbar,
+  .actions {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  .card, .table-wrap {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .modal-overlay.open .modal-panel {
+    position: static;
+    transform: none;
+    box-shadow: none;
+    max-height: none;
+    width: 100%;
+  }
+
+  a { text-decoration: none; color: black; }
+  a[href]::after { content: none; }
+}

@@ -1,10 +1,12 @@
 import { AuthManager } from '../../../core/auth/AuthManager'
 import { NotificationManager } from '../../../services/NotificationManager'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 export class UserManagementModal {
   private authManager: AuthManager
   private notificationManager: NotificationManager
   private overlay: HTMLElement | null = null
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(authManager: AuthManager, notificationManager: NotificationManager) {
     this.authManager = authManager
@@ -20,6 +22,8 @@ export class UserManagementModal {
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     if (this.overlay) {
       this.overlay.remove()
       this.overlay = null
@@ -39,28 +43,32 @@ export class UserManagementModal {
 
     this.overlay = document.createElement('div')
     this.overlay.className = 'modal-overlay'
+    this.overlay.setAttribute('role', 'dialog')
+    this.overlay.setAttribute('aria-modal', 'true')
+    this.overlay.setAttribute('aria-labelledby', 'usersModalTitle')
     this.overlay.innerHTML = `
-<div class="modal-panel" style="max-width:520px;max-height:80vh;overflow-y:auto">
-  <h2>👤 Quản lý tài khoản <button class="modal-close" id="usersModalClose">×</button></h2>
+<div class="modal-panel max-w-md overflow-y-auto" style="max-height:80vh">
+  <h2 id="usersModalTitle">👤 Quản lý tài khoản <button class="modal-close" id="usersModalClose" aria-label="Đóng">×</button></h2>
   <button class="btn btn-primary btn-sm" id="createUserBtn" style="margin-bottom:10px">＋ Tạo tài khoản</button>
   <div id="usersList">
     ${users.map(u => `
-      <div class="user-row" style="display:flex;justify-content:space-between;align-items:center;padding:8px 6px;border-bottom:1px solid var(--color-border-subtle)">
+      <div class="user-row d-flex justify-between items-center py-2 px-2 border-b">
         <div>
           <strong>${this.escapeHtml(this.userDisplay(u))}</strong>
-          <span class="hint" style="font-size:.8rem;margin-left:6px">@${this.escapeHtml(u.username)}</span>
+          <span class="hint ml-2" style="font-size:.8rem">@${this.escapeHtml(u.username)}</span>
           <span class="badge" style="font-size:.7rem;margin-left:6px;background:${u.role === 'ban_gl' ? 'var(--color-primary)' : 'var(--color-text-muted-2)'}20;color:${u.role === 'ban_gl' ? 'var(--color-primary)' : 'var(--color-text-muted-2)'}">${u.role === 'ban_gl' ? 'Ban GL' : 'GLV'}</span>
-          ${!u.active ? '<span class="badge" style="font-size:.7rem;margin-left:6px;background:var(--color-danger)20;color:var(--color-danger)">Vô hiệu</span>' : ''}
+          ${!u.active ? '<span class="badge ml-2 text-danger" style="font-size:.7rem;background:var(--color-danger)20">Vô hiệu</span>' : ''}
         </div>
-        <div style="display:flex;gap:4px">
-          <button type="button" class="btn btn-ghost btn-sm user-edit-btn" data-id="${u.id}">✏️</button>
-          <button type="button" class="btn btn-ghost btn-sm user-del-btn" data-id="${u.id}" data-name="${this.escapeHtml(this.userDisplay(u))}">🗑️</button>
+        <div class="d-flex" style="gap:4px">
+          <button type="button" class="btn btn-ghost btn-sm user-edit-btn" data-id="${u.id}" aria-label="Sửa người dùng">✏️</button>
+          <button type="button" class="btn btn-ghost btn-sm user-del-btn" data-id="${u.id}" data-name="${this.escapeHtml(this.userDisplay(u))}" aria-label="Xóa người dùng">🗑️</button>
         </div>
       </div>
     `).join('')}
   </div>
 </div>`
     document.body.appendChild(this.overlay)
+    this._focusTrap = createFocusTrap(this.overlay)
 
     this.overlay.querySelector('#usersModalClose')?.addEventListener('click', () => this.close())
     this.overlay.querySelector('#createUserBtn')?.addEventListener('click', () => this.showCreateForm())
@@ -86,17 +94,17 @@ export class UserManagementModal {
   private showCreateForm(): void {
     const body = this.overlay!.querySelector('#usersList')!
     body.innerHTML = `
-<div style="padding:12px;background:var(--color-bg-subtle);border-radius:8px">
-  <h3 style="font-size:.95rem;margin-bottom:8px">Tạo tài khoản mới</h3>
-  <div style="display:grid;gap:8px">
-    <input type="text" id="userFormUsername" placeholder="Tên đăng nhập" autocomplete="off" />
-    <input type="text" id="userFormDisplay" placeholder="Tên hiển thị" autocomplete="off" />
-    <input type="password" id="userFormPin" placeholder="PIN (ít nhất 4 số)" inputmode="numeric" autocomplete="new-password" />
+<div class="p-3 rounded-lg" style="background:var(--color-bg-subtle)">
+  <h3 style="font-size:.95rem" class="mb-2">Tạo tài khoản mới</h3>
+  <div class="grid gap-2">
+    <input type="text" id="userFormUsername" placeholder="Tên đăng nhập" autocomplete="off" aria-label="Tên đăng nhập" />
+    <input type="text" id="userFormDisplay" placeholder="Tên hiển thị" autocomplete="off" aria-label="Tên hiển thị" />
+    <input type="password" id="userFormPin" placeholder="PIN (ít nhất 4 số)" inputmode="numeric" autocomplete="new-password" aria-label="Mã PIN" />
     <select id="userFormRole">
       <option value="glv">Giáo lý viên (GLV)</option>
       <option value="ban_gl">Ban Giáo lý (Admin)</option>
     </select>
-    <div style="display:flex;gap:8px">
+    <div class="d-flex gap-2">
       <button class="btn btn-secondary" id="userFormCancel">Hủy</button>
       <button class="btn btn-primary" id="userFormSave">💾 Lưu</button>
     </div>
@@ -113,19 +121,19 @@ export class UserManagementModal {
 
     const body = this.overlay!.querySelector('#usersList')!
     body.innerHTML = `
-<div style="padding:12px;background:var(--color-bg-subtle);border-radius:8px">
-  <h3 style="font-size:.95rem;margin-bottom:8px">Sửa tài khoản: ${this.escapeHtml(this.userDisplay(u))}</h3>
-  <div style="display:grid;gap:8px">
-    <input type="text" id="userFormDisplay" value="${this.escapeHtml(u.displayName)}" placeholder="Tên hiển thị" />
-    <input type="password" id="userFormPin" placeholder="PIN mới (để trống nếu không đổi)" inputmode="numeric" autocomplete="new-password" />
+<div class="p-3 rounded-lg" style="background:var(--color-bg-subtle)">
+  <h3 style="font-size:.95rem" class="mb-2">Sửa tài khoản: ${this.escapeHtml(this.userDisplay(u))}</h3>
+  <div class="grid gap-2">
+    <input type="text" id="userFormDisplay" value="${this.escapeHtml(u.displayName)}" placeholder="Tên hiển thị" aria-label="Tên hiển thị" />
+    <input type="password" id="userFormPin" placeholder="PIN mới (để trống nếu không đổi)" inputmode="numeric" autocomplete="new-password" aria-label="Mã PIN" />
     <select id="userFormRole">
       <option value="glv" ${u.role === 'glv' ? 'selected' : ''}>Giáo lý viên (GLV)</option>
       <option value="ban_gl" ${u.role === 'ban_gl' ? 'selected' : ''}>Ban Giáo lý (Admin)</option>
     </select>
-    <label style="display:flex;align-items:center;gap:6px;font-size:.85rem">
+    <label class="d-flex items-center" style="gap:6px;font-size:.85rem">
       <input type="checkbox" id="userFormActive" ${u.active !== false ? 'checked' : ''} /> Đang hoạt động
     </label>
-    <div style="display:flex;gap:8px">
+    <div class="d-flex gap-2">
       <button class="btn btn-secondary" id="userFormCancel">Hủy</button>
       <button class="btn btn-primary" id="userFormSave">💾 Lưu</button>
     </div>

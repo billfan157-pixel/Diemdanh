@@ -38,6 +38,26 @@ export const INFO_FIELDS = ['maHV', 'ngaySinh', 'gioiTinh', 'tenPhuHuynh', 'sdPh
 export type NameField = typeof NAME_FIELDS[number]
 export type InfoField = typeof INFO_FIELDS[number]
 
+export interface InfoFieldDef {
+  key: InfoField
+  label: string
+  placeholder?: string
+  type: 'text' | 'tel' | 'email' | 'select'
+  inputmode?: string
+  options?: string[]
+}
+
+/** Optional student info fields for add/edit forms (Phase 3.2). */
+export const INFO_FIELD_DEFS: InfoFieldDef[] = [
+  { key: 'maHV', label: 'Mã học viên', placeholder: 'VD: 2023219', type: 'text' },
+  { key: 'ngaySinh', label: 'Ngày sinh', placeholder: 'dd/mm/yyyy', type: 'text', inputmode: 'numeric' },
+  { key: 'gioiTinh', label: 'Giới tính', type: 'select', options: ['', 'Nam', 'Nữ'] },
+  { key: 'tenPhuHuynh', label: 'Phụ huynh', placeholder: 'Họ tên phụ huynh', type: 'text' },
+  { key: 'sdPhuHuynh', label: 'Số điện thoại', placeholder: '09xx xxx xxx', type: 'tel', inputmode: 'tel' },
+  { key: 'diaChi', label: 'Địa chỉ / Giáo xứ', placeholder: 'VD: GX Trảng Bom', type: 'text' },
+  { key: 'email', label: 'Email', placeholder: 'email@example.com', type: 'email' },
+]
+
 // Log types and levels
 export const LOG_TYPES = [
   { key: 'hoc_tap', label: 'Học tập', color: '#3b82f6' },
@@ -132,8 +152,18 @@ export function parseScoreCell(raw: any): number[] {
     const single = parseScore(s)
     return single != null ? [single] : []
   }
-  return s
-    .split(/[;|/]+|\s*,\s*(?=\d)/)
+  // Robustly handle commas: replace list separator commas (e.g., not surrounded by digits) with semicolons,
+  // while preserving decimal commas (e.g., "1,5").
+  const normalized = s.replace(/,/g, (_, offset, string) => {
+    const prev = string[offset - 1]
+    const next = string[offset + 1]
+    if (prev && /\d/.test(prev) && next && /\d/.test(next)) {
+      return ','
+    }
+    return ';'
+  })
+  return normalized
+    .split(/[;|\s/]+/)
     .map(p => p.trim())
     .filter(Boolean)
     .map(parseScore)

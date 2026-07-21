@@ -45,6 +45,7 @@ export interface StudentData {
   diaChi: string
   email: string
   ghiChu: string
+  starred?: boolean
   scoresByTerm: ScoresByTerm
   learningLog: LearningLogEntry[]
   createdAt: number
@@ -144,5 +145,20 @@ export interface AppDBSchema extends DBSchema {
     indexes: {
       'by-timestamp': number
     }
+  }
+  classes: {
+    key: string
+    value: Omit<ClassData, 'students'>
+  }
+  students: {
+    key: string
+    value: StudentData & { classId: string }
+    indexes: {
+      'by-class': string
+    }
+  }
+  appMeta: {
+    key: string
+    value: any
   }
 }

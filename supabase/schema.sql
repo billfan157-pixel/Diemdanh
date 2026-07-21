@@ -5,6 +5,46 @@
 -- =========================================================
 
 -- =========================================================
+-- Parish Members table (Phase 2)
+-- Liên kết với auth.users để phân quyền
+-- =========================================================
+create table if not exists public.parish_members (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  username text unique not null,
+  display_name text not null,
+  role text not null check (role in ('ban_gl', 'glv', 'viewer')),
+  class_ids text[] default '{}',
+  pin_hash text,
+  pin_salt text,
+  active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(user_id)
+);
+
+create index if not exists idx_parish_members_user_id on public.parish_members(user_id);
+
+-- =========================================================
+-- Parent Tokens table (Phase 3)
+-- Token chỉ đọc cho phụ huynh xem điểm
+-- =========================================================
+create table if not exists public.parent_tokens (
+  id text primary key,
+  token text unique not null,
+  student_id text references public.students(id) on delete cascade,
+  class_id text references public.classes(id) on delete cascade,
+  expires_at timestamptz not null,
+  created_at timestamptz default now(),
+  created_by text not null,
+  label text,
+  revoked boolean default false
+);
+
+create index if not exists idx_parent_tokens_token on public.parent_tokens(token);
+create index if not exists idx_parent_tokens_student on public.parent_tokens(student_id);
+
+-- =========================================================
 -- Classes table
 -- =========================================================
 create table if not exists public.classes (
@@ -46,13 +86,15 @@ create index if not exists idx_students_class_id on public.students(class_id);
 
 -- =========================================================
 -- Scores table
+-- values dùng NUMERIC[] thay vì jsonb để đồng bộ với migration
 -- =========================================================
 create table if not exists public.scores (
   id text primary key default gen_random_uuid(),
   student_id text not null references public.students(id) on delete cascade,
   term text not null check (term in ('hk1', 'hk2')),
   col_key text not null,
-  values jsonb not null default '[]'::jsonb,
+  values numeric[] not null default '{}',
+  rev bigint not null default 1,
   updated_at timestamptz not null default now()
 );
 
@@ -108,6 +150,8 @@ on conflict (id) do nothing;
 -- =========================================================
 
 -- Enable RLS on all tables
+alter table public.parish_members enable row level security;
+alter table public.parent_tokens enable row level security;
 alter table public.classes enable row level security;
 alter table public.students enable row level security;
 alter table public.scores enable row level security;
@@ -138,6 +182,45 @@ drop policy if exists "learning_logs_delete_anon" on public.learning_logs;
 drop policy if exists "app_cloud_select_anon" on public.app_cloud;
 drop policy if exists "app_cloud_insert_anon" on public.app_cloud;
 drop policy if exists "app_cloud_update_anon" on public.app_cloud;
+
+-- Drop existing policies for new tables
+drop policy if exists "member_select_all" on public.parish_members;
+drop policy if exists "member_modify_admin" on public.parish_members;
+drop policy if exists "parent_tokens_member_all" on public.parent_tokens;
+drop policy if exists "parent_tokens_public_read" on public.parent_tokens;
+
+-- Create policies for parish_members (authenticated users only)
+create policy "member_select_all"
+  on public.parish_members for select to authenticated using (true);
+
+create policy "member_modify_admin"
+  on public.parish_members for all to authenticated
+  using (exists (
+    select 1 from public.parish_members m
+    where m.user_id = auth.uid() and m.active = true and m.role = 'ban_gl'
+  ));
+
+-- Create policies for parent_tokens
+create policy "parent_tokens_member_all"
+  on public.parent_tokens for all
+  using (
+    exists (
+      select 1 from public.parish_members m
+      where m.user_id = auth.uid() and m.active = true
+        and (m.role = 'ban_gl' or class_id = any (m.class_ids))
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.parish_members m
+      where m.user_id = auth.uid() and m.active = true
+        and (m.role = 'ban_gl' or class_id = any (m.class_ids))
+    )
+  );
+
+create policy "parent_tokens_public_read"
+  on public.parent_tokens for select
+  using (revoked = false and expires_at > now());
 
 -- Create policies for classes (anon key - trusted parish use)
 create policy "classes_select_anon"
@@ -239,6 +322,17 @@ begin
   return new;
 end;
 $$ language plpgsql;
+
+-- Create triggers for scores
+drop trigger if exists update_scores_updated_at on public.scores;
+create trigger update_scores_updated_at
+  before update on public.scores
+  for each row execute function update_updated_at_column();
+
+drop trigger if exists increment_scores_rev on public.scores;
+create trigger increment_scores_rev
+  before update on public.scores
+  for each row execute function increment_rev();
 
 -- Create triggers for classes
 drop trigger if exists update_classes_updated_at on public.classes;

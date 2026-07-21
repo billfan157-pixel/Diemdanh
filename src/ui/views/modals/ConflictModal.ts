@@ -4,11 +4,13 @@
 
 import { ConflictData } from '../../../services/sync/SyncEngine'
 import { NotificationManager } from '../../../services/NotificationManager'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 export class ConflictModal {
   private notification: NotificationManager
   private element: HTMLElement | null = null
   private currentConflict: ConflictData | null = null
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(notification: NotificationManager) {
     this.notification = notification
@@ -25,9 +27,12 @@ export class ConflictModal {
     }
 
     this.element?.classList.remove('hidden')
+    if (this.element) this._focusTrap = createFocusTrap(this.element)
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     this.element?.classList.add('hidden')
     this.currentConflict = null
   }
@@ -53,10 +58,10 @@ export class ConflictModal {
           <div class="modal-body" style="padding-top: 10px;">
             <div id="conflictDetails"></div>
           </div>
-          <div class="modal-foot" style="gap: 10px;">
+            <div class="modal-foot gap-3">
             <button type="button" class="btn btn-ghost" id="conflictCancelBtn">Bỏ qua</button>
             <button type="button" class="btn btn-success" id="conflictKeepLocalBtn">Giữ bản máy này</button>
-            <button type="button" class="btn btn-primary" id="conflictTakeCloudBtn" style="margin-left: auto;">Lấy bản Cloud</button>
+            <button type="button" class="btn btn-primary ml-auto" id="conflictTakeCloudBtn">Lấy bản Cloud</button>
           </div>
         </div>
       `
@@ -86,33 +91,35 @@ export class ConflictModal {
       const cloudVal = JSON.stringify(cloud[key] !== undefined ? cloud[key] : '')
 
       if (localVal !== cloudVal) {
+        const localDisp = local[key] !== undefined ? String(local[key]) : '(Rỗng)'
+        const cloudDisp = cloud[key] !== undefined ? String(cloud[key]) : '(Rỗng)'
         diffRows.push(`
           <tr>
-            <td style="font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--border)">${key}</td>
-            <td style="color: var(--color-danger); padding: 6px 10px; border-bottom: 1px solid var(--border)">${local[key] !== undefined ? local[key] : '(Rỗng)'}</td>
-            <td style="color: var(--color-success); padding: 6px 10px; border-bottom: 1px solid var(--border)">${cloud[key] !== undefined ? cloud[key] : '(Rỗng)'}</td>
+            <td class="font-semibold border-b" style="padding: 6px 10px;">${escapeHtml(key)}</td>
+            <td class="border-b" style="color: var(--color-danger); padding: 6px 10px;">${escapeHtml(localDisp)}</td>
+            <td class="border-b" style="color: var(--color-success); padding: 6px 10px;">${escapeHtml(cloudDisp)}</td>
           </tr>
         `)
       }
     }
 
     return `
-      <p style="margin-bottom: 12px;">Xung đột xảy ra tại: <strong>${name}</strong> (Bảng: <code>${op.table}</code>, ID: <code>${op.id}</code>)</p>
+      <p class="mb-3">Xung đột xảy ra tại: <strong>${escapeHtml(name)}</strong> (Bảng: <code>${escapeHtml(op.table)}</code>, ID: <code>${escapeHtml(op.id)}</code>)</p>
       
-      <table style="width: 100%; border-collapse: collapse; margin-top: 10px; text-align: left; font-size: 0.9rem;">
+      <table class="w-full text-left" style="border-collapse: collapse; margin-top: 10px; font-size: 0.9rem;">
         <thead>
           <tr style="background: var(--surface2)">
-            <th style="padding: 8px 10px; border-bottom: 2px solid var(--border)">Trường dữ liệu</th>
-            <th style="padding: 8px 10px; border-bottom: 2px solid var(--border)">Máy của bạn</th>
-            <th style="padding: 8px 10px; border-bottom: 2px solid var(--border)">Máy chủ Cloud</th>
+            <th scope="col" style="padding: 8px 10px; border-bottom: 2px solid var(--border)">Trường dữ liệu</th>
+            <th scope="col" style="padding: 8px 10px; border-bottom: 2px solid var(--border)">Máy của bạn</th>
+            <th scope="col" style="padding: 8px 10px; border-bottom: 2px solid var(--border)">Máy chủ Cloud</th>
           </tr>
         </thead>
         <tbody>
-          ${diffRows.length > 0 ? diffRows.join('') : '<tr><td colspan="3" style="text-align:center; padding: 12px; color:var(--text2)">Chỉ khác biệt số thứ tự sửa đổi (revision)</td></tr>'}
+          ${diffRows.length > 0 ? diffRows.join('') : '<tr><td colspan="3" class="text-center p-3" style="color:var(--text2)">Chỉ khác biệt số thứ tự sửa đổi (revision)</td></tr>'}
         </tbody>
       </table>
       
-      <div class="hint" style="margin-top:16px; line-height: 1.4;">
+      <div class="hint mt-4" style="line-height: 1.4;">
         💡 <strong>Giữ bản máy này:</strong> Ghi đè dữ liệu trên Cloud bằng dữ liệu của bạn.<br>
         💡 <strong>Lấy bản Cloud:</strong> Hủy các thay đổi trên máy này và tải dữ liệu mới từ Cloud về.
       </div>
@@ -150,4 +157,13 @@ export class ConflictModal {
       }
     })
   }
+}
+
+function escapeHtml(s: any): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
 }

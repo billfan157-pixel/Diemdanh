@@ -2,7 +2,10 @@ import { StateManager } from '../../StateManager'
 import { NotificationManager } from '../../../services/NotificationManager'
 import { resolveClassColumns } from '../../../config/columns.ts'
 import { fmt } from '../../../views/helpers.ts'
+import { debounce } from '../../../config/constants.ts'
+import { validateScoreInputEl } from '../../../utils/scoreInput.ts'
 import { type StudentData } from '../../../services/storage/StorageAdapter.types.ts'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 export class BulkEditModal {
   private stateManager: StateManager
@@ -11,6 +14,7 @@ export class BulkEditModal {
   private classId: string | null = null
   private students: StudentData[] = []
   private onComplete: (() => void) | null = null
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(stateManager: StateManager, notificationManager: NotificationManager) {
     this.stateManager = stateManager
@@ -25,6 +29,8 @@ export class BulkEditModal {
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     if (this.overlay) {
       this.overlay.remove()
       this.overlay = null
@@ -40,13 +46,16 @@ export class BulkEditModal {
 
     this.overlay = document.createElement('div')
     this.overlay.className = 'modal-overlay'
+    this.overlay.setAttribute('role', 'dialog')
+    this.overlay.setAttribute('aria-modal', 'true')
+    this.overlay.setAttribute('aria-labelledby', 'bulkEditTitle')
     this.overlay.innerHTML = `
 <div class="modal-panel" style="max-width:480px">
-  <h2>✏️ Sửa điểm hàng loạt <button class="modal-close" id="bulkModalClose">×</button></h2>
-  <p class="hint" style="margin-bottom:12px">Đang sửa <strong>${this.students.length}</strong> học viên · ${term === 'hk1' ? 'HK1' : 'HK2'}</p>
+  <h2 id="bulkEditTitle">✏️ Sửa điểm hàng loạt <button class="modal-close" id="bulkModalClose" aria-label="Đóng">×</button></h2>
+  <p class="hint mb-3">Đang sửa <strong>${this.students.length}</strong> học viên · ${term === 'hk1' ? 'HK1' : 'HK2'}</p>
   <div id="bulkModalBody">
-    <div style="margin-bottom:12px">
-      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;color:#64748b">
+    <div class="mb-3">
+      <label class="d-flex items-center gap-2 text-muted" style="font-size:.85rem">
         <input type="checkbox" id="bulkOverwrite" checked />
         Ghi đè điểm cũ (bỏ tick để thêm điểm)
       </label>
@@ -67,6 +76,7 @@ export class BulkEditModal {
   </div>
 </div>`
     document.body.appendChild(this.overlay)
+    this._focusTrap = createFocusTrap(this.overlay)
 
     // Show current scores for each column
     cols.forEach(c => {
@@ -89,6 +99,13 @@ export class BulkEditModal {
     this.overlay.addEventListener('click', (e) => {
       if (e.target === this.overlay) this.close()
     })
+
+    const validateDebounced = debounce((input: HTMLInputElement) => {
+      validateScoreInputEl(input)
+    }, 200)
+    this.overlay.querySelectorAll<HTMLInputElement>('.bulk-score-input').forEach(input => {
+      input.addEventListener('input', () => validateDebounced(input))
+    })
   }
 
   private apply(): void {
@@ -101,14 +118,19 @@ export class BulkEditModal {
     const overwrite = (this.overlay?.querySelector('#bulkOverwrite') as HTMLInputElement)?.checked ?? true
 
     let applied = 0
+    let hasInvalid = false
     for (const st of this.students) {
       for (const col of cols) {
         const row = this.overlay?.querySelector(`.bulk-col-row[data-col="${col.key}"]`)
         if (!row) continue
         const input = row.querySelector<HTMLInputElement>('.bulk-score-input')
         if (!input) continue
-        const value = parseFloat(input.value)
-        if (isNaN(value) || value < 0 || value > 10) continue
+        if (!input.value.trim()) continue
+        const value = validateScoreInputEl(input)
+        if (value === null) {
+          hasInvalid = true
+          continue
+        }
 
         if (overwrite) {
           this.stateManager.setScore(this.classId, st.id, col.key, [value], term)
@@ -120,7 +142,9 @@ export class BulkEditModal {
     }
 
     this.close()
-    if (applied > 0) {
+    if (hasInvalid) {
+      this.notificationManager.show('Có điểm không hợp lệ (0–10) — kiểm tra lại các ô đỏ.', 'error')
+    } else if (applied > 0) {
       this.notificationManager.show(`✅ Đã sửa ${applied} điểm cho ${this.students.length} học viên`, 'success')
     } else {
       this.notificationManager.show('Không có điểm nào được nhập — hãy nhập ít nhất một giá trị.', 'warning')

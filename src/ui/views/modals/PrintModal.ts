@@ -5,11 +5,13 @@ import { displayName } from '../../../config/constants.ts'
 import { studentTB, classify } from '../../../core/calc.ts'
 import { fmt, escapeHtml } from '../../../views/helpers.ts'
 import { buildParishDashboard, buildParishReportHtml } from '../../../features/parishReport.ts'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 export class PrintModal {
   private stateManager: StateManager
   private notificationManager: NotificationManager
   private overlay: HTMLElement | null = null
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(stateManager: StateManager, notificationManager: NotificationManager) {
     this.stateManager = stateManager
@@ -21,6 +23,8 @@ export class PrintModal {
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     if (this.overlay) {
       this.overlay.remove()
       this.overlay = null
@@ -30,9 +34,12 @@ export class PrintModal {
   private render(): void {
     this.overlay = document.createElement('div')
     this.overlay.className = 'modal-overlay'
+    this.overlay.setAttribute('role', 'dialog')
+    this.overlay.setAttribute('aria-modal', 'true')
+    this.overlay.setAttribute('aria-labelledby', 'printModalTitle')
     this.overlay.innerHTML = `
-<div class="modal-panel" style="max-width:420px">
-  <h2>🖨️ Cài đặt in ấn <button class="modal-close" id="printModalClose">×</button></h2>
+<div class="modal-panel max-w-sm">
+  <h2 id="printModalTitle">🖨️ Cài đặt in ấn <button class="modal-close" id="printModalClose" aria-label="Đóng">×</button></h2>
   <div id="printModalBody">
     <div class="print-opt">
       <label class="print-opt-label">Phạm vi</label>
@@ -56,12 +63,13 @@ export class PrintModal {
       </select>
     </div>
   </div>
-  <div class="actions" style="margin-top:16px">
+  <div class="actions mt-4">
     <button class="btn btn-secondary" id="printModalCancel">Hủy</button>
     <button class="btn btn-primary" id="printModalGo">🖨️ In</button>
   </div>
 </div>`
     document.body.appendChild(this.overlay)
+    this._focusTrap = createFocusTrap(this.overlay)
 
     this.overlay.querySelector('#printModalClose')?.addEventListener('click', () => this.close())
     this.overlay.querySelector('#printModalCancel')?.addEventListener('click', () => this.close())
@@ -82,7 +90,7 @@ export class PrintModal {
       const classes = this.stateManager.getAllClasses()
       const yearFilter = this.stateManager.getState().yearFilter
       const data = buildParishDashboard(classes, yearFilter)
-      html = buildParishReportHtml(data, '')
+      html = buildParishReportHtml(data, classes)
     } else {
       const classId = this.stateManager.getState().activeClassId
       if (!classId) {
@@ -139,7 +147,7 @@ export class PrintModal {
       return `<h2>${escapeHtml(cls.name)} ${cls.year ? `· ${cls.year}` : ''}</h2>
         <p class="hint">TB · ${term === 'hk1' ? 'HK1' : 'HK2'}</p>
         <table>
-          <thead><tr><th>STT</th><th>Học viên</th><th>TB</th><th>Xếp loại</th><th>Điểm đủ</th></tr></thead>
+          <thead><tr><th scope="col">STT</th><th scope="col">Học viên</th><th scope="col">TB</th><th scope="col">Xếp loại</th><th scope="col">Điểm đủ</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`
     }
@@ -163,9 +171,9 @@ export class PrintModal {
       <p class="hint">${term === 'hk1' ? 'HK1' : 'HK2'} · Đầy đủ cột điểm</p>
       <table>
         <thead><tr>
-          <th>STT</th><th>Học viên</th>
-          ${cols.map(c => `<th>${escapeHtml(c.short)}</th>`).join('')}
-          <th>TB</th><th>Ghi chú</th>
+          <th scope="col">STT</th><th scope="col">Học viên</th>
+          ${cols.map(c => `<th scope="col">${escapeHtml(c.short)}</th>`).join('')}
+          <th scope="col">TB</th><th scope="col">Ghi chú</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>`

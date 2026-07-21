@@ -1,0 +1,143 @@
+/* IO */
+.io-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 700px) {
+  .io-grid { grid-template-columns: 1fr; }
+}
+
+.io-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.io-box h4 {
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--text2);
+}
+
+.dropzone {
+  border: 2px dashed var(--border-strong);
+  border-radius: 12px;
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  background: var(--surface);
+  margin-bottom: 10px;
+}
+
+.dropzone:hover,
+.dropzone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dropzone strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 4px;
+  font-size: 0.92rem;
+}
+
+.dropzone:hover strong,
+.dropzone.dragover strong { color: var(--accent); }
+
+.io-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.io-class-select {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.sidebar-tools {
+  margin-top: 2px;
+}
+
+.sidebar-tool-btn {
+  justify-content: flex-start;
+  text-align: left;
+  font-weight: 650;
+}
+
+.undo-redo-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.undo-redo-btn {
+  padding: 7px 0;
+  font-size: 1.1rem;
+  font-weight: 650;
+  min-width: 0;
+  justify-content: center;
+}
+
+.chip-btn-icon {
+  padding: 7px 10px;
+  min-width: 36px;
+  justify-content: center;
+}
+.chip-btn-icon .chip-ico {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.undo-redo-btn:disabled,
+#undoBtn:disabled,
+#redoBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.no-class-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+}
+
+select {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 32px 8px 10px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='%236b7c93'%3E%3Cpath d='M0 0l6 8 6-8z'/%3E%3C/svg%3E") no-repeat right 10px center;
+  color: var(--text);
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+  min-width: 150px;
+}
+
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.file-name {
+  font-size: 0.8rem;
+  color: var(--gold);
+  margin-top: 6px;
+  word-break: break-all;
+  min-height: 1.2em;
+}

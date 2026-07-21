@@ -1,5 +1,8 @@
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
+
 export class HelpModal {
   private overlay: HTMLElement | null = null
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor() {
   }
@@ -9,6 +12,8 @@ export class HelpModal {
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     if (this.overlay) {
       this.overlay.remove()
       this.overlay = null
@@ -18,10 +23,13 @@ export class HelpModal {
   private render(): void {
     this.overlay = document.createElement('div')
     this.overlay.className = 'modal-overlay'
+    this.overlay.setAttribute('role', 'dialog')
+    this.overlay.setAttribute('aria-modal', 'true')
+    this.overlay.setAttribute('aria-labelledby', 'helpModalTitle')
     this.overlay.innerHTML = `
 <div class="modal-panel" style="max-width:480px">
-  <h2>ℹ️ Hướng dẫn <button class="modal-close" id="helpModalClose">×</button></h2>
-  <div style="display:grid;gap:12px;font-size:.85rem;line-height:1.5">
+  <h2 id="helpModalTitle">ℹ️ Hướng dẫn <button class="modal-close" id="helpModalClose" aria-label="Đóng">×</button></h2>
+    <div class="grid gap-3 leading-normal" style="font-size:.85rem">
     <div>
       <strong>👤 Tài khoản</strong><br/>
       Mặc định: <code>admin</code> / PIN hiển thị trên màn hình đăng nhập.
@@ -51,11 +59,12 @@ export class HelpModal {
       Vào Sao lưu → chọn thư mục lưu → tự động sao lưu định kỳ.
     </div>
   </div>
-  <div class="actions" style="margin-top:12px">
+  <div class="actions mt-3">
     <button class="btn btn-secondary" id="helpModalCloseBtn">Đã hiểu</button>
   </div>
 </div>`
     document.body.appendChild(this.overlay)
+    this._focusTrap = createFocusTrap(this.overlay)
 
     const close = () => this.close()
     this.overlay.querySelector('#helpModalClose')?.addEventListener('click', close)

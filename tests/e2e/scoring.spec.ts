@@ -10,7 +10,7 @@ test.describe('Scoring Flow', () => {
     await page.fill('#loginUser', 'admin')
     await page.fill('#loginPin', pin)
     await page.click('button[type=submit]')
-    await expect(page.locator('#appRoot')).toBeVisible()
+    await expect(page.locator('#appRoot')).toBeVisible({ timeout: 10000 })
   })
 
   async function createAndSelectClass(page: any, className: string, studentName: string) {

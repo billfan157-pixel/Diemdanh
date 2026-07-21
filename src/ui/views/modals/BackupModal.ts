@@ -4,12 +4,14 @@
 
 import { BackupService } from '../../../services/BackupService'
 import { NotificationManager } from '../../../services/NotificationManager'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 export class BackupModal {
   private backupService: BackupService
   private notification: NotificationManager
   private element: HTMLElement | null = null
   private onRestoreCallback: (() => void) | null = null
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(backupService: BackupService, notification: NotificationManager) {
     this.backupService = backupService
@@ -20,11 +22,14 @@ export class BackupModal {
     this.onRestoreCallback = onRestore
     this.ensureModalElement()
     this.element?.classList.remove('hidden')
+    if (this.element) this._focusTrap = createFocusTrap(this.element)
     this.updateFolderUI()
     this.updateStatusUI()
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     this.element?.classList.add('hidden')
   }
 
@@ -47,39 +52,39 @@ export class BackupModal {
             <button type="button" class="icon-btn modal-close" id="backupModalClose" aria-label="Đóng">×</button>
           </div>
           <div class="modal-body">
-            <p class="hint" id="backupModalStatus" style="margin:0 0 12px; font-weight: bold;"></p>
+            <p class="hint mb-3 font-bold" id="backupModalStatus"></p>
             
-            <div class="io-box" style="margin-bottom:12px; border: 1px solid var(--color-border); padding: 12px; border-radius: 8px;">
-              <h4 style="margin: 0 0 6px;">📁 Thư mục sao lưu</h4>
-              <p class="hint" style="margin: 0 0 8px; font-size: 0.85rem; color: var(--color-text-secondary)">
+            <div class="io-box mb-3 border p-3 rounded-sm">
+              <h4 class="mt-0 mb-2">📁 Thư mục sao lưu</h4>
+              <p class="hint mb-2 text-secondary" style="font-size: 0.85rem">
                 Chọn một thư mục trên máy (vd: <code>tinh-diem/backups</code>) để lưu tự động.
               </p>
-              <div id="backupFolderStatus" class="hint" style="margin:8px 0; font-size: 0.85rem;"></div>
+              <div id="backupFolderStatus" class="hint my-2" style="font-size: 0.85rem;"></div>
             </div>
 
-            <div class="io-box" style="margin-bottom:12px; border: 1px solid var(--color-border); padding: 12px; border-radius: 8px;">
-              <h4 style="margin: 0 0 6px;">💾 Tạo bản sao lưu</h4>
-              <p class="hint" style="margin: 0 0 8px; font-size: 0.85rem; color: var(--color-text-secondary)">
+            <div class="io-box mb-3 border p-3 rounded-sm">
+              <h4 class="mt-0 mb-2">💾 Tạo bản sao lưu</h4>
+              <p class="hint mb-2 text-secondary" style="font-size: 0.85rem">
                 Xuất toàn bộ lớp, học viên, và thông tin xác thực ra file JSON.
               </p>
-              <button type="button" class="btn btn-success" id="backupExportBtn" style="padding: 6px 12px; font-weight: 500;">Sao lưu ngay</button>
+              <button type="button" class="btn btn-success py-2 px-3 font-medium" id="backupExportBtn">Sao lưu ngay</button>
             </div>
 
-            <div class="io-box" style="border: 1px solid var(--color-border); padding: 12px; border-radius: 8px;">
-              <h4 style="margin: 0 0 6px;">♻️ Khôi phục dữ liệu</h4>
-              <p class="hint" style="margin: 0 0 8px; font-size: 0.85rem; color: var(--color-text-secondary)">
+            <div class="io-box border p-3 rounded-sm">
+              <h4 class="mt-0 mb-2">♻️ Khôi phục dữ liệu</h4>
+              <p class="hint mb-2 text-secondary" style="font-size: 0.85rem">
                 Nạp lại dữ liệu từ file JSON sao lưu.
               </p>
-              <select id="backupRestoreMode" class="input" style="margin-bottom:8px; width:100%; height: 36px; padding: 4px 8px;">
+              <select id="backupRestoreMode" class="input mb-2 w-full py-1 px-2" style="height: 36px;">
                 <option value="replace">Thay thế toàn bộ dữ liệu hiện tại</option>
                 <option value="merge">Gộp học viên trùng tên vào lớp cũ</option>
               </select>
               <input type="file" id="backupImportFile" accept=".json,application/json" class="hidden" />
-              <button type="button" class="btn btn-primary" id="backupImportBtn" style="padding: 6px 12px; font-weight: 500;">Chọn file &amp; Khôi phục</button>
+              <button type="button" class="btn btn-primary py-2 px-3 font-medium" id="backupImportBtn">Chọn file &amp; Khôi phục</button>
             </div>
           </div>
           <div class="modal-foot">
-            <button type="button" class="btn btn-ghost" id="backupModalDone" style="margin-left: auto;">Đóng</button>
+            <button type="button" class="btn btn-ghost ml-auto" id="backupModalDone">Đóng</button>
           </div>
         </div>
       `
@@ -116,7 +121,7 @@ export class BackupModal {
 
     if (!supported) {
       folderStatusEl.innerHTML = `
-        <span style="color: var(--color-text-muted)">
+        <span class="text-muted">
           Trình duyệt không hỗ trợ chọn thư mục (hãy dùng Chrome/Edge). File sao lưu sẽ tải về thư mục Tải xuống của máy.
         </span>
       `
@@ -126,14 +131,14 @@ export class BackupModal {
     if (meta.folderName) {
       folderStatusEl.innerHTML = `
         <span>Thư mục đã chọn: <strong>${meta.folderName}</strong></span>
-        <div style="margin-top: 6px;">
-          <button type="button" class="btn btn-ghost btn-sm" id="backupFolderChangeBtn" style="padding: 2px 8px; font-size: 0.8rem;">Thay đổi</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="backupFolderClearBtn" style="padding: 2px 8px; font-size: 0.8rem; color: var(--color-danger)">Hủy liên kết</button>
+        <div class="mt-2">
+          <button type="button" class="btn btn-ghost btn-sm py-1 px-2" id="backupFolderChangeBtn" style="font-size: 0.8rem;">Thay đổi</button>
+          <button type="button" class="btn btn-ghost btn-sm text-danger py-1 px-2" id="backupFolderClearBtn" style="font-size: 0.8rem;">Hủy liên kết</button>
         </div>
       `
     } else {
       folderStatusEl.innerHTML = `
-        <button type="button" class="btn btn-primary btn-sm" id="backupFolderPickBtn" style="padding: 4px 10px; font-size: 0.8rem;">Gắn thư mục sao lưu</button>
+        <button type="button" class="btn btn-primary btn-sm py-1 px-2" id="backupFolderPickBtn" style="font-size: 0.8rem;">Gắn thư mục sao lưu</button>
       `
     }
 

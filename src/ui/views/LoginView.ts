@@ -53,6 +53,8 @@ export class LoginView {
       pinInput.required = true
       emailInput.required = false
       passwordInput.required = false
+      tabPinBtn.setAttribute('aria-selected', String(tabPinBtn.classList.contains('active')))
+      tabEmailBtn.setAttribute('aria-selected', String(tabEmailBtn.classList.contains('active')))
     })
 
     tabEmailBtn?.addEventListener('click', () => {
@@ -64,6 +66,8 @@ export class LoginView {
       pinInput.required = false
       emailInput.required = true
       passwordInput.required = true
+      tabPinBtn.setAttribute('aria-selected', String(tabPinBtn.classList.contains('active')))
+      tabEmailBtn.setAttribute('aria-selected', String(tabEmailBtn.classList.contains('active')))
     })
   }
 
@@ -74,21 +78,21 @@ export class LoginView {
         <h1>Sổ Điểm Giáo Lý</h1>
         <p class="login-sub">Đăng nhập để tiếp tục</p>
 
-        <div class="login-tabs">
-          <button type="button" id="tabPinBtn" class="tab-btn active">Mã PIN (Offline)</button>
-          <button type="button" id="tabEmailBtn" class="tab-btn">Email Cloud</button>
+        <div class="login-tabs" role="tablist" aria-label="Phương thức đăng nhập">
+          <button type="button" id="tabPinBtn" class="tab-btn active" role="tab" aria-selected="true" aria-controls="pinFields">Mã PIN (Offline)</button>
+          <button type="button" id="tabEmailBtn" class="tab-btn" role="tab" aria-selected="false" aria-controls="emailFields">Email Cloud</button>
         </div>
 
         <form id="loginForm" autocomplete="on">
-          <div id="pinFields">
+          <div id="pinFields" role="tabpanel">
             <label class="field-label" for="loginUser">Tài khoản</label>
             <input id="loginUser" class="input" type="text" placeholder="admin" required autocomplete="username" />
 
             <label class="field-label" for="loginPin" style="margin-top:10px">PIN</label>
-            <input id="loginPin" class="input" type="password" placeholder="••••" required autocomplete="current-password" />
+            <input id="loginPin" class="input" type="password" inputmode="numeric" placeholder="••••" required autocomplete="current-password" />
           </div>
 
-          <div id="emailFields" class="hidden">
+          <div id="emailFields" class="hidden" role="tabpanel" hidden>
             <label class="field-label" for="loginEmail">Email</label>
             <input id="loginEmail" class="input" type="email" placeholder="giao.ly.vien@example.com" autocomplete="email" />
 
@@ -96,7 +100,7 @@ export class LoginView {
             <input id="loginPassword" class="input" type="password" placeholder="••••••••" autocomplete="current-password" />
           </div>
 
-          <label class="check-all" style="margin-top:12px">
+          <label class="check-all mt-3">
             <input type="checkbox" id="loginRemember" checked /> Ghi nhớ trên máy này
           </label>
 
@@ -109,15 +113,16 @@ export class LoginView {
             <span class="btn-bio-ico" aria-hidden="true">🔐</span>
             <span id="loginBioLabel">Mở bằng Face ID / vân tay</span>
           </button>
-          <p class="hint login-bio-hint" id="loginBioHint" style="margin-top:8px;text-align:center">
+          <p class="hint login-bio-hint mt-2 text-center" id="loginBioHint">
             Lần đầu: đăng nhập PIN → bật sinh trắc trong sidebar.
           </p>
         </div>
 
-        <p class="hint" style="margin-top:14px;text-align:center">
+        ${this.authManager.defaultPin ? `
+        <p class="hint text-center" style="margin-top:14px">
           Mặc định PIN: <strong>admin</strong> / PIN <strong>${this.authManager.defaultPin}</strong><br>
           (Vào app bấm <strong>Đổi PIN</strong> hoặc <strong>Cấu hình Cloud</strong>)
-        </p>
+        </p>` : ''}
 
         <p id="loginError" class="login-error hidden"></p>
       </div>

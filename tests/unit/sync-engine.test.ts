@@ -190,6 +190,7 @@ describe('SyncEngine', () => {
         year: '2025',
         columns: sm.getClassColumns(clsId),
         weights: sm.getState().classes[0].weights,
+        rev: 2,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })

@@ -2,6 +2,7 @@
 // Sổ Điểm GL - Main Entry Point
 // ============================================================
 
+import './styles/variables.css'
 import './styles/main.css'
 
 import { App } from './ui/App'

@@ -29,7 +29,7 @@ import { generateId } from '../../utils/id.ts'
 // ============================================================
 
 const DB_NAME = 'so-diem-gl-db'
-const DB_VERSION = 4
+const DB_VERSION = 5
 const STORAGE_KEYS = {
   STATE: 'so-diem-gl-state',
   AUTH: 'so-diem-gl-auth',
@@ -66,6 +66,16 @@ async function getDB(): Promise<IDBPDatabase<AppDBSchema>> {
         const backupStore = db.createObjectStore('backups', { keyPath: 'id', autoIncrement: true })
         backupStore.createIndex('by-timestamp', 'timestamp')
       }
+      if (!db.objectStoreNames.contains('classes')) {
+        db.createObjectStore('classes', { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains('students')) {
+        const studentStore = db.createObjectStore('students', { keyPath: 'id' })
+        studentStore.createIndex('by-class', 'classId')
+      }
+      if (!db.objectStoreNames.contains('appMeta')) {
+        db.createObjectStore('appMeta')
+      }
 
       // Migrations
       if (oldVersion < 2) {
@@ -76,6 +86,9 @@ async function getDB(): Promise<IDBPDatabase<AppDBSchema>> {
       }
       if (oldVersion < 4) {
         // Version 4: Update state version
+      }
+      if (oldVersion < 5) {
+        // Version 5: New split stores are already created by the blocks above
       }
     }
   })
@@ -93,13 +106,50 @@ export class StorageAdapter {
 
   async init(): Promise<void> {
     try {
-      await getDB()
+      const db = await getDB()
       this.useIndexedDB = true
+      await this.migrateToSplitSchema(db)
     } catch (e) {
       console.warn('IndexedDB not available, falling back to localStorage:', e)
       this.useIndexedDB = false
     }
     this.initialized = true
+  }
+
+  private async migrateToSplitSchema(db: IDBPDatabase<AppDBSchema>): Promise<void> {
+    try {
+      const oldState = await db.get('appState', 'main')
+      if (!oldState) return
+
+      console.info('Migrating database from version 4 to 5 (split schema)...')
+
+      await db.put('appMeta', oldState.activeClassId, 'activeClassId')
+      await db.put('appMeta', oldState.yearFilter, 'yearFilter')
+      await db.put('appMeta', oldState.archivedYears || [], 'archivedYears')
+      await db.put('appMeta', oldState.viewMode || 'cards', 'viewMode')
+      await db.put('appMeta', oldState.activeTerm || 'hk1', 'activeTerm')
+      await db.put('appMeta', oldState.theme || 'system', 'theme')
+      await db.put('appMeta', oldState.parentTokens || [], 'parentTokens')
+      await db.put('appMeta', oldState.lastModified || Date.now(), 'lastModified')
+
+      if (Array.isArray(oldState.classes)) {
+        for (const cls of oldState.classes) {
+          const { students, ...classRecord } = cls
+          await db.put('classes', classRecord)
+
+          if (Array.isArray(students)) {
+            for (const student of students) {
+              await db.put('students', { ...student, classId: cls.id })
+            }
+          }
+        }
+      }
+
+      await db.delete('appState', 'main')
+      console.info('Database migration to split schema completed successfully.')
+    } catch (e) {
+      console.error('Database migration failed:', e)
+    }
   }
 
   isReady(): boolean {
@@ -120,8 +170,41 @@ export class StorageAdapter {
     if (this.useIndexedDB) {
       try {
         const db = await getDB()
-        const raw = await db.get('appState', 'main')
-        if (raw) state = this.migrateState(raw)
+        const activeClassId = await db.get('appMeta', 'activeClassId') ?? null
+        const yearFilter = await db.get('appMeta', 'yearFilter') ?? null
+        const archivedYears = await db.get('appMeta', 'archivedYears') ?? []
+        const viewMode = await db.get('appMeta', 'viewMode') ?? 'cards'
+        const activeTerm = await db.get('appMeta', 'activeTerm') ?? 'hk1'
+        const theme = await db.get('appMeta', 'theme') ?? 'system'
+        const parentTokens = await db.get('appMeta', 'parentTokens') ?? []
+        const lastModified = await db.get('appMeta', 'lastModified') ?? Date.now()
+
+        const classesList = await db.getAll('classes')
+        const assembledClasses: ClassData[] = []
+        
+        for (const cls of classesList) {
+          const studentsList = await db.getAllFromIndex('students', 'by-class', cls.id)
+          assembledClasses.push({
+            ...cls,
+            students: studentsList.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+          })
+        }
+
+        if (classesList.length > 0 || activeClassId !== null || lastModified !== undefined) {
+          state = {
+            version: 6,
+            activeClassId,
+            yearFilter,
+            archivedYears,
+            viewMode,
+            activeTerm: activeTerm as any,
+            theme,
+            parentTokens,
+            lastModified,
+            classes: assembledClasses
+          }
+          state = this.migrateState(state)
+        }
       } catch (e) {
         console.warn('IndexedDB read failed, falling back:', e)
       }
@@ -162,15 +245,52 @@ export class StorageAdapter {
   }
 
   async setState(state: AppState): Promise<void> {
-    const stateToSave = {
-      ...state,
-      lastModified: Date.now()
-    }
+    const lastModified = Date.now()
 
     if (this.useIndexedDB) {
       try {
         const db = await getDB()
-        await db.put('appState', stateToSave, 'main')
+        
+        await db.put('appMeta', state.activeClassId, 'activeClassId')
+        await db.put('appMeta', state.yearFilter, 'yearFilter')
+        await db.put('appMeta', state.archivedYears, 'archivedYears')
+        await db.put('appMeta', state.viewMode, 'viewMode')
+        await db.put('appMeta', state.activeTerm, 'activeTerm')
+        await db.put('appMeta', state.theme, 'theme')
+        await db.put('appMeta', state.parentTokens, 'parentTokens')
+        await db.put('appMeta', lastModified, 'lastModified')
+
+        const currentClassIds = new Set(state.classes.map(c => c.id))
+
+        for (const cls of state.classes) {
+          const { students, ...classRecord } = cls
+          await db.put('classes', classRecord)
+
+          const existingDbStudents = await db.getAllFromIndex('students', 'by-class', cls.id)
+          const incomingStudentIds = new Set(students.map(s => s.id))
+
+          for (const student of students) {
+            await db.put('students', { ...student, classId: cls.id })
+          }
+
+          for (const dbs of existingDbStudents) {
+            if (!incomingStudentIds.has(dbs.id)) {
+              await db.delete('students', dbs.id)
+            }
+          }
+        }
+
+        const dbClasses = await db.getAll('classes')
+        for (const dbc of dbClasses) {
+          if (!currentClassIds.has(dbc.id)) {
+            await db.delete('classes', dbc.id)
+            const dbStudents = await db.getAllFromIndex('students', 'by-class', dbc.id)
+            for (const dbs of dbStudents) {
+              await db.delete('students', dbs.id)
+            }
+          }
+        }
+
         return
       } catch (e) {
         console.warn('IndexedDB write failed, falling back:', e)
@@ -178,6 +298,10 @@ export class StorageAdapter {
     }
 
     try {
+      const stateToSave = {
+        ...state,
+        lastModified
+      }
       localStorage.setItem('so-diem-gl-state', JSON.stringify(stateToSave))
     } catch (e) {
       if (e instanceof DOMException && e.name === 'QuotaExceededError') {
@@ -192,6 +316,9 @@ export class StorageAdapter {
     if (this.useIndexedDB) {
       try {
         const db = await getDB()
+        await db.clear('classes')
+        await db.clear('students')
+        await db.clear('appMeta')
         await db.delete('appState', 'main')
       } catch (e) {
         console.warn('IndexedDB clear failed:', e)

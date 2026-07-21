@@ -3,6 +3,7 @@ import { NotificationManager } from '../../../services/NotificationManager'
 import { type StudentData, type LearningLogEntry } from '../../../services/storage/StorageAdapter.types'
 import { LOG_TYPES, LOG_LEVELS } from '../../../config/constants.ts'
 import { displayName, formatLogDate } from '../../../core/legacyCompat.ts'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 export class JournalLogModal {
   private stateManager: StateManager
@@ -11,6 +12,7 @@ export class JournalLogModal {
   private overlay: HTMLElement | null = null
   private student: StudentData | null = null
   private classId: string = ''
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(
     stateManager: StateManager,
@@ -29,6 +31,8 @@ export class JournalLogModal {
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     if (this.overlay) {
       this.overlay.remove()
       this.overlay = null
@@ -42,29 +46,33 @@ export class JournalLogModal {
 
     this.overlay = document.createElement('div')
     this.overlay.className = 'modal-overlay'
+    this.overlay.setAttribute('role', 'dialog')
+    this.overlay.setAttribute('aria-modal', 'true')
+    this.overlay.setAttribute('aria-labelledby', 'journalLogTitle')
     this.overlay.innerHTML = `
-<div class="modal-panel" style="max-width:520px">
-  <h2>📓 Nhật ký học vụ <button class="modal-close" id="journalModalClose">×</button></h2>
-  <p class="hint" style="margin-bottom:12px">${displayName(st)}</p>
+<div class="modal-panel max-w-md">
+  <h2 id="journalLogTitle">📓 Nhật ký học vụ <button class="modal-close" id="journalModalClose" aria-label="Đóng">×</button></h2>
+  <p class="hint mb-3">${displayName(st)}</p>
 
-  <div style="margin-bottom:16px;padding:12px;background:var(--color-bg-subtle);border-radius:8px">
-    <div style="display:grid;gap:8px">
-      <select id="journalLogType" style="width:100%">
+  <div class="mb-4 p-3 rounded-lg" style="background:var(--color-bg-subtle)">
+    <div class="grid gap-2">
+      <select id="journalLogType" class="w-full">
         ${LOG_TYPES.map(t => `<option value="${t.key}">${t.label}</option>`).join('')}
       </select>
-      <select id="journalLogLevel" style="width:100%">
+      <select id="journalLogLevel" class="w-full">
         ${LOG_LEVELS.map(l => `<option value="${l.key}">${l.label}</option>`).join('')}
       </select>
-      <textarea id="journalLogText" rows="2" placeholder="Nội dung nhật ký..." style="width:100%;resize:vertical"></textarea>
+      <textarea id="journalLogText" rows="2" placeholder="Nội dung nhật ký..." class="w-full" style="resize:vertical" aria-label="Nội dung nhật ký"></textarea>
       <button class="btn btn-primary" id="journalLogSaveBtn">💾 Lưu nhật ký</button>
     </div>
   </div>
 
   <div id="journalLogList">
-    ${logs.length ? logs.map(log => this.renderLogEntry(log)).join('') : '<p class="hint" style="text-align:center;padding:12px">Chưa có nhật ký.</p>'}
+    ${logs.length ? logs.map(log => this.renderLogEntry(log)).join('') : '<p class="hint text-center p-3">Chưa có nhật ký.</p>'}
   </div>
 </div>`
     document.body.appendChild(this.overlay)
+    this._focusTrap = createFocusTrap(this.overlay)
 
     this.overlay.querySelector('#journalModalClose')?.addEventListener('click', () => this.close())
     this.overlay.querySelector('#journalLogSaveBtn')?.addEventListener('click', () => this.saveEntry())
@@ -83,16 +91,16 @@ export class JournalLogModal {
     const typeMeta = LOG_TYPES.find(t => t.key === log.type)
     const levelMeta = LOG_LEVELS.find(l => l.key === log.level)
     return `
-<div class="journal-entry" style="padding:8px 12px;margin-bottom:6px;border:1px solid var(--color-border);border-radius:6px">
-  <div style="display:flex;justify-content:space-between;align-items:start">
+<div class="journal-entry px-3 py-2 border rounded-md" style="margin-bottom:6px">
+  <div class="d-flex justify-between items-start">
     <div>
       <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:.75rem;background:${typeMeta?.color || '#64748b'}20;color:${typeMeta?.color || '#64748b'}">${typeMeta?.label || log.type}</span>
       <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:.75rem;margin-left:4px;background:${levelMeta?.color || '#64748b'}20;color:${levelMeta?.color || '#64748b'}">${levelMeta?.label || log.level}</span>
-      <span class="hint" style="font-size:.75rem;margin-left:8px">${formatLogDate(log.date)}</span>
+      <span class="hint text-xs ml-2">${formatLogDate(log.date)}</span>
     </div>
-    <button type="button" class="btn btn-ghost btn-sm journal-del-btn" data-id="${log.id}" style="color:var(--color-danger)">✕</button>
+    <button type="button" class="btn btn-ghost btn-sm journal-del-btn" data-id="${log.id}" aria-label="Xóa" style="color:var(--color-danger)">✕</button>
   </div>
-  <p style="margin:4px 0 0;font-size:.85rem">${this.escapeHtml(log.text || '')}</p>
+  <p class="mt-1 text-sm">${this.escapeHtml(log.text || '')}</p>
   <p class="hint" style="margin:2px 0 0;font-size:.7rem">${log.byName || ''}</p>
 </div>`
   }
@@ -134,7 +142,7 @@ export class JournalLogModal {
     if (!listEl) return
     listEl.innerHTML = logs.length
       ? logs.map(log => this.renderLogEntry(log)).join('')
-      : '<p class="hint" style="text-align:center;padding:12px">Chưa có nhật ký.</p>'
+      : '<p class="hint text-center p-3">Chưa có nhật ký.</p>'
 
     listEl.querySelectorAll('.journal-del-btn').forEach(btn => {
       btn.addEventListener('click', (e: Event) => {

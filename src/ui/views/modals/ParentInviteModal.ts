@@ -7,6 +7,7 @@ import { AuthManager } from '../../../core/auth/AuthManager'
 import { NotificationManager } from '../../../services/NotificationManager'
 import { displayName } from '../../../config/constants.ts'
 import { parentReportUrl } from '../../../features/parentReport.ts'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 export class ParentInviteModal {
   private stateManager: StateManager
@@ -14,6 +15,7 @@ export class ParentInviteModal {
   private notification: NotificationManager
   private element: HTMLElement | null = null
   private classId: string | null = null
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(
     stateManager: StateManager,
@@ -34,9 +36,12 @@ export class ParentInviteModal {
     this.ensureModal()
     this.renderStudents()
     this.element?.classList.remove('hidden')
+    if (this.element) this._focusTrap = createFocusTrap(this.element)
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     this.element?.classList.add('hidden')
   }
 
@@ -49,7 +54,7 @@ export class ParentInviteModal {
       modal.setAttribute('role', 'dialog')
       modal.setAttribute('aria-modal', 'true')
       modal.innerHTML = `
-        <div class="modal-panel" style="max-width:520px">
+        <div class="modal-panel max-w-md">
           <div class="modal-head">
             <div>
               <h3>Phiếu điểm phụ huynh</h3>
@@ -59,9 +64,9 @@ export class ParentInviteModal {
           </div>
           <div class="modal-body">
             <label class="field-label" for="parentExpireDays">Hết hạn sau (ngày)</label>
-            <input type="number" id="parentExpireDays" class="input" value="30" min="1" max="365" style="width:100px;margin-bottom:12px" />
+            <input type="number" id="parentExpireDays" class="input mb-3" value="30" min="1" max="365" style="width:100px" />
             <div id="parentInviteList"></div>
-            <div id="parentInviteResult" class="hidden" style="margin-top:12px;padding:10px;border:1px solid var(--color-border,#ddd);border-radius:8px"></div>
+            <div id="parentInviteResult" class="hidden mt-3 border rounded-lg" style="padding:10px"></div>
           </div>
           <div class="modal-foot">
             <button type="button" class="btn btn-primary" id="parentInviteDone">Đóng</button>
@@ -85,10 +90,10 @@ export class ParentInviteModal {
     if (!cls) return
 
     list.innerHTML = cls.students.map(s => `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--color-border,#eee)">
+      <div class="d-flex items-center justify-between gap-2 px-0 py-2 border-b">
         <div>
           <strong>${escapeHtml(displayName(s))}</strong>
-          <div class="hint" style="font-size:0.75rem">${this.activeTokenHint(cls.id, s.id)}</div>
+          <div class="hint text-xs">${this.activeTokenHint(cls.id, s.id)}</div>
         </div>
         <button type="button" class="btn btn-secondary btn-sm" data-invite-student="${s.id}">Tạo link</button>
       </div>
@@ -128,8 +133,8 @@ export class ParentInviteModal {
     if (result) {
       result.classList.remove('hidden')
       result.innerHTML = `
-        <p style="margin:0 0 8px;font-size:0.85rem">Link chỉ xem (hết hạn ${new Date(token.expiresAt).toLocaleString('vi-VN')}):</p>
-        <input type="text" class="input" id="parentInviteUrl" readonly value="${escapeAttr(url)}" style="width:100%;margin-bottom:8px" />
+        <p class="m-0 mb-2" style="font-size:0.85rem">Link chỉ xem (hết hạn ${new Date(token.expiresAt).toLocaleString('vi-VN')}):</p>
+        <input type="text" class="input w-full mb-2" id="parentInviteUrl" readonly value="${escapeAttr(url)}" />
         <button type="button" class="btn btn-secondary btn-sm" id="parentCopyUrl">Sao chép</button>
       `
       result.querySelector('#parentCopyUrl')?.addEventListener('click', async () => {

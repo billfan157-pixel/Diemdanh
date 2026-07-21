@@ -21,8 +21,8 @@ export class ParentReportView {
 
     if (!result.ok || !result.classData || !result.student || !result.token) {
       root.innerHTML = `
-        <div style="max-width:420px;margin:48px auto;padding:24px;font-family:system-ui,sans-serif;text-align:center">
-          <h1 style="font-size:1.25rem">Không xem được phiếu điểm</h1>
+        <div class="max-w-sm mx-auto mt-12 p-6 text-center" style="font-family:system-ui,sans-serif">
+          <h1 class="text-xl">Không xem được phiếu điểm</h1>
           <p style="color:#666">${escapeHtml(result.error || 'Link không hợp lệ')}</p>
         </div>
       `
@@ -30,6 +30,12 @@ export class ParentReportView {
     }
 
     root.innerHTML = buildParentReportCardHtml(result.classData, result.student, result.token)
+    
+    // Bind print button click
+    root.querySelector('#btnParentPrint')?.addEventListener('click', () => {
+      window.print()
+    })
+
     return root
   }
 }

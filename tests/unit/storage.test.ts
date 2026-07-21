@@ -147,4 +147,66 @@ describe('StorageAdapter State Migration', () => {
     expect(student.scoresByTerm.hk1).toBeDefined()
     expect(student.scoresByTerm.hk2).toBeDefined()
   })
+
+  it('should split and migrate state from version 4 to 5', async () => {
+    storage = new StorageAdapter()
+    const mockDb = {
+      get: vi.fn().mockResolvedValue({
+        activeClassId: 'cls1',
+        yearFilter: '2024-2025',
+        archivedYears: ['2023-2024'],
+        viewMode: 'table',
+        activeTerm: 'hk2',
+        theme: 'dark',
+        parentTokens: [],
+        lastModified: 1000,
+        classes: [{
+          id: 'cls1',
+          name: 'Lớp 1A',
+          year: '2024-2025',
+          columns: [],
+          weights: {},
+          createdAt: 200,
+          updatedAt: 300,
+          students: [{
+            id: 'st1',
+            tenThanh: 'Giuse',
+            hoDem: 'Nguyễn',
+            ten: 'An',
+            createdAt: 210,
+            updatedAt: 310
+          }]
+        }]
+      }),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined)
+    } as any
+
+    await (storage as any).migrateToSplitSchema(mockDb)
+
+    expect(mockDb.put).toHaveBeenCalledWith('appMeta', 'cls1', 'activeClassId')
+    expect(mockDb.put).toHaveBeenCalledWith('appMeta', '2024-2025', 'yearFilter')
+    expect(mockDb.put).toHaveBeenCalledWith('appMeta', 'dark', 'theme')
+
+    expect(mockDb.put).toHaveBeenCalledWith('classes', {
+      id: 'cls1',
+      name: 'Lớp 1A',
+      year: '2024-2025',
+      columns: [],
+      weights: {},
+      createdAt: 200,
+      updatedAt: 300
+    })
+    expect(mockDb.put).toHaveBeenCalledWith('students', {
+      id: 'st1',
+      tenThanh: 'Giuse',
+      hoDem: 'Nguyễn',
+      ten: 'An',
+      createdAt: 210,
+      updatedAt: 310,
+      classId: 'cls1'
+    })
+
+    expect(mockDb.delete).toHaveBeenCalledWith('appState', 'main')
+  })
 })

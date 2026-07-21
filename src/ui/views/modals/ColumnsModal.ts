@@ -6,6 +6,8 @@ import { StateManager } from '../../StateManager'
 import { NotificationManager } from '../../../services/NotificationManager'
 import { ScoreColumnDef } from '../../../services/storage/StorageAdapter.types'
 import { resolveClassColumns } from '../../../config/columns.ts'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
+import { loadColumnPresets, saveColumnPreset, deleteColumnPreset } from '../../../features/columnPresets.ts'
 
 export class ColumnsModal {
   private stateManager: StateManager
@@ -14,6 +16,7 @@ export class ColumnsModal {
   private classId: string | null = null
   private draft: ScoreColumnDef[] = []
   private onSaved: (() => void) | null = null
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(stateManager: StateManager, notification: NotificationManager) {
     this.stateManager = stateManager
@@ -39,10 +42,14 @@ export class ColumnsModal {
     }))
     this.ensureModal()
     this.renderBody()
+    this.populatePresetSelect('#columnsPresetSelect')
     this.element?.classList.remove('hidden')
+    if (this.element) this._focusTrap = createFocusTrap(this.element)
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     this.element?.classList.add('hidden')
   }
 
@@ -55,7 +62,7 @@ export class ColumnsModal {
       modal.setAttribute('role', 'dialog')
       modal.setAttribute('aria-modal', 'true')
       modal.innerHTML = `
-        <div class="modal-panel" style="max-width:520px">
+        <div class="modal-panel max-w-md">
           <div class="modal-head">
             <div>
               <h3>Cột điểm &amp; hệ số</h3>
@@ -64,17 +71,24 @@ export class ColumnsModal {
             <button type="button" class="icon-btn modal-close" id="columnsModalClose" aria-label="Đóng">×</button>
           </div>
           <div class="modal-body">
+            <div class="d-flex gap-2 mb-3 flex-wrap items-center">
+              <label class="field-label mb-0" for="columnsPresetSelect" style="font-size:0.8rem">Bộ mẫu:</label>
+              <select id="columnsPresetSelect" class="input" style="width:auto;flex:1;min-width:120px"></select>
+              <button type="button" class="btn btn-ghost btn-sm" id="columnsApplyPresetBtn">Áp dụng</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="columnsSavePresetBtn">💾 Lưu mẫu</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="columnsDelPresetBtn">🗑️ Xóa mẫu</button>
+            </div>
             <div id="columnsModalList"></div>
-            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-              <input type="text" id="columnsNewLabel" class="input" placeholder="Tên cột mới" style="flex:1;min-width:140px" />
+            <div class="d-flex gap-2 mt-3 flex-wrap">
+              <input type="text" id="columnsNewLabel" class="input flex-1" placeholder="Tên cột mới" style="min-width:140px" />
               <input type="text" id="columnsNewShort" class="input" placeholder="Viết tắt" maxlength="4" style="width:72px" />
               <button type="button" class="btn btn-secondary" id="columnsAddBtn">＋ Thêm cột</button>
             </div>
-            <p class="hint" style="margin-top:10px;font-size:0.8rem">
+            <p class="hint mt-3" style="font-size:0.8rem">
               Cột trống không tính vào TB. Xóa cột sẽ mất điểm của cột đó trên lớp này.
             </p>
           </div>
-          <div class="modal-foot" style="display:flex;gap:8px;justify-content:flex-end">
+          <div class="modal-foot d-flex gap-2 justify-end">
             <button type="button" class="btn btn-ghost" id="columnsResetBtn">Khôi phục mặc định</button>
             <button type="button" class="btn btn-primary" id="columnsSaveBtn">Lưu</button>
           </div>
@@ -94,6 +108,9 @@ export class ColumnsModal {
         })
       })
       modal.querySelector('#columnsSaveBtn')?.addEventListener('click', () => this.save())
+      modal.querySelector('#columnsApplyPresetBtn')?.addEventListener('click', () => this.applyPreset())
+      modal.querySelector('#columnsSavePresetBtn')?.addEventListener('click', () => this.saveAsPreset())
+      modal.querySelector('#columnsDelPresetBtn')?.addEventListener('click', () => this.deletePreset())
     }
     this.element = modal
   }
@@ -103,11 +120,11 @@ export class ColumnsModal {
     if (!list) return
 
     list.innerHTML = this.draft.map((c, i) => `
-      <div class="io-box" data-col-idx="${i}" style="margin-bottom:8px;border:1px solid var(--color-border, #ddd);padding:10px;border-radius:8px;display:grid;grid-template-columns:1fr 72px 72px auto;gap:8px;align-items:center">
+      <div class="io-box mb-2 border p-3 rounded-sm grid gap-2 items-center" data-col-idx="${i}" style="grid-template-columns:1fr 72px 72px auto">
         <input type="text" class="input col-label" value="${escapeAttr(c.label)}" aria-label="Tên cột" />
         <input type="text" class="input col-short" value="${escapeAttr(c.short)}" maxlength="4" aria-label="Viết tắt" />
         <input type="number" class="input col-weight" value="${c.defaultWeight}" min="0.1" step="0.1" aria-label="Hệ số" />
-        <button type="button" class="icon-btn danger col-remove" title="Xóa cột" ${this.draft.length <= 1 ? 'disabled' : ''}>🗑️</button>
+        <button type="button" class="icon-btn danger col-remove" title="Xóa cột" aria-label="Xóa cột" ${this.draft.length <= 1 ? 'disabled' : ''}>🗑️</button>
       </div>
     `).join('')
 
@@ -155,18 +172,7 @@ export class ColumnsModal {
 
   private save(): void {
     if (!this.classId) return
-    // Sync latest input values
-    this.element?.querySelectorAll('[data-col-idx]').forEach(row => {
-      const idx = Number((row as HTMLElement).dataset.colIdx)
-      const labelEl = row.querySelector('.col-label') as HTMLInputElement
-      const shortEl = row.querySelector('.col-short') as HTMLInputElement
-      const weightEl = row.querySelector('.col-weight') as HTMLInputElement
-      if (!this.draft[idx]) return
-      this.draft[idx].label = labelEl.value.trim() || this.draft[idx].label
-      this.draft[idx].short = (shortEl.value.trim() || this.draft[idx].short).slice(0, 4)
-      const n = parseFloat(weightEl.value)
-      this.draft[idx].defaultWeight = !isNaN(n) && n > 0 ? n : 1
-    })
+    this.syncDraftFromDOM()
 
     const cols = this.draft.map(c => ({
       key: c.key,
@@ -185,6 +191,67 @@ export class ColumnsModal {
     this.notification.show('Đã lưu cấu hình cột điểm', 'success')
     this.close()
     this.onSaved?.()
+  }
+
+  private syncDraftFromDOM(): void {
+    this.element?.querySelectorAll('[data-col-idx]').forEach(row => {
+      const idx = Number((row as HTMLElement).dataset.colIdx)
+      const labelEl = row.querySelector('.col-label') as HTMLInputElement
+      const shortEl = row.querySelector('.col-short') as HTMLInputElement
+      const weightEl = row.querySelector('.col-weight') as HTMLInputElement
+      if (!this.draft[idx]) return
+      this.draft[idx].label = labelEl.value.trim() || this.draft[idx].label
+      this.draft[idx].short = (shortEl.value.trim() || this.draft[idx].short).slice(0, 4)
+      const n = parseFloat(weightEl.value)
+      this.draft[idx].defaultWeight = !isNaN(n) && n > 0 ? n : 1
+    })
+  }
+
+  private populatePresetSelect(selectId: string, selectedPreset?: string): void {
+    const select = this.element?.querySelector(selectId) as HTMLSelectElement
+    if (!select) return
+    const presets = loadColumnPresets()
+    select.innerHTML = presets.map(p => `
+      <option value="${escapeAttr(p.name)}" ${p.name === selectedPreset ? 'selected' : ''}>${escapeAttr(p.name)}</option>
+    `).join('')
+  }
+
+  private applyPreset(): void {
+    const select = this.element?.querySelector('#columnsPresetSelect') as HTMLSelectElement
+    if (!select || !select.value) return
+    const presets = loadColumnPresets()
+    const preset = presets.find(p => p.name === select.value)
+    if (!preset) {
+      this.notification.show('Không tìm thấy bộ mẫu', 'error')
+      return
+    }
+    this.draft = preset.columns.map(c => ({ ...c }))
+    this.renderBody()
+    this.notification.show(`Đã áp dụng bộ mẫu "${preset.name}"`, 'success')
+  }
+
+  private saveAsPreset(): void {
+    this.syncDraftFromDOM()
+    const name = prompt('Đặt tên cho bộ mẫu cột điểm này:')
+    if (!name || !name.trim()) return
+    saveColumnPreset(name.trim(), this.draft)
+    this.populatePresetSelect('#columnsPresetSelect', name.trim())
+    this.notification.show(`Đã lưu bộ mẫu "${name.trim()}"`, 'success')
+  }
+
+  private deletePreset(): void {
+    const select = this.element?.querySelector('#columnsPresetSelect') as HTMLSelectElement
+    if (!select || !select.value) return
+    const name = select.value
+    const builtinPresets = loadColumnPresets().filter(p => ['Mặc định (Giáo lý)', 'Cổ điển (ĐG/15\'/1T/Thi)', 'Tối giản (3 cột)'].includes(p.name))
+    if (builtinPresets.some(p => p.name === name)) {
+      this.notification.show('Không thể xóa bộ mẫu mặc định', 'warning')
+      return
+    }
+    if (!confirm(`Xóa bộ mẫu "${name}"?`)) return
+    deleteColumnPreset(name)
+    this.populatePresetSelect('#columnsPresetSelect')
+    this.notification.show(`Đã xóa bộ mẫu "${name}"`, 'success')
   }
 }
 

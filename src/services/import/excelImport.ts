@@ -460,7 +460,14 @@ export function applyImportedRows(
     }
   }
 
-  const result: StudentData[] = [...cls.students]
+  // Deep clone each student to avoid mutating state objects outside Immer
+  const result: StudentData[] = cls.students.map(s => ({
+    ...s,
+    scoresByTerm: {
+      hk1: { ...(s.scoresByTerm?.hk1 || {}) } as any,
+      hk2: { ...(s.scoresByTerm?.hk2 || {}) } as any
+    }
+  }))
 
   for (const row of rows) {
     const nameKey = [row.tenThanh, row.hoDem, row.ten].filter(Boolean).join('|').toLowerCase()

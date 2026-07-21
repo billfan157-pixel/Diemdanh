@@ -192,7 +192,7 @@ export class StateManager {
    * Sync engine should use this instead of intercepting private `mutate()`.
    */
   applyFromNetwork(label: string, mutator: (draft: AppState) => void): void {
-    this.mutate(label, mutator, { fromNetwork: true })
+    this.mutate(label, mutator, { fromNetwork: true, skipUndo: true })
   }
 
   /**
@@ -217,7 +217,8 @@ export class StateManager {
       weights: weightsFromColumns(cols, { ...DEFAULT_WEIGHTS, ...weights }),
       students: [],
       createdAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      rev: 1
     }
 
     this.mutate(`Tạo lớp "${name}"`, (draft) => {
@@ -226,6 +227,46 @@ export class StateManager {
     })
 
     return id
+  }
+
+  createClassesWithStudents(classesToCreate: Array<{
+    name: string;
+    year: string;
+    students: Array<Omit<StudentData, 'id' | 'createdAt' | 'updatedAt' | 'scoresByTerm' | 'learningLog'>>;
+  }>): void {
+    this.mutate('Tạo lớp và nhập học viên hàng loạt', (draft) => {
+      for (const item of classesToCreate) {
+        const classId = generateId('cls')
+        const cols = cloneDefaultCols()
+        const newClass: ClassData = {
+          id: classId,
+          name: item.name.trim(),
+          year: item.year.trim(),
+          columns: cols,
+          weights: weightsFromColumns(cols, { ...DEFAULT_WEIGHTS }),
+          students: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          rev: 1
+        }
+
+        for (const st of item.students) {
+          const studentId = generateId('st')
+          newClass.students.push({
+            ...st,
+            id: studentId,
+            scoresByTerm: createEmptyScoresByTerm(cols),
+            learningLog: [],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            rev: 1
+          })
+        }
+
+        draft.classes.push(newClass)
+        if (!draft.activeClassId) draft.activeClassId = newClass.id
+      }
+    })
   }
 
   setClassStudents(classId: string, students: StudentData[]): boolean {
@@ -385,6 +426,24 @@ export class StateManager {
       draft.classes[classIdx].updatedAt = Date.now()
     })
     return true
+  }
+
+  reorderStudent(classId: string, studentId: string, targetStudentId: string): void {
+    const cls = this.getClass(classId)
+    if (!cls) return
+    const students = cls.students
+    const fromIdx = students.findIndex(s => s.id === studentId)
+    const toIdx = students.findIndex(s => s.id === targetStudentId)
+    if (fromIdx === -1 || toIdx === -1) return
+
+    this.mutate('Sắp xếp lại học viên', (draft) => {
+      const clsIdx = draft.classes.findIndex((c: any) => c.id === classId)
+      if (clsIdx === -1) return
+      const sts = draft.classes[clsIdx].students
+      const [moved] = sts.splice(fromIdx, 1)
+      sts.splice(toIdx, 0, moved)
+      draft.classes[clsIdx].updatedAt = Date.now()
+    })
   }
 
   transferStudent(studentId: string, fromClassId: string, toClassId: string): boolean {
@@ -778,38 +837,44 @@ export class StateManager {
     if (!this.canUndo()) return false
 
     this.isApplyingUndoRedo = true
-    const entry = this.undoStack.pop()!
+    try {
+      const entry = this.undoStack.pop()!
 
-    // Apply inverse patches
-    this.state = produce(this.state, (draft) => {
-      for (const patch of entry.inversePatches) {
-        applyPatch(draft, patch)
-      }
-    })
+      // Apply inverse patches
+      this.state = produce(this.state, (draft) => {
+        for (const patch of entry.inversePatches) {
+          applyPatch(draft, patch)
+        }
+      })
 
-    this.redoStack.push(entry)
-    this.notify()
-    this.isApplyingUndoRedo = false
-    return true
+      this.redoStack.push(entry)
+      this.notify()
+      return true
+    } finally {
+      this.isApplyingUndoRedo = false
+    }
   }
 
   redo(): boolean {
     if (!this.canRedo()) return false
 
     this.isApplyingUndoRedo = true
-    const entry = this.redoStack.pop()!
+    try {
+      const entry = this.redoStack.pop()!
 
-    // Apply original patches
-    this.state = produce(this.state, (draft) => {
-      for (const patch of entry.patches) {
-        applyPatch(draft, patch)
-      }
-    })
+      // Apply original patches
+      this.state = produce(this.state, (draft) => {
+        for (const patch of entry.patches) {
+          applyPatch(draft, patch)
+        }
+      })
 
-    this.undoStack.push(entry)
-    this.notify()
-    this.isApplyingUndoRedo = false
-    return true
+      this.undoStack.push(entry)
+      this.notify()
+      return true
+    } finally {
+      this.isApplyingUndoRedo = false
+    }
   }
 
   clearUndoRedo(): void {

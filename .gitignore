@@ -12,3 +12,6 @@ dist/
 .idea/
 coverage/
 *.tsbuildinfo
+.history/
+backup-*/
+playwright-report/data/

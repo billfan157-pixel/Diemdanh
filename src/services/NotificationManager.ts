@@ -22,10 +22,14 @@ export interface ConfirmOptions {
   cancelText?: string
 }
 
+import { createFocusTrap } from '../utils/focusTrap.ts'
+
 export class NotificationManager {
   private container: HTMLElement | null = null
   private maxToasts = 4
   private dialogResolve: ((value: boolean) => void) | null = null
+  private _dialogFocusTrap: ReturnType<typeof createFocusTrap> | null = null
+  private _dialogKeyHandler: ((e: KeyboardEvent) => void) | null = null
 
   constructor() {}
 
@@ -48,12 +52,13 @@ export class NotificationManager {
       dialog.className = 'modal-overlay dialog-overlay hidden'
       dialog.setAttribute('role', 'dialog')
       dialog.setAttribute('aria-modal', 'true')
+      dialog.setAttribute('aria-labelledby', 'dlgTitle')
       dialog.innerHTML = `
         <div class="dialog-panel">
           <div class="dialog-icon-wrap" id="appDialogIconWrap">
             <span class="dialog-icon" id="appDialogIcon"></span>
           </div>
-          <h3 class="dialog-title" id="appDialogTitle">Xác nhận</h3>
+          <h3 class="dialog-title" id="dlgTitle">Xác nhận</h3>
           <p class="dialog-message" id="appDialogMessage"></p>
           <div class="dialog-actions">
             <button type="button" class="btn btn-ghost" id="appDialogCancel">Hủy</button>
@@ -68,6 +73,12 @@ export class NotificationManager {
       const overlay = document.getElementById('appDialog')!
 
       const closeDialog = (result: boolean) => {
+        if (this._dialogKeyHandler) {
+          document.removeEventListener('keydown', this._dialogKeyHandler)
+          this._dialogKeyHandler = null
+        }
+        this._dialogFocusTrap?.destroy()
+        this._dialogFocusTrap = null
         overlay.classList.add('hidden')
         document.body.style.overflow = ''
         if (this.dialogResolve) {
@@ -82,12 +93,20 @@ export class NotificationManager {
         if (e.target === overlay) closeDialog(false)
       })
 
-      document.addEventListener('keydown', (e) => {
-        if (!overlay.classList.contains('hidden')) {
-          if (e.key === 'Escape') closeDialog(false)
-          if (e.key === 'Enter') closeDialog(true)
+      if (!this._dialogKeyHandler) {
+        this._dialogKeyHandler = (e: KeyboardEvent) => {
+          if (!overlay.classList.contains('hidden')) {
+            if (e.key === 'Escape') closeDialog(false)
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              if (document.activeElement !== cancelBtn) {
+                closeDialog(true)
+              }
+            }
+          }
         }
-      })
+        document.addEventListener('keydown', this._dialogKeyHandler)
+      }
     }
   }
 
@@ -122,9 +141,9 @@ export class NotificationManager {
   private createToast(message: string, type: 'info' | 'success' | 'warning' | 'error', options?: Partial<ToastOptions>): HTMLElement {
     const meta = {
       info: { icon: 'ℹ️', class: 'toast-info', label: 'Thông báo' },
-      success: { icon: '✅', class: 'toast-success', label: 'Thành công' },
-      warning: { icon: '⚠️', class: 'toast-warning', label: 'Cảnh báo' },
-      error: { icon: '❌', class: 'toast-error', label: 'Lỗi' }
+      success: { icon: '✅', class: 'toast-ok', label: 'Thành công' },
+      warning: { icon: '⚠️', class: 'toast-warn', label: 'Cảnh báo' },
+      error: { icon: '❌', class: 'toast-err', label: 'Lỗi' }
     }[type]
 
     const toast = document.createElement('div')
@@ -134,7 +153,7 @@ export class NotificationManager {
       <div class="toast-icon" aria-hidden="true">${meta.icon}</div>
       <div class="toast-body">
         ${options?.title || meta.label ? `<div class="toast-title">${this.escapeHtml(options?.title || meta.label)}</div>` : ''}
-        <div class="toast-message">${this.escapeHtml(message)}</div>
+        <div class="toast-msg">${this.escapeHtml(message)}</div>
       </div>
       <button type="button" class="toast-close" aria-label="Đóng">×</button>
       <div class="toast-progress"></div>
@@ -176,7 +195,7 @@ export class NotificationManager {
       const overlay = document.getElementById('appDialog')!
       const iconWrap = document.getElementById('appDialogIconWrap')!
       const icon = document.getElementById('appDialogIcon')!
-      const title = document.getElementById('appDialogTitle')!
+      const title = document.getElementById('dlgTitle')!
       const messageEl = document.getElementById('appDialogMessage')!
       const okBtn = document.getElementById('appDialogOk')!
       const cancelBtn = document.getElementById('appDialogCancel')!
@@ -204,6 +223,7 @@ export class NotificationManager {
 
       overlay.classList.remove('hidden')
       document.body.style.overflow = 'hidden'
+      this._dialogFocusTrap = createFocusTrap(overlay)
 
       setTimeout(() => okBtn.focus(), 30)
     })

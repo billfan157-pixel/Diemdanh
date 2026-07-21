@@ -1,10 +1,12 @@
 import { StateManager } from '../../StateManager'
 import { resolveClassColumns } from '../../../config/columns.ts'
 import { displayName, termLabel, studentMissingCols } from '../../../core/legacyCompat.ts'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 export class MissingScoresModal {
   private stateManager: StateManager
   private overlay: HTMLElement | null = null
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(stateManager: StateManager, _notificationManager: any) {
     this.stateManager = stateManager
@@ -15,6 +17,8 @@ export class MissingScoresModal {
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     if (this.overlay) {
       this.overlay.remove()
       this.overlay = null
@@ -37,33 +41,37 @@ export class MissingScoresModal {
 
     this.overlay = document.createElement('div')
     this.overlay.className = 'modal-overlay'
+    this.overlay.setAttribute('role', 'dialog')
+    this.overlay.setAttribute('aria-modal', 'true')
+    this.overlay.setAttribute('aria-labelledby', 'missingScoresTitle')
     this.overlay.innerHTML = `
-<div class="modal-panel" style="max-width:600px;max-height:80vh;overflow-y:auto">
-  <h2>📋 Học viên thiếu điểm <button class="modal-close" id="missingModalClose">×</button></h2>
-  <p class="hint" style="margin-bottom:12px">Học kỳ: ${termLabel(term)}</p>
+<div class="modal-panel overflow-y-auto" style="max-width:600px;max-height:80vh">
+  <h2 id="missingScoresTitle">📋 Học viên thiếu điểm <button class="modal-close" id="missingModalClose" aria-label="Đóng">×</button></h2>
+  <p class="hint mb-3">Học kỳ: ${termLabel(term)}</p>
   ${classStats.length ? classStats.map(cs => `
-    <div style="margin-bottom:16px">
+    <div class="mb-4">
       <h3 style="font-size:.95rem;margin-bottom:6px">${cs.cls.name} (${cs.hasMissing.length}/${cs.students.length})</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+      <table class="w-full" style="border-collapse:collapse;font-size:.85rem">
         <thead>
           <tr>
-            <th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--color-border)">Học viên</th>
-            <th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--color-border)">Thiếu</th>
+            <th scope="col" class="text-left border-b" style="padding:4px 6px">Học viên</th>
+            <th scope="col" class="text-left border-b" style="padding:4px 6px">Thiếu</th>
           </tr>
         </thead>
         <tbody>
           ${cs.hasMissing.map(({ student, missing }) => `
             <tr>
-              <td style="padding:4px 6px;border-bottom:1px solid var(--color-border-subtle)">${displayName(student)}</td>
-              <td style="padding:4px 6px;border-bottom:1px solid var(--color-border-subtle);color:var(--color-danger)">${missing.map((c: any) => c.label).join(', ')}</td>
+              <td class="border-b" style="padding:4px 6px">${displayName(student)}</td>
+              <td class="border-b" style="padding:4px 6px;color:var(--color-danger)">${missing.map((c: any) => c.label).join(', ')}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
     </div>
-  `).join('') : '<p class="hint" style="text-align:center;padding:20px">Tất cả học viên đã đủ điểm.</p>'}
+  `).join('') : '<p class="hint text-center p-5">Tất cả học viên đã đủ điểm.</p>'}
 </div>`
     document.body.appendChild(this.overlay)
+    this._focusTrap = createFocusTrap(this.overlay)
 
     this.overlay.querySelector('#missingModalClose')?.addEventListener('click', () => this.close())
     this.overlay.addEventListener('click', (e: Event) => {

@@ -38,7 +38,8 @@ export function renderStudents(
   term: ActiveTerm,
   viewMode: ViewMode,
   searchQuery?: string,
-  filter?: StudentFilter
+  filter?: StudentFilter,
+  selectedSet?: Set<string>
 ): string {
   let students = filterStudents(cls.students, searchQuery)
   students = applyFilters(students, cls, term, filter)
@@ -57,7 +58,7 @@ export function renderStudents(
   switch (viewMode) {
     case 'year': {
       if (term !== 'year') {
-        return renderCardsView({ students, cols, weights: cls.weights, term: actualTerm })
+        return renderCardsView({ students, cols, weights: cls.weights, term: actualTerm }, selectedSet)
       }
       return renderYearView(cls, students, cols)
     }
@@ -65,16 +66,16 @@ export function renderStudents(
       if (term !== 'year') {
         return renderStatsView(cls, students, cols, cls.weights, actualTerm)
       }
-      return renderYearView(cls, students, cols) + '<div style="margin-top:14px">' + renderStatsView(cls, students, cols, cls.weights, actualTerm) + '</div>'
+      return renderYearView(cls, students, cols) + '<div class="mt-4">' + renderStatsView(cls, students, cols, cls.weights, actualTerm) + '</div>'
     }
     case 'cards':
-      return renderCardsView({ students, cols, weights: cls.weights, term: actualTerm })
+      return renderCardsView({ students, cols, weights: cls.weights, term: actualTerm }, selectedSet)
     case 'table':
-      return renderTableView(cls, students, actualTerm)
+      return renderTableView(cls, students, actualTerm, selectedSet)
     case 'rank':
       return renderRankView(cls, students, cls.weights, actualTerm, cols)
     default:
-      return renderCardsView({ students, cols, weights: cls.weights, term: actualTerm })
+      return renderCardsView({ students, cols, weights: cls.weights, term: actualTerm }, selectedSet)
   }
 }
 
@@ -89,34 +90,49 @@ function filterStudents(all: StudentData[], query?: string): StudentData[] {
 }
 
 function emptyState(icon: string, title: string, hint: string): string {
-  return `<div class="dash-empty" style="text-align:center;padding:40px 16px">
+  return `<div class="dash-empty text-center pt-10 pb-10 px-4">
     <div class="empty-icon">${icon}</div>
     <strong>${title}</strong>
-    <p class="hint" style="margin-top:8px;line-height:1.4">${hint}</p>
+    <p class="hint mt-2" style="line-height:1.4">${hint}</p>
   </div>`
 }
 
-export function renderTableView(cls: ClassData, students: StudentData[], term: 'hk1' | 'hk2' = 'hk1'): string {
+export function renderSingleStudentRow(
+  st: StudentData,
+  i: number,
+  cols: ScoreColumnDef[],
+  weights: Record<string, number>,
+  term: 'hk1' | 'hk2',
+  selected: boolean
+): string {
+  const delay = Math.min(i * 30, 300)
+  const headerCells = `<td class="sel-col col-hide-xs"><input type="checkbox" class="student-select" data-select-student="${st.id}" title="Chọn học viên" aria-label="Chọn học viên" ${selected ? 'checked' : ''} /></td><td>${i + 1}</td><td class="name-col col-hide-xs">${escapeHtml(st.hoDem)}</td><td class="name-col">${escapeHtml(st.ten || st.name)}</td>`
+  const scoreCells = cols.map((c, ci) => {
+    const priorityClass = ci >= 4 ? 'col-hide-sm' : ci >= 2 ? 'col-hide-xs' : ''
+    const scores = st.scoresByTerm?.[term]?.[c.key] || []
+    return `<td class="${priorityClass}"><input class="cell-score" type="number" min="0" max="10" step="0.25" inputmode="decimal" enterkeyhint="next" autocomplete="off" value="${scores.length ? scores[scores.length - 1] : ''}" data-table-score data-sid="${st.id}" data-col="${c.key}" aria-label="${escapeHtml(c.label)}" /></td>`
+  }).join('')
+  const tb = studentTB(st, weights, term, cols)
+  return `<tr data-id="${st.id}" draggable="true" class="${st.starred ? 'is-starred' : ''} stagger-enter" style="animation-delay:${delay}ms">${headerCells}${scoreCells}<td class="tb-cell">${fmt(tb)}</td><td class="name-col col-hide-xs">${escapeHtml(st.ghiChu)}</td></tr>`
+}
+
+export function renderTableView(cls: ClassData, students: StudentData[], term: 'hk1' | 'hk2' = 'hk1', selectedSet?: Set<string>): string {
   const cols = resolveClassColumns(cls)
-  const headerCols = cols.map(c =>
-    `<th title="${c.label}×${cls.weights[c.key] || 1}">${c.short}<br><span>×${cls.weights[c.key] || 1}</span></th>`
-  ).join('')
+  const headerCols = cols.map((c, ci) => {
+    const priorityClass = ci >= 4 ? 'col-hide-sm' : ci >= 2 ? 'col-hide-xs' : ''
+    return `<th scope="col" class="${priorityClass}" title="${c.label}×${cls.weights[c.key] || 1}">${c.short}<br><span>×${cls.weights[c.key] || 1}</span></th>`
+  }).join('')
   const rows = students.map((st, i) => {
-    const headerCells = `<td class="sel-col"><input type="checkbox" class="student-select" data-select-student="${st.id}" title="Chọn học viên" /></td><td>${i + 1}</td><td class="name-col">${st.hoDem || ''}</td><td class="name-col">${st.ten || st.name || ''}</td>`
-    const scoreCells = cols.map(c => {
-      const scores = st.scoresByTerm?.[term]?.[c.key] || []
-      return `<td><input class="cell-score" type="number" min="0" max="10" step="0.25" value="${scores.length ? scores[scores.length - 1] : ''}" data-table-score data-sid="${st.id}" data-col="${c.key}" /></td>`
-    }).join('')
-    const tb = studentTB(st, cls.weights, term, cols)
-    return `<tr data-id="${st.id}">${headerCells}${scoreCells}<td class="tb-cell">${fmt(tb)}</td><td class="name-col">${st.ghiChu || ''}</td></tr>`
+    const isSelected = selectedSet?.has(st.id) || false
+    return renderSingleStudentRow(st, i, cols, cls.weights, term, isSelected)
   }).join('')
   return `<div class="table-wrap">
     <table class="score-table">
-      <thead><tr><th class="sel-col"><input type="checkbox" id="selectAllTable" data-select-all aria-label="Chọn tất cả" /></th><th>STT</th><th class="name-col">Họ đệm</th><th class="name-col">Tên</th>${headerCols}<th>TB</th><th>Ghi chú</th></tr></thead>
+      <thead><tr><th scope="col" class="sel-col col-hide-xs"><input type="checkbox" id="selectAllTable" data-select-all aria-label="Chọn tất cả" /></th><th scope="col">STT</th><th scope="col" class="name-col col-hide-xs">Họ đệm</th><th scope="col" class="name-col">Tên</th>${headerCols}<th scope="col">TB</th><th scope="col" class="col-hide-xs">Ghi chú</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </div>
-  <p class="hint" style="margin-top:8px">Gõ điểm vào ô — Enter hoặc Tab để sang ô kế tiếp.</p>`
+  <p class="hint mt-2">Gõ điểm vào ô — Enter hoặc Tab để sang ô kế tiếp.</p>`
 }
 
 export function renderRankView(
@@ -143,23 +159,24 @@ export function renderRankView(
     const tb = st.tb
     const cl = classify(tb)
     const rankLabel = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`
-      return `<tr>
-        <td class="rank-badge">${rankLabel}</td>
-        <td class="name-col">${[st.tenThanh, st.hoDem, st.ten].filter(Boolean).join(' ') || st.name || '—'}</td>
-        <td class="tb-cell ${cl.score}">${fmt(tb)}</td>
-        <td><span class="tag ${cl.rank.replace(/^rank-/, '')}">${cl.label}</span></td>
-        <td>${st.filled}/${cols.length}</td>
-        <td class="name-col">${st.ghiChu || ''}</td>
-      </tr>`
+    const displayName = [st.tenThanh, st.hoDem, st.ten].filter(Boolean).join(' ') || st.name || '—'
+    return `<tr>
+      <td class="rank-badge">${rankLabel}</td>
+      <td class="name-col">${escapeHtml(displayName)}</td>
+      <td class="tb-cell ${cl.score}">${fmt(tb)}</td>
+      <td><span class="tag ${cl.rank.replace(/^rank-/, '')}">${cl.label}</span></td>
+      <td>${st.filled}/${cols.length}</td>
+      <td class="name-col">${escapeHtml(st.ghiChu)}</td>
+    </tr>`
   }).join('')
 
   return `<div class="table-wrap">
     <table class="rank-table">
-      <thead><tr><th>#</th><th class="name-col">Học viên</th><th>TB</th><th>Xếp loại</th><th>Điểm đủ</th><th>Ghi chú</th></tr></thead>
+      <thead><tr><th scope="col">#</th><th scope="col" class="name-col">Học viên</th><th scope="col">TB</th><th scope="col">Xếp loại</th><th scope="col">Điểm đủ</th><th scope="col">Ghi chú</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </div>
-  <p class="hint" style="margin-top:8px">Xếp hạng theo TB — từ cao xuống thấp.</p>`
+  <p class="hint mt-2">Xếp hạng theo TB — từ cao xuống thấp.</p>`
 }
 
 // ========== Year view (combined HK1+HK2) ==========
@@ -201,15 +218,15 @@ export function renderYearView(cls: ClassData, students: StudentData[], cols: Sc
     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`
     return `<tr>
       <td class="tb-cell">${medal}</td>
-      <td class="name-col">${st.hoDem || ''}</td>
-      <td class="name-col">${st.ten || st.name || ''}</td>
+      <td class="name-col">${escapeHtml(st.hoDem)}</td>
+      <td class="name-col">${escapeHtml(st.ten || st.name)}</td>
       <td class="tb-cell ${c1?.score || 'score-none'}">${fmt(t1)}</td>
       <td>${c1 ? `<span class="tag ${c1.rank.replace(/^rank-/, '')}">${c1.label}</span>` : '—'}</td>
       <td class="tb-cell ${c2?.score || 'score-none'}">${fmt(t2)}</td>
       <td>${c2 ? `<span class="tag ${c2.rank.replace(/^rank-/, '')}">${c2.label}</span>` : '—'}</td>
-      <td class="tb-cell ${cYr?.score || 'score-none'}" style="font-weight:800">${fmt(tYr)}</td>
+      <td class="tb-cell ${cYr?.score || 'score-none'} font-extrabold">${fmt(tYr)}</td>
       <td>${cYr ? `<span class="tag ${cYr.rank.replace(/^rank-/, '')}">${cYr.label}</span>` : '—'}</td>
-      <td class="name-col">${st.ghiChu || ''}</td>
+      <td class="name-col">${escapeHtml(st.ghiChu)}</td>
     </tr>`
   }).join('')
 
@@ -232,9 +249,9 @@ export function renderYearView(cls: ClassData, students: StudentData[], cols: Sc
     <div class="table-wrap">
       <table class="score-table year-table">
         <thead><tr>
-          <th>Hạng</th><th class="name-col">Họ đệm</th><th class="name-col">Tên</th>
-          <th>TB HK1</th><th>XL HK1</th><th>TB HK2</th><th>XL HK2</th>
-          <th>TB cả năm</th><th>XL năm</th><th>Ghi chú</th>
+          <th scope="col">Hạng</th><th scope="col" class="name-col">Họ đệm</th><th scope="col" class="name-col">Tên</th>
+          <th scope="col">TB HK1</th><th scope="col">XL HK1</th><th scope="col">TB HK2</th><th scope="col">XL HK2</th>
+          <th scope="col">TB cả năm</th><th scope="col">XL năm</th><th scope="col">Ghi chú</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -281,7 +298,7 @@ export function renderStatsView(
     `<div class="bar-row">
       <div class="bl">${b.label}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${Math.round((b.n / maxCount) * 100)}%;background:${b.color}"></div></div>
-      <div class="bn" style="min-width:24px;text-align:right">${b.n}</div>
+      <div class="bn text-right" style="min-width:24px">${b.n}</div>
     </div>`
   ).join('')
 
@@ -301,10 +318,10 @@ export function renderStatsView(
     <div class="stats-panel">
       <h4>Phân bố xếp loại (theo TB)</h4>
       ${barRows}
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;margin-top:10px">
-        <div>TB lớp</div><div style="font-weight:800;font-size:1.2rem;color:var(--gold,#d97706)">${avg}</div>
-        <div>Cao nhất</div><div style="font-weight:800;font-size:1.2rem;color:var(--success,#16a34a)">${maxTb}</div>
-        <div>Thấp nhất</div><div style="font-weight:800;font-size:1.2rem;color:var(--danger,#dc2626)">${minTb}</div>
+      <div class="grid gap-2 text-center mt-3" style="grid-template-columns:1fr 1fr 1fr">
+        <div>TB lớp</div><div class="font-extrabold text-gold" style="font-size:1.2rem">${avg}</div>
+        <div>Cao nhất</div><div class="font-extrabold text-success" style="font-size:1.2rem">${maxTb}</div>
+        <div>Thấp nhất</div><div class="font-extrabold text-danger" style="font-size:1.2rem">${minTb}</div>
       </div>
     </div>
     <div class="stats-panel">
@@ -312,4 +329,13 @@ export function renderStatsView(
       ${colRows}
     </div>
   </div>`
+}
+
+function escapeHtml(s: any): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
 }

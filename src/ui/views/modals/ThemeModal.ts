@@ -4,11 +4,13 @@
 
 import { StateManager } from '../../StateManager'
 import { NotificationManager } from '../../../services/NotificationManager'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 export class ThemeModal {
   private stateManager: StateManager
   private notification: NotificationManager
   private element: HTMLElement | null = null
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(stateManager: StateManager, notification: NotificationManager) {
     this.stateManager = stateManager
@@ -19,9 +21,12 @@ export class ThemeModal {
     this.ensureModal()
     this.renderOptions()
     this.element?.classList.remove('hidden')
+    if (this.element) this._focusTrap = createFocusTrap(this.element)
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     this.element?.classList.add('hidden')
   }
 
@@ -34,7 +39,7 @@ export class ThemeModal {
       modal.setAttribute('role', 'dialog')
       modal.setAttribute('aria-modal', 'true')
       modal.innerHTML = `
-        <div class="modal-panel" style="max-width:360px">
+        <div class="modal-panel max-w-xs">
           <div class="modal-head">
             <div>
               <h3>Giao diện ứng dụng</h3>
@@ -42,8 +47,8 @@ export class ThemeModal {
             </div>
             <button type="button" class="icon-btn modal-close" id="themeModalClose" aria-label="Đóng">×</button>
           </div>
-          <div class="modal-body" style="padding:16px 20px">
-            <div style="display:flex;flex-direction:column;gap:12px" id="themeOptionsList">
+          <div class="modal-body py-4 px-5">
+            <div class="d-flex flex-col gap-3" id="themeOptionsList">
             </div>
           </div>
         </div>
@@ -71,11 +76,11 @@ export class ThemeModal {
 
     list.innerHTML = options.map(opt => `
       <button type="button" class="theme-opt-btn" data-theme-key="${opt.key}" style="display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;padding:12px 14px;border:1px solid ${opt.key === current ? 'var(--color-primary)' : 'var(--color-border)'};border-radius:8px;background:${opt.key === current ? 'var(--color-primary-soft)' : 'var(--color-bg-elevated)'};cursor:pointer;font-family:inherit;font-size:0.9rem;font-weight:600;color:var(--color-text);transition:all 150ms">
-        <div style="display:flex;align-items:center;gap:10px">
+        <div class="d-flex items-center" style="gap:10px">
           <span>${opt.icon}</span>
           <span>${opt.label}</span>
         </div>
-        ${opt.key === current ? '<span style="color:var(--color-primary);font-size:1.1rem">✓</span>' : ''}
+        ${opt.key === current ? '<span class="text-primary" style="font-size:1.1rem">✓</span>' : ''}
       </button>
     `).join('')
 

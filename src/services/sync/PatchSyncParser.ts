@@ -78,6 +78,7 @@ export function parsePatchesToOps(oldState: AppState, newState: AppState, patche
                       action: 'update', // Treat score updates as upserts
                       id: `${s.id}_${term}_${col}`,
                       data: {
+                        id: `${s.id}_${term}_${col}`,
                         student_id: s.id,
                         term,
                         col_key: col,
@@ -127,6 +128,43 @@ export function parsePatchesToOps(oldState: AppState, newState: AppState, patche
               rev: (updatedCls.rev || 1) + 1
             }
           })
+        }
+      } else if (field === 'students' && op === 'replace') {
+        // Entire students array replaced (e.g. Excel import into existing class).
+        // Diff old vs new to generate per-student score sync ops.
+        const oldClass = oldState.classes[classIdx]
+        const newClass = newState.classes[classIdx]
+        if (oldClass && newClass) {
+          for (const s of newClass.students || []) {
+            const oldStudent = oldClass.students.find(os => os.id === s.id)
+            if (oldStudent) {
+              for (const term of ['hk1', 'hk2'] as const) {
+                const newTermScores = s.scoresByTerm?.[term]
+                const oldTermScores = oldStudent.scoresByTerm?.[term]
+                if (newTermScores && oldTermScores) {
+                  for (const colKey of Object.keys(newTermScores)) {
+                    const newVals = newTermScores[colKey as keyof typeof newTermScores]
+                    const oldVals = oldTermScores[colKey as keyof typeof oldTermScores]
+                    if (Array.isArray(newVals) && newVals !== oldVals) {
+                      ops.push({
+                        table: 'scores',
+                        action: 'update',
+                        id: `${s.id}_${term}_${colKey}`,
+                        data: {
+                          id: `${s.id}_${term}_${colKey}`,
+                          student_id: s.id,
+                          term,
+                          col_key: colKey,
+                          values: newVals,
+                          rev: 1
+                        }
+                      })
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
       continue
@@ -229,6 +267,7 @@ export function parsePatchesToOps(oldState: AppState, newState: AppState, patche
             action: 'update',
             id: `${updatedStudent.id}_${term}_${colKey}`,
             data: {
+              id: `${updatedStudent.id}_${term}_${colKey}`,
               student_id: updatedStudent.id,
               term,
               col_key: colKey,

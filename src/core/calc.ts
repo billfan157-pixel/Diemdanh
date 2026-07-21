@@ -133,7 +133,7 @@ export function studentTB(
     const avg = colAvg(bag[col.key])
     if (avg === null) continue
 
-    const w = Number(weights[col.key]) || 0
+    const w = weights ? (Number(weights[col.key]) || 0) : 1
     if (w <= 0) continue
 
     sum += avg * w

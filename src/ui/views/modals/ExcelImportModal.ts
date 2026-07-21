@@ -1,8 +1,9 @@
-﻿// ============================================================
+// ============================================================
 // Sổ Điểm GL — Import Excel Modal
 // Step-by-step: pick sheet → map columns → preview → import
 // ============================================================
 
+import type { ClassData } from '../../../services/storage/StorageAdapter.types'
 import { StateManager } from '../../StateManager'
 import { NotificationManager } from '../../../services/NotificationManager'
 import {
@@ -13,6 +14,7 @@ import {
   type ExcelImportResult,
   type StudentListRow,
 } from '../../../services/import/excelImport.ts'
+import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 const STYLES = `
 <style>
@@ -56,6 +58,7 @@ export class ExcelImportModal {
   // Import state
   private sheets: Record<string, any[][]> = {}
   private currentSheet: string = ''
+  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(stateManager: StateManager, notificationManager: NotificationManager) {
     this.stateManager = stateManager
@@ -86,6 +89,8 @@ export class ExcelImportModal {
   }
 
   close(): void {
+    this._focusTrap?.destroy()
+    this._focusTrap = null
     if (this.overlay) {
       this.overlay.remove()
       this.overlay = null
@@ -98,16 +103,20 @@ export class ExcelImportModal {
 
     const overlay = document.createElement('div')
     overlay.className = 'modal-overlay'
+    overlay.setAttribute('role', 'dialog')
+    overlay.setAttribute('aria-modal', 'true')
+    overlay.setAttribute('aria-labelledby', 'excelImportTitle')
     overlay.innerHTML = STYLES + `
       <div class="modal-panel">
-        <button type="button" class="modal-close" id="modalClose">×</button>
-        <h2>📥 Import từ Excel</h2>
+        <button type="button" class="modal-close" id="modalClose" aria-label="Đóng">×</button>
+        <h2 id="excelImportTitle">📥 Import từ Excel</h2>
         <div id="modalBody"></div>
       </div>
     `
     document.body.appendChild(overlay)
     document.body.style.overflow = 'hidden'
     this.overlay = overlay
+    this._focusTrap = createFocusTrap(overlay)
 
     overlay.querySelector('#modalClose')?.addEventListener('click', () => this.close())
     overlay.addEventListener('click', (e) => {
@@ -125,12 +134,12 @@ export class ExcelImportModal {
       <div class="step">
         <p class="hint">Chọn file Excel (.xlsx, .xls) có điểm cần import. File cần có dòng header với tên cột khớp với cột điểm của lớp.</p>
         <div class="file-drop" id="fileDrop">
-          <div style="font-size:2rem;margin-bottom:8px">📄</div>
+          <div style="font-size:2rem" class="mb-2">📄</div>
           <strong>Chọn file Excel</strong>
-          <p class="hint" style="margin:4px 0 0">hoặc kéo thả file vào đây</p>
+          <p class="hint mt-1">hoặc kéo thả file vào đây</p>
           <p class="hint" id="selectedFileName"></p>
         </div>
-        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" />
+        <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden" />
       </div>
       <div class="actions" id="fileActions">
         <button class="btn btn-primary" id="btnNext">Tiếp theo →</button>
@@ -229,7 +238,7 @@ export class ExcelImportModal {
       <div class="step">
         <p class="hint">File có nhiều sheet. Chọn sheet chứa danh sách học viên.</p>
         ${sheetNames.map((name, i) => `
-          <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-bottom:6px;cursor:pointer">
+          <label class="d-flex items-center gap-2 p-2 cursor-pointer" style="border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-bottom:6px">
             <input type="radio" name="sheetSelect" value="${name}" ${i === 0 ? 'checked' : ''} />
             <span>📊 ${name}</span>
             <span class="hint">(${(this.sheets[name].length - 1) || 0} dòng)</span>
@@ -285,19 +294,19 @@ export class ExcelImportModal {
     body.innerHTML = `
       <div class="step">
         <p class="hint">File không có cột "Lớp". Sẽ tạo một lớp và đưa tất cả <strong>${result.validRows}</strong> học viên vào lớp này.</p>
-        <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+        <div class="d-flex flex-col mt-3" style="gap:10px">
           <div>
-            <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Tên lớp</label>
+            <label class="block font-semibold mb-1" style="font-size:.8rem">Tên lớp</label>
             <input type="text" id="newClassName" value="${suggestedName}" placeholder="VD: Lớp Khôi 1"
-              style="width:100%;padding:8px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:.9rem" />
+              class="w-full" style="padding:8px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:.9rem" />
           </div>
           <div>
-            <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Năm học</label>
+            <label class="block font-semibold mb-1" style="font-size:.8rem">Năm học</label>
             <input type="text" id="newClassYear" value="${suggestedYear}" placeholder="VD: 2026-2027"
-              style="width:100%;padding:8px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:.9rem" />
+              class="w-full" style="padding:8px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:.9rem" />
           </div>
         </div>
-        <div style="margin-top:8px">
+        <div class="mt-2">
           <span class="tag tag-info">${result.validRows} học viên</span>
         </div>
       </div>
@@ -315,8 +324,24 @@ export class ExcelImportModal {
       const year = yearInput.value.trim()
       if (!name) { this.notificationManager.show('Vui lòng nhập tên lớp', 'warning'); return }
       if (!year) { this.notificationManager.show('Vui lòng nhập năm học', 'warning'); return }
-      const newId = this.stateManager.createClass(name, year)
-      this.importStudentsIntoClass(newId, result.rows)
+
+      const students = result.rows.map(row => ({
+        tenThanh: row.tenThanh || '',
+        hoDem: row.hoDem || '',
+        ten: row.ten || '',
+        name: '',
+        maHV: row.maHV || '',
+        ngaySinh: '',
+        gioiTinh: '',
+        tenPhuHuynh: '',
+        sdPhuHuynh: '',
+        diaChi: '',
+        email: '',
+        ghiChu: row.ghiChu || '',
+      }))
+
+      this.stateManager.createClassesWithStudents([{ name, year, students }])
+
       this.close()
       this.notificationManager.show(`✅ Đã tạo lớp "${name}" và nhập ${result.validRows} học viên`, 'success')
       this.afterImport()
@@ -334,22 +359,22 @@ export class ExcelImportModal {
 
     body.innerHTML = `
       <div class="step">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <div class="d-flex gap-2 flex-wrap mb-2">
           <span class="tag tag-info">${classInfo.length} lớp</span>
           <span class="tag tag-ok">${result.validRows} học viên</span>
         </div>
         <p class="hint">Phát hiện cột "Lớp" trong file. Hệ thống sẽ tự động tạo các lớp tương ứng và xếp học viên vào đúng lớp.</p>
-        <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+        <div class="mt-2 d-flex flex-col" style="gap:6px">
           <div>
-            <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Năm học</label>
+            <label class="block font-semibold mb-1" style="font-size:.8rem">Năm học</label>
             <input type="text" id="multiClassYear" value="${suggestedYear}" placeholder="VD: 2026-2027"
-              style="width:100%;padding:8px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:.9rem" />
+              class="w-full" style="padding:8px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:.9rem" />
           </div>
         </div>
-        <div style="margin-top:10px;max-height:240px;overflow-y:auto;border:1px solid var(--border,#e2e8f0);border-radius:6px">
+        <div class="y-auto" style="margin-top:10px;max-height:240px;border:1px solid var(--border,#e2e8f0);border-radius:6px">
           ${classInfo.map((c, i) => `
             <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;${i < classInfo.length - 1 ? 'border-bottom:1px solid var(--border,#e2e8f0)' : ''}">
-              <span style="flex:1;font-size:.85rem;font-weight:600">📚 ${c.name}</span>
+              <span class="flex-1 font-semibold" style="font-size:.85rem">📚 ${c.name}</span>
               <span class="tag tag-info">${c.count} HV</span>
             </div>
           `).join('')}
@@ -367,36 +392,31 @@ export class ExcelImportModal {
       const year = yearInput.value.trim()
       if (!year) { this.notificationManager.show('Vui lòng nhập năm học', 'warning'); return }
 
-      let created = 0
-      for (const clsName of result.detectedClasses) {
-        const newId = this.stateManager.createClass(clsName, year)
+      const classesToCreate = result.detectedClasses.map(clsName => {
         const studentsInClass = result.rows.filter(r => r.lop === clsName)
-        this.importStudentsIntoClass(newId, studentsInClass)
-        created++
-      }
+        const students = studentsInClass.map(row => ({
+          tenThanh: row.tenThanh || '',
+          hoDem: row.hoDem || '',
+          ten: row.ten || '',
+          name: '',
+          maHV: row.maHV || '',
+          ngaySinh: '',
+          gioiTinh: '',
+          tenPhuHuynh: '',
+          sdPhuHuynh: '',
+          diaChi: '',
+          email: '',
+          ghiChu: row.ghiChu || '',
+        }))
+        return { name: clsName, year, students }
+      })
+
+      this.stateManager.createClassesWithStudents(classesToCreate)
+
       this.close()
-      this.notificationManager.show(`✅ Đã tạo ${created} lớp với ${result.validRows} học viên`, 'success')
+      this.notificationManager.show(`✅ Đã tạo ${classesToCreate.length} lớp với ${result.validRows} học viên`, 'success')
       this.afterImport()
     })
-  }
-
-  private importStudentsIntoClass(classId: string, rows: StudentListRow[]): void {
-    for (const row of rows) {
-      this.stateManager.addStudent(classId, {
-        tenThanh: row.tenThanh || '',
-        hoDem: row.hoDem || '',
-        ten: row.ten || '',
-        name: '',
-        maHV: row.maHV || '',
-        ngaySinh: '',
-        gioiTinh: '',
-        tenPhuHuynh: '',
-        sdPhuHuynh: '',
-        diaChi: '',
-        email: '',
-        ghiChu: row.ghiChu || '',
-      })
-    }
   }
 
   private afterImport(): void {
@@ -430,7 +450,7 @@ export class ExcelImportModal {
       <div class="step">
         <p class="hint">File Excel có nhiều sheet. Chọn sheet chứa điểm cần import.</p>
         ${termDetections.map((s, i) => `
-          <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-bottom:6px;cursor:pointer">
+          <label class="d-flex items-center gap-2 p-2 cursor-pointer" style="border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-bottom:6px">
             <input type="radio" name="sheetSelect" value="${s.name}" ${i === 0 ? 'checked' : ''} />
             <span>📊 ${s.name}</span>
             ${s.term ? `<span class="tag tag-info">${s.term === 'hk1' ? 'HK1' : 'HK2'}</span>` : ''}
@@ -467,15 +487,35 @@ export class ExcelImportModal {
       return
     }
 
-    // Auto-detect term from sheet name
+    // Auto-detectTerm from term from content ofeterm: 'hk1' | 'hk2' = 'hk1'
     let term: 'hk1' | 'hk2' = 'hk1'
-    const detected = detectTerm(this.currentSheet)
-    if (detected) {
-      term = detected
+    let termSource: 'sheet' | 'content' | 'default' = 'default'
+    
+    // 1. Try to detect from sheet name
+    const sheetTerm = detectTerm(this.currentSheet)
+    if (sheetTerm) {
+      term = sheetTerm
+      termSource = 'sheet'
     } else {
-      // Default to current active term
-      const state = this.stateManager.getState()
-      term = state.activeTerm === 'year' ? 'hk1' : state.activeTerm
+      // 2. Try to detect from content (first few rows)
+      const contentTerm = this.detectTermFromContent(rows)
+      if (contentTerm) {
+        term = contentTerm
+        termSource = 'content'
+      } else {
+        // 3. Default to current active term
+        const state = this.stateManager.getState()
+        term = state.activeTerm === 'year' ? 'hk1' : state.activeTerm
+        termSource = 'default'
+      }
+    }
+
+    // Check for existing scores and show warning if needed
+    if (this.hasExistingTermScores(cls, term)) {
+      this.notificationManager.show(
+        `Cảnh báo: Lớp này đã có điểm học kỳ ${term === 'hk1' ? 'HK1' : 'HK2'}. Nếu tiếp tục, điểm cũ sẽ bị ghi đè.`,
+        'warning'
+      );
     }
 
     const result = parseExcelSheet(this.currentSheet, rows, cls, term)
@@ -485,7 +525,7 @@ export class ExcelImportModal {
       return
     }
 
-    this.renderPreview(result, term)
+    this.renderPreview(result, term, termSource)
   }
 
   private renderNoMatch(result: ExcelImportResult): void {
@@ -494,11 +534,11 @@ export class ExcelImportModal {
 
     body.innerHTML = `
       <div class="step">
-        <div style="text-align:center;padding:16px">
+        <div class="text-center p-4">
           <div style="font-size:2.4rem">😕</div>
           <strong>Không khớp cột điểm</strong>
           <p class="hint">Không tìm thấy cột nào trong file Excel khớp với cột điểm của lớp.</p>
-          ${result.unmatchedCols.length ? `<p class="hint" style="margin-top:8px">Cột trong Excel: ${result.unmatchedCols.join(', ')}</p>` : ''}
+          ${result.unmatchedCols.length ? `<p class="hint mt-2">Cột trong Excel: ${result.unmatchedCols.join(', ')}</p>` : ''}
           <p class="hint">Cột điểm của lớp: ${this.getClassColumnLabels().join(', ')}</p>
         </div>
       </div>
@@ -518,7 +558,7 @@ export class ExcelImportModal {
     return cls.columns?.map(c => c.label) || []
   }
 
-  private downloadTemplate(): void {
+private downloadTemplate(): void {
     const cls = this.stateManager.getClass(this.classId!)
     if (!cls) return
 
@@ -556,7 +596,57 @@ export class ExcelImportModal {
     })
   }
 
-  private async renderPreview(result: ExcelImportResult, term: 'hk1' | 'hk2'): Promise<void> {
+  private hasExistingTermScores(cls: ClassData, term: 'hk1' | 'hk2'): boolean {
+    return cls.students.some(student => {
+      const termScores = student.scoresByTerm[term];
+      return Object.values(termScores).some(scores => scores && scores.length > 0);
+    });
+  }
+
+  private detectTermFromContent(rows: any[][]): 'hk1' | 'hk2' | null {
+    // Check first few rows for term indicators
+    const rowsToCheck = Math.min(5, rows.length);
+    
+    for (let i = 0; i < rowsToCheck; i++) {
+      const row = rows[i];
+      if (!row) continue;
+      
+      // Join all cells in the row and check for term patterns
+      const rowText = row
+        .map(cell => String(cell || '').trim())
+        .join(' ')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      // Check for common term indicators
+      if (
+        rowText.includes('hoc ky 1') ||
+        rowText.includes('hoc ky i') ||
+        rowText.includes('ky 1') ||
+        rowText.includes('ki 1') ||
+        rowText.includes('hk1') ||
+        rowText.includes('hockey 1')
+      ) {
+        return 'hk1';
+      }
+      
+      if (
+        rowText.includes('hoc ky 2') ||
+        rowText.includes('hoc ky ii') ||
+        rowText.includes('ky 2') ||
+        rowText.includes('ki 2') ||
+        rowText.includes('hk2') ||
+        rowText.includes('hockey 2')
+      ) {
+        return 'hk2';
+      }
+    }
+    
+    return null;
+  }
+
+  private async renderPreview(result: ExcelImportResult, term: 'hk1' | 'hk2', termSource: 'sheet' | 'content' | 'default' = 'sheet'): Promise<void> {
     const body = this.overlay?.querySelector('#modalBody')
     if (!body) return
     const cls = this.stateManager.getClass(this.classId!)
@@ -566,17 +656,32 @@ export class ExcelImportModal {
     const previewRows = result.rows.slice(0, 10)
     const headerLabels = ['Tên thánh', 'Họ đệm', 'Tên', ...classCols.filter(c => result.matchedCols.some(m => m.mappedTo === c.key)).map(c => c.label), 'Ghi chú']
 
+    // Determine term source text and styling
+    let termSourceText = ''
+    let termSourceClass = ''
+    if (termSource === 'sheet') {
+      termSourceText = '(từ tên sheet)'
+      termSourceClass = 'tag-info'
+    } else if (termSource === 'content') {
+      termSourceText = '(từ nội dung file)'
+      termSourceClass = 'tag-ok'
+    } else {
+      termSourceText = '(mặc định)'
+      termSourceClass = 'tag-warn'
+    }
+
     body.innerHTML = `
       <div class="step">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <div class="d-flex gap-2 flex-wrap mb-2">
           <span class="tag tag-info">Sheet: ${this.currentSheet}</span>
           <span class="tag tag-info">Học kỳ: ${term === 'hk1' ? 'HK1' : 'HK2'}</span>
+          <span class="tag ${termSourceClass}">${termSourceText}</span>
           <span class="tag ${result.validRows > 0 ? 'tag-ok' : 'tag-warn'}">${result.validRows}/${result.totalRows} dòng hợp lệ</span>
           <span class="tag tag-info">🇩🇪 ${result.matchedCols.length} cột khớp</span>
           ${result.unmatchedCols.length ? `<span class="tag tag-warn">🇩🇪 ${result.unmatchedCols.length} cột không khớp</span>` : ''}
         </div>
 
-        ${result.unmatchedCols.length ? `<p class="hint" style="color:#dc2626">⚠️ Cột không khớp: ${result.unmatchedCols.join(', ')}</p>` : ''}
+        ${result.unmatchedCols.length ? `<p class="hint text-danger">⚠️ Cột không khớp: ${result.unmatchedCols.join(', ')}</p>` : ''}
 
         <div class="table-wrap">
           <table>
@@ -597,14 +702,29 @@ export class ExcelImportModal {
                   <td>${row.ghiChu || ''}</td>
                 </tr>`
               }).join('')}
-              ${result.rows.length > 10 ? `<tr><td colspan="${headerLabels.length}" style="text-align:center;color:#64748b">... và ${result.rows.length - 10} dòng nữa</td></tr>` : ''}
+              ${result.rows.length > 10 ? `<tr><td colspan="${headerLabels.length}" class="text-center text-muted">... và ${result.rows.length - 10} dòng nữa</td></tr>` : ''}
             </tbody>
           </table>
         </div>
       </div>
       <div class="actions">
         <button class="btn btn-secondary" id="btnBack3">← Quay lại</button>
-        <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--text,#111)">
+        ${termSource === 'default' ? `
+          <div class="my-2 p-2 bg-warning-soft rounded-sm" style="border: 1px solid #ffeaa7;">
+            <strong>⚠️ Không thể tự động xác định học kỳ từ file</strong>
+            <div style="margin-top: 6px;">
+              <label class="d-flex items-center" style="gap:6px;font-size:.85rem;color:var(--text,#111)">
+                <input type="radio" name="termSelect" value="hk1" ${term === 'hk1' ? 'checked' : ''} />
+                Học kỳ 1 (HK1)
+              </label>
+              <label class="d-flex items-center" style="gap:6px;font-size:.85rem;color:var(--text,#111)">
+                <input type="radio" name="termSelect" value="hk2" ${term === 'hk2' ? 'checked' : ''} />
+                Học kỳ 2 (HK2)
+              </label>
+            </div>
+          </div>
+        ` : ''}
+        <label class="d-flex items-center" style="gap:6px;font-size:.85rem;color:var(--text,#111)">
           <input type="checkbox" id="chkOverwrite" />
           Ghi đè điểm cũ
         </label>
@@ -613,6 +733,16 @@ export class ExcelImportModal {
     `
 
     body.querySelector('#btnBack3')?.addEventListener('click', () => this.renderSheetPicker())
+    
+    // Handle term selection if in default mode
+    if (termSource === 'default') {
+      const hk1Radio = body.querySelector('input[name="termSelect"][value="hk1"]') as HTMLInputElement
+      const hk2Radio = body.querySelector('input[name="termSelect"][value="hk2"]') as HTMLInputElement
+      
+      hk1Radio?.addEventListener('change', () => { term = 'hk1' })
+      hk2Radio?.addEventListener('change', () => { term = 'hk2' })
+    }
+
     body.querySelector('#btnImport')?.addEventListener('click', () => {
       const chkOverwrite = body.querySelector('#chkOverwrite') as HTMLInputElement
       this.executeImport(result, term, chkOverwrite.checked)
