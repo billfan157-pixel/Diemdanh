@@ -4,8 +4,11 @@ test.describe('Class Management', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('#appMount')
+    // Read the dynamic default PIN from the login hint
+    const pinEl = page.locator('.login-screen .hint strong:nth-of-type(2)')
+    const pin = (await pinEl.textContent() || '').trim()
     await page.fill('#loginUser', 'admin')
-    await page.fill('#loginPin', '1234')
+    await page.fill('#loginPin', pin)
     await page.click('button[type=submit]')
     await expect(page.locator('#appRoot')).toBeVisible()
   })

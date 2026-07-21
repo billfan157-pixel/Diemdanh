@@ -85,7 +85,7 @@ tinh-diem/
 │   │   ├── main.css
 │   │   └── mobile.css
 │   └── vendor/             # xlsx, jszip (offline)
-├── legacy/                 # Code JS cũ (tham chiếu khi migration)
+├── legacy/          # (đã xoá — code đã migrate sang TypeScript)
 │   ├── core/               # calc.js, state.js, auth.js ...
 │   ├── services/           # backup.js, export/, import/
 │   ├── features/           # dashboard.js, journal.js ...

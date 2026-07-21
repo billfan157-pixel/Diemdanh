@@ -1,4 +1,4 @@
-// ============================================================
+ // ============================================================
 // Sổ Điểm GL — Notification Manager
 // Toast & Confirmation Dialogs
 // ============================================================
@@ -164,6 +164,12 @@ export class NotificationManager {
   }
 
   confirm(message: string, options: ConfirmOptions = {}): Promise<boolean> {
+    this.init()
+    // Reject previous pending confirm if dialog is already visible
+    if (this.dialogResolve) {
+      this.dialogResolve(false)
+      this.dialogResolve = null
+    }
     return new Promise((resolve) => {
       this.dialogResolve = resolve
 
@@ -212,12 +218,33 @@ export class NotificationManager {
     }).then(() => {})
   }
 
+  /** Re-attach dialog button listeners (call after promptDialog replaces buttons) */
+  rebindDialog(): void {
+    const overlay = document.getElementById('appDialog')
+    if (!overlay) return
+    const cancelBtn = document.getElementById('appDialogCancel')!
+    const okBtn = document.getElementById('appDialogOk')!
+    const closeDialog = (result: boolean) => {
+      overlay.classList.add('hidden')
+      document.body.style.overflow = ''
+      if (this.dialogResolve) {
+        this.dialogResolve(result)
+        this.dialogResolve = null
+      }
+    }
+    cancelBtn.addEventListener('click', () => closeDialog(false))
+    okBtn.addEventListener('click', () => closeDialog(true))
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeDialog(false)
+    })
+  }
+
   private escapeHtml(s: string): string {
     return String(s)
-      .replace(/&/g, '&')
-      .replace(/</g, '<')
-      .replace(/>/g, '>')
-      .replace(/"/g, '"')
-      .replace(/'/g, '\'')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
   }
 }

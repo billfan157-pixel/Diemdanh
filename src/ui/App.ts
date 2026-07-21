@@ -9,6 +9,7 @@ import { AuthManager } from '../core/auth/AuthManager'
 import { SyncManager } from '../services/sync/SyncManager'
 import { NotificationManager } from '../services/NotificationManager'
 import { BackupService } from '../services/BackupService'
+import { BeforeInstallPromptEvent, setInstallPrompt } from '../services/PWAInstall'
 
 export class App extends EventEmitter {
   private mountPoint!: HTMLElement
@@ -18,6 +19,7 @@ export class App extends EventEmitter {
   private syncManager!: SyncManager
   private notificationManager!: NotificationManager
   private backupService!: BackupService
+
   async mount(mountPoint: HTMLElement): Promise<void> {
     this.mountPoint = mountPoint
 
@@ -108,6 +110,17 @@ export class App extends EventEmitter {
 
     window.addEventListener('offline', () => {
       this.notificationManager.show('Mất kết nối mạng - chế độ offline', 'warning')
+    })
+
+    // PWA install prompt
+    window.addEventListener('beforeinstallprompt', (e: Event) => {
+      e.preventDefault()
+      setInstallPrompt(e as BeforeInstallPromptEvent)
+    })
+
+    window.addEventListener('appinstalled', () => {
+      setInstallPrompt(null)
+      this.notificationManager.show('Đã cài đặt ứng dụng thành công!', 'success')
     })
   }
 

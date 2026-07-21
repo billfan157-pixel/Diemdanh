@@ -2,16 +2,16 @@
 // Sổ Điểm GL - Main Entry Point
 // ============================================================
 
-import '../assets/css/main.css'
-import '../assets/css/mobile.css'
+import './styles/main.css'
 
 import { App } from './ui/App'
+import { logger } from './services/Logger'
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   const mountPoint = document.getElementById('appMount')
   if (!mountPoint) {
-    console.error('Missing #appMount element')
+    logger.error('Missing #appMount element')
     return
   }
 
@@ -21,19 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Handle unhandled errors gracefully
 window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection:', event.reason)
+  logger.error('Unhandled promise rejection:', event.reason)
   event.preventDefault()
 })
 
 window.addEventListener('error', (event) => {
-  console.error('Global error:', event.error)
+  logger.error('Global error:', event.error)
 })
-
-// Service Worker registration for PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // SW registration failed - app still works offline via Cache API
-    })
-  })
-}

@@ -3,6 +3,7 @@
 // ============================================================
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { logger } from './Logger'
 
 export class SupabaseService extends EventTarget {
   private client: SupabaseClient | null = null
@@ -40,12 +41,12 @@ export class SupabaseService extends EventTarget {
         }
       }
 
-      // 3. Fallback to hardcoded default values
-      this.url = 'https://gqmbhvgyoenweiepvrvk.supabase.co'
-      this.key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxbWJodmd5b2Vud2VpZXB2cnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxOTE0MDIsImV4cCI6MjA5OTc2NzQwMn0._jPtAkpaepFHzGVqpUZEA5wW8B3dJmrzkymlL_CtiE8'
-      this.initClient()
+      // 3. No fallback - require explicit configuration
+      logger.warn('Supabase not configured. Please configure via settings.')
+      this.url = ''
+      this.key = ''
     } catch (e) {
-      console.warn('Failed to load Supabase settings:', e)
+      logger.warn('Failed to load Supabase settings:', e)
     }
   }
 
@@ -61,7 +62,7 @@ export class SupabaseService extends EventTarget {
       settings.supabaseKey = key
       localStorage.setItem('so-diem-gl-settings', JSON.stringify(settings))
     } catch (e) {
-      console.warn('Failed to save to settings, using fallback store:', e)
+      logger.warn('Failed to save to settings, using fallback store:', e)
       localStorage.setItem('so-diem-gl-supabase', JSON.stringify({ url, key }))
     }
 
@@ -81,7 +82,7 @@ export class SupabaseService extends EventTarget {
       })
       this.dispatchEvent(new CustomEvent('initialized'))
     } catch (e) {
-      console.error('Failed to create Supabase client:', e)
+      logger.error('Failed to create Supabase client:', e)
       this.client = null
     }
   }

@@ -25,6 +25,7 @@ export {
 } from './columns.ts'
 
 import { COLS, type ColumnKey } from './columns.ts'
+import { classify as calcClassify } from '../core/calc.ts'
 
 export const COL_KEYS: ColumnKey[] = COLS.map(c => c.key)
 export const COL_SHORTS: Record<string, string> = Object.fromEntries(COLS.map(c => [c.key, c.short]))
@@ -85,18 +86,6 @@ export const RANK_THRESHOLDS = [
   { min: 0, score: 'score-y', rank: 'y', label: 'Yếu' }
 ] as const
 
-export function classifyRank(tb: number | null): RankInfo {
-  if (tb === null || tb === undefined || isNaN(tb)) {
-    return { score: 'score-none', rank: 'none', label: 'Chưa có điểm' }
-  }
-  for (const threshold of RANK_THRESHOLDS) {
-    if (tb >= threshold.min) {
-      return { score: threshold.score, rank: threshold.rank, label: threshold.label }
-    }
-  }
-  return { score: 'score-y', rank: 'y', label: 'Yếu' }
-}
-
 export function getRankColorClass(rank: string): string {
   const colors: Record<string, string> = {
     xs: 'text-amber-600 dark:text-amber-400',
@@ -127,7 +116,8 @@ export function parseScore(raw: string): number | null {
   const cleaned = raw.trim().replace(',', '.')
   const num = parseFloat(cleaned)
   if (isNaN(num)) return null
-  return num >= 0 && num <= 10 ? Math.round(num * 100) / 100 : null
+  const rounded = Math.round(num * 100) / 100
+  return rounded >= 0 && rounded <= 10 ? rounded : null
 }
 
 export function parseScoreCell(raw: any): number[] {
@@ -169,13 +159,15 @@ export function formatRank(rank: string): string {
   return labels[rank] || rank
 }
 
-// Grade classification
+// Grade classification (wraps calc's classify, strips rank- prefix)
 export function classifyStudent(tb: number): { score: string; rank: string; label: string } {
-  if (tb >= 9) return { score: 'score-xs', rank: 'xs', label: 'Xuất sắc' }
-  if (tb >= 8) return { score: 'score-g', rank: 'g', label: 'Giỏi' }
-  if (tb >= 6.5) return { score: 'score-k', rank: 'k', label: 'Khá' }
-  if (tb >= 5) return { score: 'score-tb', rank: 'tb', label: 'Trung bình' }
-  return { score: 'score-y', rank: 'y', label: 'Yếu' }
+  const result = calcClassify(tb)
+  return { score: result.score, rank: result.rank.replace('rank-', ''), label: result.label }
+}
+
+export function classifyRank(tb: number | null): { score: string; rank: string; label: string } {
+  const result = calcClassify(tb)
+  return { score: result.score, rank: result.rank.replace('rank-', ''), label: result.label }
 }
 
 // Year weights for final grade calculation

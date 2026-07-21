@@ -3,9 +3,15 @@ import { test, expect } from '@playwright/test'
 test.describe('Sổ Điểm GL', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    // Wait for app to load
     await page.waitForSelector('#appMount', { state: 'attached' })
   })
+
+  /** Extract the dynamically generated default PIN from the login hint text */
+  async function getDefaultPin(page: any): Promise<string> {
+    const el = page.locator('.login-screen .hint strong:nth-of-type(2)')
+    const text = await el.textContent()
+    return (text || '').trim()
+  }
 
   test('should load login screen', async ({ page }) => {
     await expect(page.locator('#loginScreen')).toBeVisible()
@@ -13,11 +19,11 @@ test.describe('Sổ Điểm GL', () => {
   })
 
   test('should login with default admin credentials', async ({ page }) => {
+    const pin = await getDefaultPin(page)
     await page.fill('#loginUser', 'admin')
-    await page.fill('#loginPin', '1234')
+    await page.fill('#loginPin', pin)
     await page.click('button[type=submit]')
 
-    // Wait for app to load
     await expect(page.locator('#appRoot')).toBeVisible({ timeout: 10000 })
     await expect(page.locator('.m-top-title')).toContainText('Sổ Điểm')
   })
@@ -32,8 +38,9 @@ test.describe('Sổ Điểm GL', () => {
   })
 
   test('should navigate to dashboard after login', async ({ page }) => {
+    const pin = await getDefaultPin(page)
     await page.fill('#loginUser', 'admin')
-    await page.fill('#loginPin', '1234')
+    await page.fill('#loginPin', pin)
     await page.click('button[type=submit]')
 
     await expect(page.locator('#appRoot')).toBeVisible()

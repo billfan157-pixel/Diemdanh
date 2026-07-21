@@ -12,6 +12,7 @@ export interface AppState {
   archivedYears: string[]
   viewMode: string
   activeTerm: 'hk1' | 'hk2' | 'year'
+  theme: 'light' | 'dark' | 'system'
   /** Parent read-only report tokens (local + optional cloud sync). */
   parentTokens: ParentToken[]
   lastModified: number

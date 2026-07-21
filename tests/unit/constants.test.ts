@@ -300,7 +300,7 @@ describe('constants', () => {
       expect(classifyRank(6.5)).toEqual({ score: 'score-k', rank: 'k', label: 'Khá' })
       expect(classifyRank(5.5)).toEqual({ score: 'score-tb', rank: 'tb', label: 'Trung bình' })
       expect(classifyRank(4.5)).toEqual({ score: 'score-y', rank: 'y', label: 'Yếu' })
-      expect(classifyRank(null)).toEqual({ score: 'score-none', rank: 'none', label: 'Chưa có điểm' })
+      expect(classifyRank(null)).toEqual({ score: 'score-none', rank: 'none', label: 'Chưa đủ điểm' })
     })
   })
 

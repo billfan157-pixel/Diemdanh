@@ -46,18 +46,9 @@ export class LoginView {
 
     tabPinBtn?.addEventListener('click', () => {
       tabPinBtn.classList.add('active')
-      tabPinBtn.style.color = 'var(--accent)'
-      tabPinBtn.style.borderBottom = '2px solid var(--accent)'
-      tabPinBtn.style.fontWeight = '600'
-      
       tabEmailBtn.classList.remove('active')
-      tabEmailBtn.style.color = 'var(--text2)'
-      tabEmailBtn.style.borderBottom = '2px solid transparent'
-      tabEmailBtn.style.fontWeight = '500'
-
       pinFields.classList.remove('hidden')
       emailFields.classList.add('hidden')
-
       userInput.required = true
       pinInput.required = true
       emailInput.required = false
@@ -66,18 +57,9 @@ export class LoginView {
 
     tabEmailBtn?.addEventListener('click', () => {
       tabEmailBtn.classList.add('active')
-      tabEmailBtn.style.color = 'var(--accent)'
-      tabEmailBtn.style.borderBottom = '2px solid var(--accent)'
-      tabEmailBtn.style.fontWeight = '600'
-
       tabPinBtn.classList.remove('active')
-      tabPinBtn.style.color = 'var(--text2)'
-      tabPinBtn.style.borderBottom = '2px solid transparent'
-      tabPinBtn.style.fontWeight = '500'
-
       emailFields.classList.remove('hidden')
       pinFields.classList.add('hidden')
-
       userInput.required = false
       pinInput.required = false
       emailInput.required = true
@@ -92,9 +74,9 @@ export class LoginView {
         <h1>Sổ Điểm Giáo Lý</h1>
         <p class="login-sub">Đăng nhập để tiếp tục</p>
 
-        <div class="login-tabs" style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:8px">
-          <button type="button" id="tabPinBtn" class="tab-btn active" style="flex:1;background:none;border:none;padding:8px 12px;font-size:14px;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);cursor:pointer;transition:all 0.2s">Mã PIN (Offline)</button>
-          <button type="button" id="tabEmailBtn" class="tab-btn" style="flex:1;background:none;border:none;padding:8px 12px;font-size:14px;font-weight:500;color:var(--text2);border-bottom:2px solid transparent;cursor:pointer;transition:all 0.2s">Email Cloud</button>
+        <div class="login-tabs">
+          <button type="button" id="tabPinBtn" class="tab-btn active">Mã PIN (Offline)</button>
+          <button type="button" id="tabEmailBtn" class="tab-btn">Email Cloud</button>
         </div>
 
         <form id="loginForm" autocomplete="on">
@@ -133,7 +115,7 @@ export class LoginView {
         </div>
 
         <p class="hint" style="margin-top:14px;text-align:center">
-          Mặc định PIN: <strong>admin</strong> / PIN <strong>1234</strong><br>
+          Mặc định PIN: <strong>admin</strong> / PIN <strong>${this.authManager.defaultPin}</strong><br>
           (Vào app bấm <strong>Đổi PIN</strong> hoặc <strong>Cấu hình Cloud</strong>)
         </p>
 

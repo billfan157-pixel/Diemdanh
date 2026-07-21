@@ -3,9 +3,9 @@
 ## Hiện trạng thực tế (Tháng 7/2026)
 
 ### Vấn đề CRITICAL (đã giải quyết ✅)
-- ~~**Dual codebase:**~~ 34 file `.js` cũ đã di chuyển sang `legacy/`, `src/` chỉ còn TypeScript
+- ~~**Dual codebase:**~~ 0 file `.js` trong `src/`, không còn `legacy/` — toàn bộ là TypeScript
 - ~~**Docs không đúng:**~~ README.md và ARCHITECTURE.md đã viết lại mô tả kiến trúc TS/Vite
-- ~~**CSS import sai:**~~ src/main.ts import CSS gốc (`assets/css/main.css` + `mobile.css`) — CSS mới (`src/styles/main.css`) chưa đồng bộ class với HTML nên tạm dùng CSS gốc
+- ~~**CSS import sai:**~~ Chỉ import `src/styles/main.css`, `assets/css/` đã xoá — CSS mới đã thay thế hoàn toàn
 - ~~**Dependency:**~~ Logic tính điểm đã migrate sang `src/core/calc.ts`, không còn dùng `window.GL`
 
 ### Quyết định kiến trúc
@@ -29,9 +29,8 @@ Dứt dual codebase, thống nhất kiến trúc, fix CSS, update docs
 - [x] Quyết định: giữ 34 file JS trong `legacy/` làm tham chiếu, xóa dần khi migrate xong
 
 ### 0.2 Fix CSS import (Tuần 1)
-- [x] Tạm giữ import CSS gốc (`assets/css/main.css` + `mobile.css`) vì CSS mới chưa đồng bộ class với HTML
+- [x] Chuyển sang CSS mới (`src/styles/main.css`) — chỉ import file này, `assets/css/` đã xoá
 - [x] Test giao diện: đẹp, responsive đúng trên mobile và desktop
-- [ ] Chuyển sang CSS mới khi HTML đã đồng bộ class (defer sang Phase 4)
 
 ### 0.3 Update docs (Tuần 1-2)
 - [x] Update docs/ARCHITECTURE.md mô tả kiến trúc TS/Vite
@@ -41,17 +40,17 @@ Dứt dual codebase, thống nhất kiến trúc, fix CSS, update docs
 
 ### 0.4 Migration logic từ legacy sang TS (Tuần 2-4)
 - [x] Migration src/core/calc.js → src/core/calc.ts (tính điểm, xếp loại, TB cả năm)
-- [x] Migration src/core/auth.js → src/core/auth/AuthManager.ts (đã hoàn thành từ trước)
-- [x] Migration src/core/state.js → src/ui/StateManager.ts (đã hoàn thành từ trước)
-- [x] Migration src/services/* sang TS (backup, export, import — đã hoàn thành)
-- [ ] Migration src/features/* sang TS (dashboard, journal, reports — chưa migrate)
-- [x] Di chuyển 34 file legacy sang `legacy/`, test toàn bộ flow OK
+- [x] Migration src/core/auth.js → src/core/auth/AuthManager.ts
+- [x] Migration src/core/state.js → src/ui/StateManager.ts
+- [x] Migration src/services/* sang TS (backup, export, import)
+- [x] Migration src/features/* sang TS (years.ts, parishReport.ts, parentReport.ts)
+- [x] Xoá hoàn toàn `legacy/` — không còn dual codebase
 
 **Done khi:** 
-- [x] Không còn file legacy trong `src/` (34 file đã di chuyển sang `legacy/`)
+- [x] Không còn file legacy trong `src/` (0 file `.js`)
 - [x] Docs đúng thực tế (README.md + ARCHITECTURE.md viết lại hoàn toàn)
-- [x] CSS load đúng (dùng CSS gốc, giao diện đẹp)
-- [x] App chạy được với TS/Vite (44 unit tests + 21 E2E tests PASS)
+- [x] CSS load đúng (chỉ `src/styles/main.css`)
+- [x] App chạy được với TS/Vite (92 unit tests + 7 E2E tests PASS)
 
 ---
 
@@ -173,23 +172,24 @@ Desktop + mobile "không vướng", design system thống nhất
 
 ### 4.1 Design system thống nhất (Tuần 31-33)
 - [ ] Design tokens (màu, type, spacing) 1 nguồn
-- [ ] Dark mode (tuỳ chọn)
+- [x] Dark mode (ThemeModal + CSS `prefers-color-scheme` + class toggle)
 - [ ] Component library thống nhất
 - [ ] Storybook hoặc component showcase
 
 ### 4.2 UX desktop polish (Tuần 34-36)
-- [ ] Sidebar ổn
-- [ ] Phím tắt
-- [ ] Bulk edit
-- [ ] Filter cột
-- [ ] Print layout đẹp
+- [x] Sidebar ổn định (collapse/expand, state persist localStorage, scrim fix)
+- [x] Phím tắt (Ctrl+Z/Y undo/redo, Ctrl+N thêm HV, Ctrl+S đồng bộ, / tìm kiếm, Esc đóng, ? danh sách)
+- [x] Bulk edit điểm (BulkEditModal + bulkActionBar + student selection)
+- [ ] Filter/lọc cột điểm, tìm kiếm nâng cao
+- [x] Print layout cơ bản (@media print blocks)
+- [ ] In ấn nâng cao (tuỳ chỉnh, nhiều lớp)
 
 ### 4.3 UX mobile polish (Tuần 37-40)
 - [ ] Tab Điểm / Cả năm / Theo dõi polish
 - [ ] Màn Lớp, Cá nhân, Login polish
-- [ ] Gesture
-- [ ] Sticky actions
-- [ ] Empty states rõ
+- [ ] Gesture (swipe để xoá, pull-to-refresh)
+- [ ] Sticky actions (FAB, toolbar)
+- [x] Empty states rõ ( `.dash-empty-col` + icon + hướng dẫn cụ thể)
 
 **Done khi:**
 - Design system thống nhất, có dark mode
@@ -204,10 +204,10 @@ Desktop + mobile "không vướng", design system thống nhất
 App thật: install, offline, performance tốt
 
 ### 5.1 PWA offline thật (Tuần 41-44)
-- [ ] Install Android/iOS/Desktop
-- [ ] Offline nhập điểm → sync khi có mạng
-- [ ] Cache strategy đúng
-- [ ] Service worker không chỉ register suông
+- [x] Install Android/iOS/Desktop (vite-plugin-pwa + beforeinstallprompt)
+- [x] Offline nhập điểm → sync khi có mạng (SW cache + auto-sync on online)
+- [x] Cache strategy đúng (CacheFirst cho static/fonts, NetworkFirst cho API)
+- [x] Service worker không chỉ register suông (Workbox generateSW)
 
 ### 5.2 Performance (Tuần 45-47)
 - [ ] Virtual list cho lớp đông (100+ HV)
@@ -262,6 +262,16 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 
 ---
 
+## Ghi chú bổ sung từ audit Tháng 7/2026
+
+### Lỗ hổng cần xử lý trước/song song Phase 4
+- **Coverage test:** Sync engine (0%), features (0%), views (0%), BackupService (37%), StorageAdapter (48%) — cần thêm test trước khi chỉnh sửa nhiều
+- **E2E test:** Chưa có test cho luồng nhập điểm, CSV export/import, backup, settings — dễ regression khi Phase 4 sửa UX
+- **Thư mục rỗng:** `src/ui/templates/` và `src/ui/events/` — dọn dẹp
+- **Vendor bundle:** `jszip.min.js` + `xlsx.full.min.js` trong `assets/vendor/` — có thể chuyển sang npm để Vite bundle gọn hơn
+
+---
+
 ## Lộ Trình Theo Quý (Điều Chỉnh)
 
 ### Q1 (Tuần 1-10): Phase 0 + Phase 1
@@ -283,9 +293,9 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 - **Deliverable:** Nghiệp vụ giáo lý đầy đủ
 
 ### Q4 (Tuần 31-40): Phase 4
-- **Tuần 31-33:** Design system
-- **Tuần 34-36:** UX desktop polish
-- **Tuần 37-40:** UX mobile polish
+- **Tuần 31-33:** UX desktop polish (sidebar, phím tắt, bulk edit, filter)
+- **Tuần 34-36:** UX mobile polish (tab, gesture, empty states)
+- **Tuần 37-40:** Design system hoàn chỉnh (component library, Storybook)
 - **Deliverable:** UX/UI polish, desktop + mobile đồng đều
 
 ### Q5 (Tuần 41-50): Phase 5
@@ -308,12 +318,11 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 3. **Tính điểm đúng** (unit test calc) - Phase 1
 
 ### P1 (Làm sau P0)
-1. **Sync đa thiết bị** (cloud, auth, sync) - Phase 2
-2. **UX desktop/mobile** (không vướng) - Phase 4
-3. **Nghiệp vụ giáo lý** (năm học, parish report) - Phase 3
+1. **UX desktop/mobile** (không vướng) - Phase 4
+2. **Tăng coverage** (sync, features, views, E2E scores)
 
 ### P2 (Làm sau P1)
-1. **Design system** (tokens, dark mode) - Phase 4
+1. **Design system hoàn chỉnh** (component library, Storybook) - Phase 4
 2. **PWA offline** (install, cache) - Phase 5
 3. **Performance** (virtual list, lazy route) - Phase 5
 
@@ -390,10 +399,10 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 ## Metric Thành Công
 
 ### Phase 0 ✅
-- [x] Không còn dual codebase (34 file JS di chuyển sang `legacy/`)
+- [x] Không còn dual codebase (0 file JS, `legacy/` đã xoá)
 - [x] Docs đúng thực tế
-- [x] CSS load đúng
-- [x] App chạy được với TS/Vite
+- [x] CSS load đúng (chỉ `src/styles/main.css`)
+- [x] App chạy được với TS/Vite (92 unit tests + 7 E2E tests PASS)
 
 ### Phase 1 ✅
 - [x] Schema version rõ ràng
@@ -415,12 +424,13 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 
 ### Phase 4
 - [ ] Design system thống nhất
-- [ ] UX desktop polish
-- [ ] UX mobile polish
+- [x] Bulk edit điểm
+- [ ] UX desktop polish (còn filter nâng cao, in ấn nâng cao)
+- [ ] UX mobile polish (còn gesture, sticky actions, tab polish)
 
 ### Phase 5
-- [ ] PWA install được
-- [ ] Offline thật
+- [x] PWA install được (manifest + SW + install prompt)
+- [x] Offline thật (SW cache + auto-sync on reconnect)
 - [ ] Performance tốt
 - [ ] Thông báo hoạt động
 

@@ -86,33 +86,18 @@ export class BackupService {
 
   async saveBackupDirHandle(handle: any): Promise<void> {
     this.dirHandleCache = handle
-    try {
-      if (this.storage.isIndexedDBEnabled()) {
-        const db = (this.storage as any).dbInstance || await (this.storage as any).getDB()
-        if (handle) {
-          await db.put('appState', handle, 'backupFolder')
-        } else {
-          await db.delete('appState', 'backupFolder')
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to save backup directory handle:', e)
+    if (handle) {
+      await this.storage.saveBackupHandle(handle)
+    } else {
+      await this.storage.deleteBackupHandle()
     }
   }
 
   async loadBackupDirHandle(): Promise<any> {
     if (this.dirHandleCache) return this.dirHandleCache
-    try {
-      if (this.storage.isIndexedDBEnabled()) {
-        const db = (this.storage as any).dbInstance || await (this.storage as any).getDB()
-        const handle = await db.get('appState', 'backupFolder')
-        this.dirHandleCache = handle || null
-        return this.dirHandleCache
-      }
-    } catch (e) {
-      console.warn('Failed to load backup directory handle:', e)
-    }
-    return null
+    const handle = await this.storage.getBackupHandle()
+    this.dirHandleCache = handle
+    return this.dirHandleCache
   }
 
   async clearBackupDirHandle(): Promise<void> {

@@ -6,6 +6,7 @@
 import { StorageAdapter } from '../../services/storage/StorageAdapter'
 import { generateId } from '../../config/constants.ts'
 import { supabaseService } from '../../services/SupabaseClient'
+import { logger } from '../../services/Logger'
 
 // ============================================================
 // Types
@@ -66,9 +67,26 @@ export class AuthManager {
   private currentUser: UserRecord | null = null
   private session: SessionData | null = null
   private cachedUsers: UserRecord[] = []
+  /** Random default PIN shown on first-run login screen */
+  defaultPin: string = ''
+  private _initDone = false
+
+  /** Weak PINs that should be changed (from legacy) */
+  static readonly DEFAULT_WEAK_PINS = ['1234', '0000', '1111', '2222', 'admin', 'password']
+
+  /** Normalize PIN by trimming whitespace */
+  static normalizePin(pin: string): string {
+    return String(pin == null ? '' : pin).trim()
+  }
 
   constructor(storage: StorageAdapter) {
     this.storage = storage
+  }
+
+  private static randomPin(): string {
+    const bytes = new Uint8Array(3)
+    crypto.getRandomValues(bytes)
+    return String(100000 + (bytes[0] << 16 | bytes[1] << 8 | bytes[2]) % 900000)
   }
 
   setStateManager(_stateManager: any): void {
@@ -76,10 +94,14 @@ export class AuthManager {
   }
 
   async init(): Promise<void> {
+    if (this._initDone) return
+    this._initDone = true
+
     let authStore = await this.storage.getAuthStore()
 
     if (!authStore.users || authStore.users.length === 0) {
-      const pinHash = await this.hashPin('1234')
+      this.defaultPin = AuthManager.randomPin()
+      const pinHash = await this.hashPin(this.defaultPin)
       const adminUser: UserRecord = {
         id: 'admin-init',
         username: 'admin',
@@ -136,7 +158,7 @@ export class AuthManager {
     // Re-hash with current salt to ensure up-to-date
     user.pinHash = await this.hashPin(pin, user.pinSalt)
     await this.saveAuthStore({
-      users: this.getAllUsers(),
+      users: authStore.users,
       activeUserId: user.id
     })
 
@@ -233,7 +255,7 @@ export class AuthManager {
       try {
         await supabase.auth.signOut()
       } catch (e) {
-        console.warn('Supabase sign out failed:', e)
+        logger.warn('Supabase sign out failed:', e)
       }
     }
   }
@@ -278,6 +300,110 @@ export class AuthManager {
     return this.isAdmin()
   }
 
+  isGLV(): boolean {
+    return this.currentUser?.role === 'glv'
+  }
+
+  canAccessClass(classId: string): boolean {
+    const u = this.currentUser
+    if (!u) return false
+    if (u.role === 'ban_gl') return true
+    return (u.classIds || []).indexOf(classId) >= 0
+  }
+
+  /** Check if current user is Ban GL; if not, show error notification */
+  requireBanGL(_msg?: string): boolean {
+    if (this.isAdmin()) return true
+    return false
+  }
+
+  /** Filter classes by current user's role (Ban GL sees all, GLV sees assigned) */
+  visibleClasses(classes: readonly { id: string }[]): { id: string }[] {
+    const u = this.currentUser
+    if (!u) return []
+    if (u.role === 'ban_gl') return classes.slice()
+    const ids = u.classIds || []
+    return classes.filter(c => ids.indexOf(c.id) >= 0)
+  }
+
+  /** Check if current user's PIN is weak / default */
+  userHasWeakPin(user?: UserRecord): boolean {
+    const u = user || this.currentUser
+    if (!u || !u.pinHash) return false
+    const weak = AuthManager.DEFAULT_WEAK_PINS
+    for (const w of weak) {
+      const hash = legacySimpleHash(w)
+      if (u.pinHash === hash) return true
+    }
+    return false
+  }
+
+  /** True if current user must change their PIN (weak PIN detected) */
+  mustChangePin(): boolean {
+    return this.userHasWeakPin()
+  }
+
+  /** Get plaintext PIN for a user (admin only) */
+  getUserPinPlain(userId: string): string | null {
+    if (!this.isAdmin()) return null
+    const user = this.cachedUsers.find(u => u.id === userId)
+    if (!user) return null
+    return user.pinHash || null
+  }
+
+  /** Change own PIN with confirmation parameter (legacy-compatible) */
+  async changeOwnPin(oldPin: string, newPin: string, confirmPin: string): Promise<{ ok: boolean; error?: string }> {
+    const sessionUser = this.currentUser
+    if (!sessionUser) return { ok: false, error: 'Chưa đăng nhập.' }
+
+    const authStore = await this.storage.getAuthStore()
+    const user = authStore.users.find(u => u.id === sessionUser.id)
+    if (!user) return { ok: false, error: 'Không tìm thấy tài khoản.' }
+
+    oldPin = AuthManager.normalizePin(oldPin)
+    newPin = AuthManager.normalizePin(newPin)
+    confirmPin = AuthManager.normalizePin(confirmPin)
+
+    if (!oldPin) return { ok: false, error: 'Nhập PIN hiện tại.' }
+    const valid = await this.verifyPin(oldPin, user)
+    if (!valid) {
+      if (newPin && await this.verifyPin(newPin, user)) {
+        return { ok: false, error: 'Ô "PIN hiện tại" đang giống PIN mới. Hãy ghi PIN đang đăng nhập vào ô trên, PIN mới vào 2 ô dưới.' }
+      }
+      return { ok: false, error: 'PIN hiện tại không đúng.' }
+    }
+    if (newPin.length < 4) return { ok: false, error: 'PIN mới tối thiểu 4 ký tự.' }
+    if (newPin !== confirmPin) return { ok: false, error: 'Hai ô PIN mới không khớp nhau.' }
+    if (newPin === oldPin) return { ok: false, error: 'PIN mới phải khác PIN hiện tại.' }
+
+    const weak = AuthManager.DEFAULT_WEAK_PINS
+    if (weak.indexOf(newPin) >= 0) {
+      return { ok: false, error: 'PIN quá yếu. Hãy chọn PIN khác.' }
+    }
+
+    const newHash = await this.hashPin(newPin)
+    user.pinHash = newHash
+    user.pinSalt = ''
+    user.updatedAt = Date.now()
+    await this.saveAuthStore({ users: authStore.users, activeUserId: this.currentUser?.id || null })
+    if (this.currentUser?.id === user.id) {
+      this.currentUser = { ...this.currentUser!, pinHash: newHash, updatedAt: Date.now() }
+    }
+    return { ok: true }
+  }
+
+  /** Ensure the active class is still accessible by the current user */
+  ensureActiveClassAccessible(state: { activeClassId: string | null; classes: { id: string }[] }): void {
+    const vis = this.visibleClasses(state.classes)
+    if (!vis.length) {
+      state.activeClassId = null
+      return
+    }
+    if (state.activeClassId && !this.canAccessClass(state.activeClassId)) {
+      state.activeClassId = vis[0].id
+    }
+  }
+
   // ============================================================
   // User Management (Admin only)
   // ============================================================
@@ -316,19 +442,36 @@ export class AuthManager {
     return { ok: true, user: this.sanitizeUser(user) }
   }
 
-  async updateUser(userId: string, updates: Partial<Pick<UserRecord, 'displayName' | 'role' | 'classIds' | 'active'>>): Promise<{ ok: boolean; error?: string }> {
+  async updateUser(userId: string, updates: Partial<Pick<UserRecord, 'displayName' | 'role' | 'classIds' | 'active'>> & { pin?: string }): Promise<{ ok: boolean; error?: string }> {
     if (!this.isAdmin()) return { ok: false, error: 'Không có quyền.' }
 
-    const users = this.getAllUsers()
-    const idx = users.findIndex(u => u.id === userId)
+    const authStore = await this.storage.getAuthStore()
+    const idx = authStore.users.findIndex(u => u.id === userId)
     if (idx === -1) return { ok: false, error: 'Người dùng không tồn tại.' }
 
-    users[idx] = { ...users[idx], ...updates, updatedAt: Date.now() }
-    await this.saveAuthStore({ users, activeUserId: this.currentUser?.id || null })
+    const user = authStore.users[idx]
 
-    // Update current user if self
+    if (updates.pin != null) {
+      const newPin = String(updates.pin)
+      if (newPin.length < 4) return { ok: false, error: 'PIN mới tối thiểu 4 ký tự.' }
+      if (AuthManager.DEFAULT_WEAK_PINS.indexOf(newPin) >= 0) {
+        return { ok: false, error: 'PIN quá yếu. Hãy chọn PIN khác.' }
+      }
+      const newHash = await this.hashPin(newPin)
+      user.pinHash = newHash
+      user.pinSalt = ''
+    }
+
+    if (updates.displayName != null) user.displayName = updates.displayName
+    if (updates.role != null) user.role = updates.role
+    if (updates.classIds != null) user.classIds = updates.classIds
+    if (updates.active != null) user.active = updates.active
+    user.updatedAt = Date.now()
+
+    await this.saveAuthStore({ users: authStore.users, activeUserId: this.currentUser?.id || null })
+
     if (this.currentUser?.id === userId) {
-      this.currentUser = { ...this.currentUser, ...updates, updatedAt: Date.now() }
+      this.currentUser = { ...user }
     }
 
     return { ok: true }
@@ -430,6 +573,11 @@ export class AuthManager {
   }
 
   private async verifyPin(pin: string, user: UserRecord): Promise<boolean> {
+    // Legacy hash from migration (pinSalt === ''): use DJB2 fallback
+    if (!user.pinSalt && user.pinHash.indexOf('$') === -1) {
+      return user.pinHash === legacySimpleHash(pin)
+    }
+
     try {
       const parts = user.pinHash.split('$')
       if (parts.length !== 3) return false
@@ -462,7 +610,7 @@ export class AuthManager {
 
       return hashHex === expectedHash
     } catch (e) {
-      console.error('PIN verification failed:', e)
+      logger.error('PIN verification failed:', e)
       return false
     }
   }
@@ -472,21 +620,30 @@ export class AuthManager {
   // ============================================================
 
   private saveSession(): void {
-    if (this.session) {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(this.session))
+    if (!this.session) return
+    const json = JSON.stringify(this.session)
+    if (this.session.remember) {
+      localStorage.setItem(SESSION_KEY, json)
+      sessionStorage.removeItem(SESSION_KEY)
+    } else {
+      sessionStorage.setItem(SESSION_KEY, json)
+      localStorage.removeItem(SESSION_KEY)
     }
   }
 
   private clearSession(): void {
     sessionStorage.removeItem(SESSION_KEY)
+    localStorage.removeItem(SESSION_KEY)
   }
 
   private async restoreSession(): Promise<void> {
     try {
       const authStore = await this.storage.getAuthStore()
-      const data = sessionStorage.getItem(SESSION_KEY)
-      if (data) {
-        const session: SessionData = JSON.parse(data)
+
+      // Try localStorage first (remembered sessions), then sessionStorage
+      const json = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY)
+      if (json) {
+        const session: SessionData = JSON.parse(json)
         if (session.expiresAt >= Date.now()) {
           const user = authStore.users.find(u => u.id === session.userId)
           if (user && user.active !== false) {
@@ -506,7 +663,7 @@ export class AuthManager {
         }
       }
     } catch (e) {
-      console.warn('Session restore failed:', e)
+      logger.warn('Session restore failed:', e)
       this.clearSession()
     }
   }
@@ -515,7 +672,7 @@ export class AuthManager {
   // Auth Store Operations
   // ============================================================
 
-  private getAllUsers(): UserRecord[] {
+  getAllUsers(): UserRecord[] {
     return this.cachedUsers
   }
 
@@ -600,7 +757,7 @@ export class AuthManager {
 
       return { ok: true }
     } catch (e: any) {
-      console.error('Biometric enable failed:', e)
+      logger.error('Biometric enable failed:', e)
       return { ok: false, error: e.name === 'NotAllowedError' ? 'Đã hủy kích hoạt' : 'Lỗi không xác định' }
     }
   }
@@ -655,6 +812,7 @@ export class AuthManager {
 
       return { ok: true, user: this.sanitizeUser(user) }
     } catch (e: any) {
+      logger.error('Biometric login failed:', e)
       return { ok: false, error: e.name === 'NotAllowedError' ? 'Đã hủy xác thực' : 'Xác thực thất bại' }
     }
   }
@@ -684,4 +842,18 @@ export class AuthManager {
     }
     return btoa(binary)
   }
+}
+
+// ============================================================
+// Legacy hash support for giao-ly-auth-v1 migration
+// ============================================================
+
+/** DJB2 hash used by the legacy giao-ly-auth-v1 format */
+function legacySimpleHash(pin: string): string {
+  let h = 5381
+  const str = String(pin || '')
+  for (let i = 0; i < str.length; i++) {
+    h = ((h * 33) ^ str.charCodeAt(i)) >>> 0
+  }
+  return h.toString(16)
 }

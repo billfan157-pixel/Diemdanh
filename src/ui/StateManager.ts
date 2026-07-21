@@ -25,6 +25,7 @@ import {
   resolveClassColumns,
   colLabel
 } from '../config/constants.ts'
+import { logger } from '../services/Logger'
 
 // Enable Immer patches for undo/redo
 enablePatches()
@@ -43,6 +44,9 @@ export interface UndoEntry {
 
 type StateListener = (state: Readonly<AppState>) => void
 
+/** Callback invoked after each mutation, with the mutation label and whether it's from network sync. */
+type MutationListener = (label: string, fromNetwork: boolean) => void
+
 // ============================================================
 // State Manager
 // ============================================================
@@ -51,6 +55,7 @@ export class StateManager {
   private state!: AppState
   private storage: StorageAdapter
   private listeners: Set<StateListener> = new Set()
+  private mutationListeners: Set<MutationListener> = new Set()
   private undoStack: UndoEntry[] = []
   private redoStack: UndoEntry[] = []
   private maxUndoSize = 50
@@ -68,6 +73,14 @@ export class StateManager {
     this.state = await this.storage.getState()
     await this.migrateIfNeeded()
     this.initialized = true
+    this.applyTheme()
+
+    // Listen for system color scheme changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (this.getTheme() === 'system') {
+        this.applyTheme()
+      }
+    })
   }
 
   isReady(): boolean {
@@ -82,7 +95,13 @@ export class StateManager {
     return this.state
   }
 
+  /**
+   * @deprecated Returns raw state, bypassing Immer immutability.
+   * Do NOT mutate the returned object directly — use getState() for read-only access.
+   * This method exists only for legacy compatibility and should not be used in new code.
+   */
   getMutableState(): AppState {
+    console.warn('[StateManager] getMutableState() bypasses Immer — use getState() for read-only access.')
     return this.state
   }
 
@@ -91,12 +110,31 @@ export class StateManager {
     return () => this.listeners.delete(listener)
   }
 
+  /**
+   * Subscribe to mutation events (label + fromNetwork flag).
+   * Useful for sync engine to track changes without intercepting private methods.
+   */
+  onMutation(listener: MutationListener): () => void {
+    this.mutationListeners.add(listener)
+    return () => this.mutationListeners.delete(listener)
+  }
+
   private notify(): void {
     for (const listener of this.listeners) {
       try {
         listener(this.state)
       } catch (e) {
-        console.error('State listener error:', e)
+        logger.error('State listener error:', e)
+      }
+    }
+  }
+
+  private notifyMutation(label: string, fromNetwork: boolean): void {
+    for (const listener of this.mutationListeners) {
+      try {
+        listener(label, fromNetwork)
+      } catch (e) {
+        logger.error('Mutation listener error:', e)
       }
     }
   }
@@ -111,7 +149,7 @@ export class StateManager {
   private mutate(
     label: string,
     mutator: (draft: AppState) => void,
-    options: { skipUndo?: boolean; skipPersist?: boolean } = {}
+    options: { skipUndo?: boolean; skipPersist?: boolean; fromNetwork?: boolean } = {}
   ): void {
     if (this.isApplyingUndoRedo) return
 
@@ -145,6 +183,23 @@ export class StateManager {
     }
 
     this.notify()
+    this.notifyMutation(label, !!options.fromNetwork)
+  }
+
+  /**
+   * PUBLIC API: Apply a mutation that originated from network/cloud sync.
+   * This sets `fromNetwork = true` to prevent sync loop-back.
+   * Sync engine should use this instead of intercepting private `mutate()`.
+   */
+  applyFromNetwork(label: string, mutator: (draft: AppState) => void): void {
+    this.mutate(label, mutator, { fromNetwork: true })
+  }
+
+  /**
+   * Get the current undo stack (read-only, for sync engine patch parsing).
+   */
+  getUndoStack(): ReadonlyArray<UndoEntry> {
+    return this.undoStack
   }
 
   // ============================================================
@@ -171,6 +226,16 @@ export class StateManager {
     })
 
     return id
+  }
+
+  setClassStudents(classId: string, students: StudentData[]): boolean {
+    const classIdx = this.state.classes.findIndex(c => c.id === classId)
+    if (classIdx === -1) return false
+    this.mutate('Import điểm từ Excel', (draft) => {
+      draft.classes[classIdx].students = students
+      draft.classes[classIdx].updatedAt = Date.now()
+    })
+    return true
   }
 
   updateClass(id: string, updates: Partial<Pick<ClassData, 'name' | 'year' | 'weights' | 'columns'>>): boolean {
@@ -353,6 +418,32 @@ export class StateManager {
       draft.classes[toIdx].updatedAt = Date.now()
     })
     return true
+  }
+
+  // ============================================================
+  // Theme Operations
+  // ============================================================
+
+  setTheme(theme: 'light' | 'dark' | 'system'): void {
+    this.mutate('Thay đổi giao diện', (draft) => {
+      draft.theme = theme
+    }, { skipUndo: true })
+    this.applyTheme()
+  }
+
+  getTheme(): 'light' | 'dark' | 'system' {
+    return this.state.theme || 'system'
+  }
+
+  applyTheme(): void {
+    const theme = this.getTheme()
+    let isDark = false
+    if (theme === 'dark') {
+      isDark = true
+    } else if (theme === 'system') {
+      isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    }
+    document.documentElement.classList.toggle('dark', isDark)
   }
 
   // ============================================================
@@ -740,8 +831,7 @@ export class StateManager {
 
   async persist(): Promise<void> {
     this.pendingSave = false
-    this.state.lastModified = Date.now()
-    await this.storage.setState(this.state)
+    await this.storage.setState({ ...this.state, lastModified: Date.now() })
   }
 
   async forcePersist(): Promise<void> {
@@ -784,6 +874,15 @@ export class StateManager {
         }
       }
       this.state.version = 5
+      changed = true
+    }
+
+    // v5 → v6: ensure theme is set
+    if (this.state.version < 6) {
+      if (!this.state.theme) {
+        this.state.theme = 'system'
+      }
+      this.state.version = 6
       changed = true
     }
 

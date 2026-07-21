@@ -104,17 +104,6 @@ Logic tập trung tại [`src/core/calc.ts`](../src/core/calc.ts):
 
 ---
 
-## Code legacy
-
-Thư mục [`legacy/`](../legacy/) chứa toàn bộ 34 file `.js` cũ (kiến trúc `window.GL`) đã được tách ra khỏi `src/` để tham chiếu trong quá trình migration. Các file này **không được load** bởi Vite và sẽ được xóa dần khi từng tính năng được chuyển sang TypeScript hoàn chỉnh.
-
-Danh sách tính năng chưa migrate:
-- Xuất/Nhập điểm Excel (`legacy/services/export/`, `legacy/services/import/`)
-- Sao lưu JSON (`legacy/services/backup.js`)
-- Nhật ký học viên (`legacy/features/journal.js`)
-- Báo cáo giáo xứ (`legacy/features/reports.js`, `legacy/features/parish.js`)
-- Thư mời phụ huynh (`legacy/features/invite.js`)
-
 ---
 
 ## Kiểm thử

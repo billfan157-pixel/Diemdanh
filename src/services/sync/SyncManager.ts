@@ -8,6 +8,8 @@ import { AuthManager } from '../../core/auth/AuthManager'
 import { supabaseService } from '../SupabaseClient'
 import { SyncEngine } from './SyncEngine'
 import { AppState } from '../storage/StorageAdapter.types'
+import { resolveClassColumns } from '../../config/constants.ts'
+import { logger } from '../Logger'
 
 export interface SyncStatus {
   status: 'idle' | 'syncing' | 'error' | 'offline'
@@ -96,12 +98,14 @@ export class SyncManager extends EventTarget {
       this.status.status = 'idle'
       this.status.error = undefined
       localStorage.setItem('so-diem-gl-last-sync', String(this.status.lastSync))
+      await this.refreshPendingCount()
       this.emitStatusChange()
 
       return { ok: true }
     } catch (e: any) {
       this.status.status = 'error'
       this.status.error = e.message
+      await this.refreshPendingCount()
       this.emitStatusChange()
       return { ok: false, error: e.message }
     }
@@ -131,19 +135,29 @@ export class SyncManager extends EventTarget {
       // 5. Merge all into local StateManager
       if (this.stateManager) {
         const sm = this.stateManager
-        ;(sm as any).mutate('Tải dữ liệu từ đám mây', (draft: AppState) => {
+        sm.applyFromNetwork('Tải dữ liệu từ đám mây', (draft: AppState) => {
           draft.classes = (dbClasses || []).map((c: any) => {
+            const classColumns = resolveClassColumns(c)
             const students = (dbStudents || [])
               .filter((s: any) => s.class_id === c.id)
               .map((s: any) => {
+                // Initialize scoresByTerm with dynamic columns from class
                 const scoresByTerm: any = {
-                  hk1: { khaoKinh: [], thuocBai: [], chuyenCan: [], baiTap: [], thaiDo: [], kiemTra: [] },
-                  hk2: { khaoKinh: [], thuocBai: [], chuyenCan: [], baiTap: [], thaiDo: [], kiemTra: [] }
+                  hk1: {} as any,
+                  hk2: {} as any
+                }
+                
+                // Initialize empty arrays for each column
+                for (const col of classColumns) {
+                  scoresByTerm.hk1[col.key] = []
+                  scoresByTerm.hk2[col.key] = []
                 }
 
                 const studentScores = (dbScores || []).filter((sc: any) => sc.student_id === s.id)
                 for (const sc of studentScores) {
-                  scoresByTerm[sc.term as 'hk1'|'hk2'][sc.col_key] = sc.values
+                  if (scoresByTerm[sc.term as 'hk1'|'hk2']) {
+                    scoresByTerm[sc.term as 'hk1'|'hk2'][sc.col_key] = sc.values
+                  }
                 }
 
                 const logs = (dbLogs || [])
@@ -192,12 +206,12 @@ export class SyncManager extends EventTarget {
               updatedAt: new Date(c.updated_at).getTime()
             }
           })
-        }, { fromNetwork: true })
+        })
       }
 
       return { ok: true }
     } catch (e: any) {
-      console.error('Pull failed:', e)
+      logger.error('Pull failed:', e)
       return { ok: false, error: e.message }
     }
   }
@@ -231,6 +245,10 @@ export class SyncManager extends EventTarget {
     return { ...this.status }
   }
 
+  async refreshPendingCount(): Promise<void> {
+    this.status.pendingCount = await this.syncEngine.getPendingCount()
+  }
+
   getSupabaseUrl(): string {
     return supabaseService.getUrl()
   }
@@ -239,7 +257,8 @@ export class SyncManager extends EventTarget {
     return supabaseService.isConfigured()
   }
 
-  private emitStatusChange(): void {
+  private async emitStatusChange(): Promise<void> {
+    await this.refreshPendingCount()
     this.dispatchEvent(new CustomEvent('syncstatuschange', { detail: this.getStatus() }))
   }
 }

@@ -7,7 +7,8 @@ import { StorageAdapter } from '../storage/StorageAdapter'
 import { StateManager } from '../../ui/StateManager'
 import { parsePatchesToOps, SyncOp } from './PatchSyncParser'
 import { AppState } from '../storage/StorageAdapter.types'
-import { cloneDefaultCols } from '../../config/columns.ts'
+import { cloneDefaultCols, resolveClassColumns } from '../../config/columns.ts'
+import { logger } from '../Logger'
 
 export interface ConflictData {
   op: SyncOp
@@ -32,28 +33,30 @@ export class SyncEngine extends EventTarget {
     this.stateManager = sm
     
     if (!this.onMutationAttached) {
-      // Intercept state changes to enqueue sync operations
-      const origMutate = (sm as any).mutate.bind(sm)
-      ;(sm as any).mutate = (label: string, mutator: any, options: any) => {
-        const oldState = sm.getMutableState()
-        
-        // Execute original mutate to update state
-        origMutate(label, mutator, options)
-        
-        const newState = sm.getMutableState()
-        
+      // Cache state before mutation to detect changes
+      let cachedState: any = null
+      
+      // Subscribe to state changes to cache current state
+      sm.subscribe((state) => {
+        cachedState = JSON.parse(JSON.stringify(state))
+      })
+      
+      // Use event-based tracking instead of intercepting private methods
+      sm.onMutation((_label: string, fromNetwork: boolean) => {
         // If this mutation was loaded from sync/network, do not loop-sync it
-        if (options && options.fromNetwork) return
+        if (fromNetwork) return
 
         // Parse changes into sync ops and enqueue them
-        if (!options || !options.skipPersist) {
-          const patches = (sm as any).undoStack[(sm as any).undoStack.length - 1]?.patches || []
-          const ops = parsePatchesToOps(oldState, newState, patches)
+        const undoStack = sm.getUndoStack()
+        const latestEntry = undoStack[undoStack.length - 1]
+        if (latestEntry && latestEntry.patches && cachedState) {
+          const newState = sm.getState()
+          const ops = parsePatchesToOps(cachedState, newState, latestEntry.patches)
           for (const op of ops) {
             this.enqueueOp(op)
           }
         }
-      }
+      })
       this.onMutationAttached = true
     }
   }
@@ -107,7 +110,7 @@ export class SyncEngine extends EventTarget {
           }
           await this.storage.markSyncItemCompleted(item.id!)
         } catch (e: any) {
-          console.warn('Sync item failed:', e)
+          logger.warn('Sync item failed:', e)
           await this.storage.markSyncItemFailed(item.id!)
           this.scheduleRetry()
           break
@@ -121,6 +124,10 @@ export class SyncEngine extends EventTarget {
     } finally {
       this.processingQueue = false
     }
+  }
+
+  async getPendingCount(): Promise<number> {
+    return this.storage.getPendingSyncCount()
   }
 
   private async processSyncOp(op: SyncOp): Promise<void> {
@@ -141,40 +148,50 @@ export class SyncEngine extends EventTarget {
 
         if (!fetchErr && cloudRec && cloudRec.rev > (op.data.rev - 1)) {
           // Cloud has a newer revision! Stop queue and wait for conflict resolution
+          let settled = false
+          const CONFLICT_TIMEOUT = 30_000
+
           return new Promise<void>((resolve, reject) => {
+            const resolveOnce = async (choice: 'keep_local' | 'take_cloud' | 'merge', mergedData?: any) => {
+              if (settled) return
+              settled = true
+              clearTimeout(fallbackTimer)
+              try {
+                if (choice === 'keep_local') {
+                  op.data.rev = cloudRec.rev + 1
+                  const { error } = await supabase.from(op.table).upsert(op.data)
+                  if (error) throw error
+                } else if (choice === 'take_cloud') {
+                  const { data: fullCloud } = await supabase
+                    .from(op.table)
+                    .select('*')
+                    .eq('id', op.id)
+                    .single()
+                  if (fullCloud) {
+                    this.mergeRecordLocally(op.table, fullCloud)
+                  }
+                } else if (choice === 'merge' && mergedData) {
+                  mergedData.rev = cloudRec.rev + 1
+                  const { error } = await supabase.from(op.table).upsert(mergedData)
+                  if (error) throw error
+                  this.mergeRecordLocally(op.table, mergedData)
+                }
+                resolve()
+              } catch (err) {
+                reject(err)
+              }
+            }
+
+            // Auto-resolve with keep_local after timeout to prevent queue deadlock
+            const fallbackTimer = setTimeout(() => {
+              resolveOnce('keep_local').catch(() => {})
+            }, CONFLICT_TIMEOUT)
+
             const conflictEvent = new CustomEvent('conflict', {
               detail: {
                 op,
                 cloudRecord: cloudRec,
-                resolve: async (choice: 'keep_local' | 'take_cloud' | 'merge', mergedData?: any) => {
-                  try {
-                    if (choice === 'keep_local') {
-                      // Bump local rev and force push
-                      op.data.rev = cloudRec.rev + 1
-                      const { error } = await supabase.from(op.table).upsert(op.data)
-                      if (error) throw error
-                    } else if (choice === 'take_cloud') {
-                      // Pull cloud record and write locally
-                      const { data: fullCloud } = await supabase
-                        .from(op.table)
-                        .select('*')
-                        .eq('id', op.id)
-                        .single()
-                      if (fullCloud) {
-                        this.mergeRecordLocally(op.table, fullCloud)
-                      }
-                    } else if (choice === 'merge' && mergedData) {
-                      // Upsert merged data
-                      mergedData.rev = cloudRec.rev + 1
-                      const { error } = await supabase.from(op.table).upsert(mergedData)
-                      if (error) throw error
-                      this.mergeRecordLocally(op.table, mergedData)
-                    }
-                    resolve()
-                  } catch (err) {
-                    reject(err)
-                  }
-                }
+                resolve: resolveOnce
               } as ConflictData
             })
             this.dispatchEvent(conflictEvent)
@@ -274,7 +291,7 @@ export class SyncEngine extends EventTarget {
       const idx = sm.getState().classes.findIndex(c => c.id === record.id)
       if (idx === -1) {
         // Class not found locally, create it
-        ;(sm as any).mutate(label, (draft: AppState) => {
+        sm.applyFromNetwork(label, (draft: AppState) => {
           draft.classes.push({
             id: record.id,
             name: record.name,
@@ -287,10 +304,10 @@ export class SyncEngine extends EventTarget {
             createdAt: new Date(record.created_at).getTime(),
             updatedAt: new Date(record.updated_at).getTime()
           })
-        }, { fromNetwork: true })
+        })
       } else {
         // Update class properties
-        ;(sm as any).mutate(label, (draft: AppState) => {
+        sm.applyFromNetwork(label, (draft: AppState) => {
           draft.classes[idx].name = record.name
           draft.classes[idx].year = record.year
           if (Array.isArray(record.columns) && record.columns.length) {
@@ -298,7 +315,7 @@ export class SyncEngine extends EventTarget {
           }
           draft.classes[idx].weights = record.weights
           draft.classes[idx].updatedAt = new Date(record.updated_at).getTime()
-        }, { fromNetwork: true })
+        })
       }
     } else if (table === 'students') {
       // Find class
@@ -307,7 +324,20 @@ export class SyncEngine extends EventTarget {
 
       const sIdx = sm.getState().classes[classIdx].students.findIndex(s => s.id === record.id)
       if (sIdx === -1) {
-        ;(sm as any).mutate(label, (draft: AppState) => {
+        const classColumns = resolveClassColumns(sm.getState().classes[classIdx])
+        sm.applyFromNetwork(label, (draft: AppState) => {
+          // Initialize scoresByTerm with dynamic columns from class
+          const scoresByTerm: any = {
+            hk1: {} as any,
+            hk2: {} as any
+          }
+          
+          // Initialize empty arrays for each column
+          for (const col of classColumns) {
+            scoresByTerm.hk1[col.key] = []
+            scoresByTerm.hk2[col.key] = []
+          }
+
           draft.classes[classIdx].students.push({
             id: record.id,
             tenThanh: record.ten_thanh || '',
@@ -322,17 +352,14 @@ export class SyncEngine extends EventTarget {
             diaChi: record.dia_chi || '',
             email: record.email || '',
             ghiChu: record.ghi_chu || '',
-            scoresByTerm: {
-              hk1: { khaoKinh: [], thuocBai: [], chuyenCan: [], baiTap: [], thaiDo: [], kiemTra: [] },
-              hk2: { khaoKinh: [], thuocBai: [], chuyenCan: [], baiTap: [], thaiDo: [], kiemTra: [] }
-            },
+            scoresByTerm,
             learningLog: [],
             createdAt: new Date(record.created_at).getTime(),
             updatedAt: new Date(record.updated_at).getTime()
           })
-        }, { fromNetwork: true })
+        })
       } else {
-        ;(sm as any).mutate(label, (draft: AppState) => {
+        sm.applyFromNetwork(label, (draft: AppState) => {
           const s = draft.classes[classIdx].students[sIdx]
           s.tenThanh = record.ten_thanh || ''
           s.hoDem = record.ho_dem || ''
@@ -347,17 +374,21 @@ export class SyncEngine extends EventTarget {
           s.email = record.email || ''
           s.ghiChu = record.ghi_chu || ''
           s.updatedAt = new Date(record.updated_at).getTime()
-        }, { fromNetwork: true })
+        })
       }
     } else if (table === 'scores') {
       // Find the class and student
       for (let cIdx = 0; cIdx < sm.getState().classes.length; cIdx++) {
         const sIdx = sm.getState().classes[cIdx].students.findIndex(s => s.id === record.student_id)
         if (sIdx !== -1) {
-          ;(sm as any).mutate(label, (draft: AppState) => {
+          const classColumns = resolveClassColumns(sm.getState().classes[cIdx])
+          sm.applyFromNetwork(label, (draft: AppState) => {
             const termScores = draft.classes[cIdx].students[sIdx].scoresByTerm[record.term as 'hk1'|'hk2']
-            termScores[record.col_key as keyof typeof termScores] = record.values
-          }, { fromNetwork: true })
+            // Only set if the column exists in this class
+            if (classColumns.some(col => col.key === record.col_key)) {
+              termScores[record.col_key as keyof typeof termScores] = record.values
+            }
+          })
           break
         }
       }
@@ -365,7 +396,7 @@ export class SyncEngine extends EventTarget {
       for (let cIdx = 0; cIdx < sm.getState().classes.length; cIdx++) {
         const sIdx = sm.getState().classes[cIdx].students.findIndex(s => s.id === record.student_id)
         if (sIdx !== -1) {
-          ;(sm as any).mutate(label, (draft: AppState) => {
+          sm.applyFromNetwork(label, (draft: AppState) => {
             const logs = draft.classes[cIdx].students[sIdx].learningLog
             const logIdx = logs.findIndex(l => l.id === record.id)
             const logItem = {
@@ -384,7 +415,7 @@ export class SyncEngine extends EventTarget {
             } else {
               logs[logIdx] = logItem
             }
-          }, { fromNetwork: true })
+          })
           break
         }
       }
@@ -400,20 +431,20 @@ export class SyncEngine extends EventTarget {
     if (table === 'classes') {
       const idx = sm.getState().classes.findIndex(c => c.id === id)
       if (idx !== -1) {
-        ;(sm as any).mutate(label, (draft: AppState) => {
+        sm.applyFromNetwork(label, (draft: AppState) => {
           draft.classes.splice(idx, 1)
           if (draft.activeClassId === id) {
             draft.activeClassId = draft.classes[0]?.id || null
           }
-        }, { fromNetwork: true })
+        })
       }
     } else if (table === 'students') {
       for (let cIdx = 0; cIdx < sm.getState().classes.length; cIdx++) {
         const sIdx = sm.getState().classes[cIdx].students.findIndex(s => s.id === id)
         if (sIdx !== -1) {
-          ;(sm as any).mutate(label, (draft: AppState) => {
+          sm.applyFromNetwork(label, (draft: AppState) => {
             draft.classes[cIdx].students.splice(sIdx, 1)
-          }, { fromNetwork: true })
+          })
           break
         }
       }

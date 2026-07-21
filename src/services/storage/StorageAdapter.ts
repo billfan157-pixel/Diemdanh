@@ -8,7 +8,12 @@ import {
   AppState,
   SyncQueueItem,
   BackupRecord,
-  AppDBSchema
+  AppDBSchema,
+  ScoreColumnDef,
+  ColumnWeights,
+  ClassData,
+  TermScores,
+  ScoresByTerm
 } from './StorageAdapter.types'
 import {
   cloneDefaultCols,
@@ -17,6 +22,7 @@ import {
   ensureScoresMatchColumns,
   weightsFromColumns
 } from '../../config/columns.ts'
+import { generateId } from '../../utils/id.ts'
 
 // ============================================================
 // Constants
@@ -109,25 +115,50 @@ export class StorageAdapter {
   // ============================================================
 
   async getState(): Promise<AppState> {
+    let state: AppState | null = null
+
     if (this.useIndexedDB) {
       try {
         const db = await getDB()
-        const state = await db.get('appState', 'main')
-        if (state) return this.migrateState(state)
+        const raw = await db.get('appState', 'main')
+        if (raw) state = this.migrateState(raw)
       } catch (e) {
         console.warn('IndexedDB read failed, falling back:', e)
       }
     }
 
     // Fallback to localStorage
-    try {
-      const data = localStorage.getItem('so-diem-gl-state')
-      if (data) return this.migrateState(JSON.parse(data))
-    } catch (e) {
-      console.warn('localStorage read failed:', e)
+    if (!state) {
+      try {
+        const data = localStorage.getItem('so-diem-gl-state')
+        if (data) state = this.migrateState(JSON.parse(data))
+      } catch (e) {
+        console.warn('localStorage read failed:', e)
+      }
     }
 
-    return this.getDefaultState()
+    // One-time migration from legacy giao-ly-diem-v3
+    // Only runs when the new state has zero classes (fresh start or stale empty state)
+    try {
+      const legacyRaw = localStorage.getItem('giao-ly-diem-v3')
+      if (legacyRaw) {
+        const legacy = JSON.parse(legacyRaw)
+        if (legacy && Array.isArray(legacy.classes) && legacy.classes.length > 0) {
+          if (!state || state.classes.length === 0) {
+            console.info('Migrating legacy data from giao-ly-diem-v3')
+            const migrated = this.migrateLegacyState(legacy)
+            if (state) migrated.theme = state.theme
+            await this.setState(migrated)
+            this.migrateLegacyAuth()
+            return migrated
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Legacy migration failed:', e)
+    }
+
+    return state ?? this.getDefaultState()
   }
 
   async setState(state: AppState): Promise<void> {
@@ -274,6 +305,17 @@ export class StorageAdapter {
     }
   }
 
+  async getPendingSyncCount(): Promise<number> {
+    if (!this.useIndexedDB) return 0
+    try {
+      const db = await getDB()
+      const all = await db.getAll('syncQueue')
+      return all.filter(item => item.status === 'pending' || item.status === 'failed').length
+    } catch {
+      return 0
+    }
+  }
+
   async updateSyncStatus(id: number, status: 'pending' | 'syncing' | 'failed' | 'completed'): Promise<void> {
     if (!this.useIndexedDB) return
     try {
@@ -324,7 +366,9 @@ export class StorageAdapter {
       if (backups.length > keep) {
         const toDelete = backups.slice(0, backups.length - keep)
         const tx = db.transaction('backups', 'readwrite')
-        await Promise.all(toDelete.map(b => tx.store.delete(b.id!)))
+        for (const b of toDelete) {
+          await tx.store.delete(b.id!)
+        }
         await tx.done
       }
     } catch (e) {
@@ -392,13 +436,14 @@ export class StorageAdapter {
 
   private getDefaultState(): AppState {
     return {
-      version: 5,
+      version: 6,
       activeClassId: null,
       classes: [],
       yearFilter: null,
       archivedYears: [],
       viewMode: 'cards',
       activeTerm: 'hk1',
+      theme: 'system',
       parentTokens: [],
       lastModified: Date.now()
     }
@@ -431,7 +476,7 @@ export class StorageAdapter {
     })
 
     return {
-      version: Math.max(Number(state.version) || 1, 5),
+      version: Math.max(Number(state.version) || 1, 6),
       activeClassId: state.activeClassId ?? null,
       classes,
       yearFilter: state.yearFilter ?? null,
@@ -440,6 +485,7 @@ export class StorageAdapter {
         : [],
       viewMode: state.viewMode || 'cards',
       activeTerm: state.activeTerm || 'hk1',
+      theme: state.theme || 'system',
       parentTokens: Array.isArray(state.parentTokens) ? state.parentTokens : [],
       lastModified: state.lastModified || Date.now()
     }
@@ -474,6 +520,133 @@ export class StorageAdapter {
   // ============================================================
   // Export/Import
   // ============================================================
+
+  /** Migrate legacy giao-ly-diem-v3 state to new format. */
+  private migrateLegacyState(legacy: any): AppState {
+    // Must match the actual legacy GL.COLS so score keys align
+    const legacyDefaultCols: ScoreColumnDef[] = [
+      { key: 'dauGio', short: 'ĐG', label: 'Đầu giờ', defaultWeight: 1 },
+      { key: 'phut15', short: '15\'', label: '15 phút', defaultWeight: 1 },
+      { key: 'motTiet', short: '1T', label: '1 tiết', defaultWeight: 2 },
+      { key: 'khaoKinh', short: 'KK', label: 'Khảo kinh', defaultWeight: 1 },
+      { key: 'daoDuc', short: 'ĐĐ', label: 'Đạo đức', defaultWeight: 1 },
+      { key: 'thi', short: 'Thi', label: 'Thi', defaultWeight: 3 }
+    ]
+
+    const classes: ClassData[] = (legacy.classes || []).map((oldCls: any) => {
+      const clsCols = Array.isArray(oldCls.COLS)
+        ? oldCls.COLS.map((c: any, _i: number) => ({
+            key: String(c.key || c),
+            short: String(c.short || c.key || ''),
+            label: String(c.label || c.key || ''),
+            defaultWeight: Number(c.defaultWeight || oldCls.weights?.[c.key] || 1)
+          }))
+        : legacyDefaultCols
+
+      const clsWeights: ColumnWeights = {}
+      clsCols.forEach((c: ScoreColumnDef) => {
+        clsWeights[c.key] = Number(oldCls.weights?.[c.key] || c.defaultWeight || 1)
+      })
+
+      return {
+        id: oldCls.id || generateId('cls'),
+        name: oldCls.name || 'Lớp',
+        year: oldCls.year || '',
+        columns: clsCols,
+        weights: clsWeights,
+        students: (oldCls.students || []).map((oldSt: any, _si: number) => {
+          const sid = oldSt.id || generateId('st')
+          const scoresByTerm: ScoresByTerm = {
+            hk1: this.buildLegacyScores(oldSt, clsCols, 'hk1'),
+            hk2: this.buildLegacyScores(oldSt, clsCols, 'hk2')
+          }
+          return {
+            id: sid,
+            tenThanh: String(oldSt.tenThanh || oldSt.hoTenThanh || ''),
+            hoDem: String(oldSt.hoDem || ''),
+            ten: String(oldSt.ten || oldSt.name || ''),
+            name: String(oldSt.name || ''),
+            maHV: String(oldSt.maHV || oldSt.ma_hv || ''),
+            ngaySinh: String(oldSt.ngaySinh || ''),
+            gioiTinh: String(oldSt.gioiTinh || ''),
+            tenPhuHuynh: String(oldSt.tenPhuHuynh || oldSt.phuHuynh || ''),
+            sdPhuHuynh: String(oldSt.sdPhuHuynh || oldSt.sdt || ''),
+            diaChi: String(oldSt.diaChi || oldSt.giaoXu || ''),
+            email: String(oldSt.email || ''),
+            ghiChu: String(oldSt.ghiChu || ''),
+            scoresByTerm,
+            learningLog: Array.isArray(oldSt.learningLog) ? oldSt.learningLog : [],
+            createdAt: oldSt.createdAt || Date.now() - _si * 1000,
+            updatedAt: oldSt.updatedAt || Date.now()
+          }
+        }),
+        createdAt: oldCls.createdAt || Date.now(),
+        updatedAt: oldCls.updatedAt || Date.now()
+      }
+    })
+
+    return {
+      version: 6,
+      activeClassId: legacy.activeClassId || (classes[0]?.id || null),
+      classes,
+      yearFilter: null,
+      archivedYears: [],
+      viewMode: 'cards',
+      activeTerm: 'hk1',
+      theme: 'system',
+      parentTokens: [],
+      lastModified: Date.now()
+    }
+  }
+
+  private buildLegacyScores(oldSt: any, cols: ScoreColumnDef[], term: 'hk1' | 'hk2'): TermScores {
+    const result: Record<string, number[]> = {}
+    for (const col of cols) {
+      const raw = oldSt.scoresByTerm?.[term]?.[col.key]
+        ?? oldSt.scores?.[term]?.[col.key]
+        ?? oldSt[`${col.key}_${term}`]
+        ?? oldSt[col.key]
+      result[col.key] = Array.isArray(raw) ? raw.filter((n: any) => typeof n === 'number') : []
+    }
+    return result as TermScores
+  }
+
+  private migrateLegacyAuth(): void {
+    try {
+      const legacyRaw = localStorage.getItem('giao-ly-auth-v1')
+      if (!legacyRaw) return
+
+      const existing = localStorage.getItem('so-diem-gl-auth')
+      if (existing) return
+
+      const legacy = JSON.parse(legacyRaw)
+      if (!legacy || !Array.isArray(legacy.users) || !legacy.users.length) return
+
+      const newUsers = legacy.users.map((u: any) => ({
+        id: u.id,
+        username: u.username || 'admin',
+        displayName: u.displayName || 'Ban Giáo lý',
+        pinHash: u.pinHash || '',
+        pinSalt: '', // ← empty signals legacy hash; verifyPin will fall back to simpleHash
+        role: u.role === 'glv' ? 'glv' as const : 'ban_gl' as const,
+        classIds: Array.isArray(u.classIds) ? u.classIds : [],
+        active: u.active !== false,
+        biometricEnabled: false,
+        createdAt: u.createdAt || Date.now(),
+        updatedAt: u.updatedAt || Date.now()
+      }))
+
+      const newStore = {
+        version: 1,
+        users: newUsers,
+        activeUserId: legacy.activeUserId || null
+      }
+
+      localStorage.setItem('so-diem-gl-auth', JSON.stringify(newStore))
+    } catch (e) {
+      console.warn('Legacy auth migration failed:', e)
+    }
+  }
 
   async exportAll(): Promise<string> {
     const [state, auth] = await Promise.all([
@@ -530,6 +703,45 @@ export class StorageAdapter {
 
   async setSettings(settings: Record<string, any>): Promise<void> {
     localStorage.setItem('so-diem-gl-settings', JSON.stringify(settings))
+  }
+
+  // ============================================================
+  // Backup Directory Handle (stored in IndexedDB appState store)
+  // ============================================================
+
+  async saveBackupHandle(handle: any): Promise<void> {
+    if (!this.useIndexedDB) return
+    try {
+      const db = await getDB()
+      if (handle) {
+        await db.put('appState', handle, 'backupFolder')
+      } else {
+        await db.delete('appState', 'backupFolder')
+      }
+    } catch (e) {
+      console.warn('Failed to save backup handle:', e)
+    }
+  }
+
+  async getBackupHandle(): Promise<any> {
+    if (!this.useIndexedDB) return null
+    try {
+      const db = await getDB()
+      return (await db.get('appState', 'backupFolder')) || null
+    } catch (e) {
+      console.warn('Failed to get backup handle:', e)
+      return null
+    }
+  }
+
+  async deleteBackupHandle(): Promise<void> {
+    if (!this.useIndexedDB) return
+    try {
+      const db = await getDB()
+      await db.delete('appState', 'backupFolder')
+    } catch (e) {
+      console.warn('Failed to delete backup handle:', e)
+    }
   }
 
   // ============================================================

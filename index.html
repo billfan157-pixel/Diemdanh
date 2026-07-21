@@ -8,21 +8,24 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sổ Điểm GL" />
+  <meta name="application-name" content="Sổ Điểm GL" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co;" />
+  <link rel="apple-touch-icon" href="/icon.svg" />
+  <link rel="apple-touch-icon" sizes="512x512" href="/icon.svg" />
   <title>Sổ Điểm Giáo Lý</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 </head>
 <body>
-  <a href="#mainContent" class="skip-link">Chuyển đến nội dung chính</a>
+  <a href="#appMount" class="skip-link">Chuyển đến nội dung chính</a>
   <noscript>
     <div class="noscript">
       <strong>JavaScript bị tắt</strong><br>
       Vui lòng bật JavaScript để sử dụng Sổ Điểm Giáo Lý.
     </div>
   </noscript>
-  <div id="appMount"></div>
+  <div id="appMount" tabindex="-1"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

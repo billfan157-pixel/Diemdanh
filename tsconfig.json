@@ -15,15 +15,14 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@/core/*": ["src/core/*"],
-      "@/features/*": ["src/features/*"],
-      "@/services/*": ["src/services/*"],
-      "@/ui/*": ["src/ui/*"],
-      "@/config/*": ["src/config/*"],
-      "@/platform/*": ["src/platform/*"]
+      "@/*": ["./src/*"],
+      "@/core/*": ["./src/core/*"],
+      "@/features/*": ["./src/features/*"],
+      "@/services/*": ["./src/services/*"],
+      "@/ui/*": ["./src/ui/*"],
+      "@/config/*": ["./src/config/*"],
+      "@/platform/*": ["./src/platform/*"]
     },
     "types": ["vite/client"]
   },
