@@ -2,13 +2,14 @@ import { resolveClassColumns } from '../config/columns.ts'
 import { type ViewMode } from '../config/constants.ts'
 import { type ClassData, type StudentData, type ScoreColumnDef } from '../services/storage/StorageAdapter.types.ts'
 import { studentTB, studentYearTB, classify, colAvg } from '../core/calc.ts'
-import { renderCardsView } from './cardsView.ts'
 import { fmt, scoreClass } from './helpers.ts'
+import { iconEditStr, iconSearchStr } from '../ui/views/components/gl-icons'
 export type ActiveTerm = 'hk1' | 'hk2' | 'year'
 
 export interface StudentFilter {
   classification?: string
   completion?: 'all' | 'complete' | 'incomplete' | 'none'
+  scoreRanges?: Record<string, { min?: number; max?: number }>
 }
 
 export function applyFilters(students: StudentData[], cls: ClassData, term: ActiveTerm, filter?: StudentFilter): StudentData[] {
@@ -29,6 +30,16 @@ export function applyFilters(students: StudentData[], cls: ClassData, term: Acti
       if (filter.completion === 'incomplete' && filled === cols.length) return false
       if (filter.completion === 'none' && filled > 0) return false
     }
+    // Per-column score range filter (AND logic)
+    if (filter.scoreRanges) {
+      for (const [colKey, range] of Object.entries(filter.scoreRanges)) {
+        const scores = st.scoresByTerm?.[actualTerm]?.[colKey]
+        const latest = scores?.length ? scores[scores.length - 1] : null
+        if (latest === null) return false
+        if (range.min != null && latest < range.min) return false
+        if (range.max != null && latest > range.max) return false
+      }
+    }
     return true
   })
 }
@@ -39,17 +50,17 @@ export function renderStudents(
   viewMode: ViewMode,
   searchQuery?: string,
   filter?: StudentFilter,
-  selectedSet?: Set<string>
+  _selectedSet?: Set<string>
 ): string {
   let students = filterStudents(cls.students, searchQuery)
   students = applyFilters(students, cls, term, filter)
 
   if (!cls.students.length) {
-    return emptyState('✏️', 'Lớp chưa có học viên', 'Thêm học viên mới từ nút "➕ Thêm HV" ở trên.')
+    return emptyState(iconEditStr(), 'Lớp chưa có học viên', 'Thêm học viên mới để bắt đầu ghi điểm học kỳ.', 'add-student')
   }
   if (!students.length) {
-    if (searchQuery) return emptyState('🔍', 'Không tìm thấy học viên', 'Thử tìm với từ khóa khác.')
-    return emptyState('🔍', 'Không có học viên phù hợp', 'Thử điều chỉnh bộ lọc hoặc tìm kiếm.')
+    if (searchQuery) return emptyState(iconSearchStr(), 'Không tìm thấy học viên', 'Không tìm thấy học viên khớp với từ khóa tìm kiếm của bạn.')
+    return emptyState(iconSearchStr(), 'Không có học viên phù hợp', 'Thử điều chỉnh hoặc xóa bộ lọc hiện tại của bạn.', 'clear-filters')
   }
 
   const cols = resolveClassColumns(cls)
@@ -58,7 +69,7 @@ export function renderStudents(
   switch (viewMode) {
     case 'year': {
       if (term !== 'year') {
-        return renderCardsView({ students, cols, weights: cls.weights, term: actualTerm }, selectedSet)
+        return ''
       }
       return renderYearView(cls, students, cols)
     }
@@ -68,72 +79,39 @@ export function renderStudents(
       }
       return renderYearView(cls, students, cols) + '<div class="mt-4">' + renderStatsView(cls, students, cols, cls.weights, actualTerm) + '</div>'
     }
-    case 'cards':
-      return renderCardsView({ students, cols, weights: cls.weights, term: actualTerm }, selectedSet)
-    case 'table':
-      return renderTableView(cls, students, actualTerm, selectedSet)
     case 'rank':
       return renderRankView(cls, students, cls.weights, actualTerm, cols)
     default:
-      return renderCardsView({ students, cols, weights: cls.weights, term: actualTerm }, selectedSet)
+      return ''
   }
 }
 
-function filterStudents(all: StudentData[], query?: string): StudentData[] {
+export function filterStudents(all: StudentData[], query?: string): StudentData[] {
   if (!query) return all
   const q = query.toLowerCase()
   return all.filter(st => {
-    const name = [st.tenThanh, st.hoDem, st.ten, st.name, st.maHV]
+    const searchable = [st.tenThanh, st.hoDem, st.ten, st.name, st.maHV, st.ghiChu]
       .filter(Boolean).join(' ').toLowerCase()
-    return name.includes(q)
+    return searchable.includes(q)
   })
 }
 
-function emptyState(icon: string, title: string, hint: string): string {
-  return `<div class="dash-empty text-center pt-10 pb-10 px-4">
-    <div class="empty-icon">${icon}</div>
-    <strong>${title}</strong>
-    <p class="hint mt-2" style="line-height:1.4">${hint}</p>
+function emptyState(icon: string, title: string, hint: string, actionId?: 'add-student' | 'clear-filters'): string {
+  let buttonHtml = ''
+  if (actionId === 'add-student') {
+    buttonHtml = `<gl-button variant="primary" size="sm" id="emptyAddStudentBtn" style="margin-top: 12px;">➕ Thêm học viên</gl-button>`
+  } else if (actionId === 'clear-filters') {
+    buttonHtml = `<gl-button variant="ghost" size="sm" id="emptyClearFiltersBtn" style="margin-top: 12px;">🧹 Xóa bộ lọc</gl-button>`
+  }
+  return `<div class="dash-empty text-center pt-10 pb-10 px-4" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 250px;">
+    <div class="empty-icon" style="margin-bottom: 8px;">${icon}</div>
+    <strong style="font-size: 1rem; color: var(--color-text);">${title}</strong>
+    <p class="hint mt-2" style="line-height:1.45; max-width: 280px; margin: 6px auto 0;">${hint}</p>
+    ${buttonHtml}
   </div>`
 }
 
-export function renderSingleStudentRow(
-  st: StudentData,
-  i: number,
-  cols: ScoreColumnDef[],
-  weights: Record<string, number>,
-  term: 'hk1' | 'hk2',
-  selected: boolean
-): string {
-  const delay = Math.min(i * 30, 300)
-  const headerCells = `<td class="sel-col col-hide-xs"><input type="checkbox" class="student-select" data-select-student="${st.id}" title="Chọn học viên" aria-label="Chọn học viên" ${selected ? 'checked' : ''} /></td><td>${i + 1}</td><td class="name-col col-hide-xs">${escapeHtml(st.hoDem)}</td><td class="name-col">${escapeHtml(st.ten || st.name)}</td>`
-  const scoreCells = cols.map((c, ci) => {
-    const priorityClass = ci >= 4 ? 'col-hide-sm' : ci >= 2 ? 'col-hide-xs' : ''
-    const scores = st.scoresByTerm?.[term]?.[c.key] || []
-    return `<td class="${priorityClass}"><input class="cell-score" type="number" min="0" max="10" step="0.25" inputmode="decimal" enterkeyhint="next" autocomplete="off" value="${scores.length ? scores[scores.length - 1] : ''}" data-table-score data-sid="${st.id}" data-col="${c.key}" aria-label="${escapeHtml(c.label)}" /></td>`
-  }).join('')
-  const tb = studentTB(st, weights, term, cols)
-  return `<tr data-id="${st.id}" draggable="true" class="${st.starred ? 'is-starred' : ''} stagger-enter" style="animation-delay:${delay}ms">${headerCells}${scoreCells}<td class="tb-cell">${fmt(tb)}</td><td class="name-col col-hide-xs">${escapeHtml(st.ghiChu)}</td></tr>`
-}
 
-export function renderTableView(cls: ClassData, students: StudentData[], term: 'hk1' | 'hk2' = 'hk1', selectedSet?: Set<string>): string {
-  const cols = resolveClassColumns(cls)
-  const headerCols = cols.map((c, ci) => {
-    const priorityClass = ci >= 4 ? 'col-hide-sm' : ci >= 2 ? 'col-hide-xs' : ''
-    return `<th scope="col" class="${priorityClass}" title="${c.label}×${cls.weights[c.key] || 1}">${c.short}<br><span>×${cls.weights[c.key] || 1}</span></th>`
-  }).join('')
-  const rows = students.map((st, i) => {
-    const isSelected = selectedSet?.has(st.id) || false
-    return renderSingleStudentRow(st, i, cols, cls.weights, term, isSelected)
-  }).join('')
-  return `<div class="table-wrap">
-    <table class="score-table">
-      <thead><tr><th scope="col" class="sel-col col-hide-xs"><input type="checkbox" id="selectAllTable" data-select-all aria-label="Chọn tất cả" /></th><th scope="col">STT</th><th scope="col" class="name-col col-hide-xs">Họ đệm</th><th scope="col" class="name-col">Tên</th>${headerCols}<th scope="col">TB</th><th scope="col" class="col-hide-xs">Ghi chú</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </div>
-  <p class="hint mt-2">Gõ điểm vào ô — Enter hoặc Tab để sang ô kế tiếp.</p>`
-}
 
 export function renderRankView(
   _cls: ClassData,

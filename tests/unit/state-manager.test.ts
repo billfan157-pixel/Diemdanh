@@ -703,14 +703,14 @@ describe('StateManager', () => {
       const cb = vi.fn()
       sm.onMutation(cb)
       sm.createClass('Lớp 1', '2025')
-      expect(cb).toHaveBeenCalledWith(expect.stringContaining('Tạo lớp'), false)
+      expect(cb).toHaveBeenCalledWith(expect.stringContaining('Tạo lớp'), false, expect.anything(), expect.anything())
     })
 
     it('applyFromNetwork triggers mutation listener with fromNetwork=true', () => {
       const cb = vi.fn()
       sm.onMutation(cb)
       sm.applyFromNetwork('test', (draft) => { draft.version = 99 })
-      expect(cb).toHaveBeenCalledWith('test', true)
+      expect(cb).toHaveBeenCalledWith('test', true, expect.anything(), expect.anything())
     })
   })
 

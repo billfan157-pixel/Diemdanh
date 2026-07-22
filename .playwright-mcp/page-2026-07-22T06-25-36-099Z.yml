@@ -1,0 +1,92 @@
+- generic [ref=f1e1]:
+  - link "Chuyển đến nội dung chính" [ref=f1e2] [cursor=pointer]:
+    - /url: "#appMount"
+  - generic [ref=f1e50]:
+    - complementary "Menu chính" [ref=f1e51]:
+      - generic [ref=f1e54]:
+        - generic [ref=f1e55]: ✝
+        - generic [ref=f1e56]:
+          - heading "Sổ Điểm Giáo Lý" [level=1] [ref=f1e57]
+          - paragraph [ref=f1e58]: Lưu điểm theo từng lớp
+      - generic [ref=f1e59]:
+        - generic [ref=f1e61]:
+          - generic [ref=f1e62]: Năm học
+          - combobox "Năm học" [ref=f1e63] [cursor=pointer]:
+            - option "Tất cả năm" [selected]
+          - paragraph [ref=f1e64]: Lọc lớp · dashboard · xuất nhiều lớp
+        - button "📊 Tổng quan năm học" [ref=f1e65] [cursor=pointer]
+        - generic [ref=f1e66]:
+          - button "Các lớp của bạn" [expanded] [ref=f1e67] [cursor=pointer]
+          - generic [ref=f1e70]: ▾
+          - generic [ref=f1e71]:
+            - generic [ref=f1e73]:
+              - generic [ref=f1e74]: 📂
+              - strong [ref=f1e75]: Chưa có lớp
+              - paragraph [ref=f1e76]: Tạo lớp mới từ ô bên dưới để bắt đầu nhập điểm.
+            - generic [ref=f1e77]:
+              - textbox "Tên lớp mới" [ref=f1e78]:
+                - /placeholder: "Tên lớp (vd: Ấu Nhi 1A)"
+              - generic [ref=f1e79]:
+                - textbox "Năm học" [ref=f1e80]:
+                  - /placeholder: Năm học (để trống nếu giữ nguyên)
+                - button "Tạo" [ref=f1e81] [cursor=pointer]
+        - generic [ref=f1e82]:
+          - button "📥 Dữ liệu & Xuất nhập" [expanded] [ref=f1e83] [cursor=pointer]:
+            - generic [ref=f1e86]: ▾
+          - generic [ref=f1e87]:
+            - button "📥 Xuất điểm lớp hiện tại" [ref=f1e88] [cursor=pointer]:
+              - generic [ref=f1e89]: 📥
+              - text: Xuất điểm lớp hiện tại
+            - button "🗂️ Xuất báo cáo giáo xứ" [ref=f1e90] [cursor=pointer]:
+              - generic [ref=f1e91]: 🗂️
+              - text: Xuất báo cáo giáo xứ
+            - button "📤 Nhập điểm Excel/CSV" [ref=f1e92] [cursor=pointer]:
+              - generic [ref=f1e93]: 📤
+              - text: Nhập điểm Excel/CSV
+        - generic [ref=f1e94]:
+          - button "📋 Học vụ & Báo cáo" [expanded] [ref=f1e95] [cursor=pointer]:
+            - generic [ref=f1e98]: ▾
+          - generic [ref=f1e99]:
+            - button "📊 Báo cáo nhanh" [ref=f1e100] [cursor=pointer]:
+              - generic [ref=f1e101]: 📊
+              - text: Báo cáo nhanh
+            - button "✉️ Mời phụ huynh liên kết" [ref=f1e102] [cursor=pointer]:
+              - generic [ref=f1e103]: ✉️
+              - text: Mời phụ huynh liên kết
+            - button "📋 Danh sách điểm thiếu" [ref=f1e104] [cursor=pointer]:
+              - generic [ref=f1e105]: 📋
+              - text: Danh sách điểm thiếu
+        - generic [ref=f1e106]:
+          - button "⚙️ Hệ thống" [expanded] [ref=f1e107] [cursor=pointer]:
+            - generic [ref=f1e110]: ▾
+          - generic [ref=f1e111]:
+            - button "👥 Quản lý tài khoản" [ref=f1e112] [cursor=pointer]:
+              - generic [ref=f1e113]: 👥
+              - text: Quản lý tài khoản
+            - button "💾 Sao lưu JSON định kỳ" [ref=f1e114] [cursor=pointer]:
+              - generic [ref=f1e115]: 💾
+              - text: Sao lưu JSON định kỳ
+            - button "⚙️ Cấu hình hệ thống" [ref=f1e116] [cursor=pointer]:
+              - generic [ref=f1e117]: ⚙️
+              - text: Cấu hình hệ thống
+            - button "❓ Hướng dẫn sử dụng" [ref=f1e118] [cursor=pointer]:
+              - generic [ref=f1e119]: ❓
+              - text: Hướng dẫn sử dụng
+        - paragraph [ref=f1e120]: "💡 Mẹo: Sao lưu JSON định kỳ · Đổi PIN bảo mật · Chỉ GLV mới có quyền xuất điểm lớp học."
+        - button "Thu gọn sidebar" [ref=f1e121] [cursor=pointer]: ◀
+    - main [ref=f1e123]:
+      - region "Tổng quan" [ref=f1e124]:
+        - generic [ref=f1e125]:
+          - heading "Tổng quan Ban GL" [level=2] [ref=f1e127]
+          - generic [ref=f1e128]:
+            - generic [ref=f1e129]: 📂
+            - strong [ref=f1e130]: Chưa có lớp học nào
+            - paragraph [ref=f1e131]: Tạo lớp mới từ menu bên trái để bắt đầu nhập điểm.
+  - dialog [ref=f1e138]:
+    - generic [ref=f1e139]:
+      - generic [ref=f1e140]: ℹ️
+      - heading "Import điểm" [level=3] [ref=f1e142]
+      - paragraph [ref=f1e143]: Bạn muốn import điểm từ file Excel (.xlsx)?
+      - generic [ref=f1e144]:
+        - button "📄 File JSON / CSV" [ref=f1e145] [cursor=pointer]
+        - button "📊 Import Excel" [active] [ref=f1e146] [cursor=pointer]

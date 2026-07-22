@@ -72,7 +72,7 @@ test.describe('Export & Import', () => {
     await page.fill('#inputTen', 'HV Backup')
     await page.click('#addForm button[type="submit"]')
 
-    // Navigate to profile — click the nav button (may be hidden on desktop)
+    // Navigate to profile
     await page.evaluate(() => {
       const btn = document.querySelector('[data-m-nav="me"]') as HTMLButtonElement
       if (btn) btn.click()
@@ -102,6 +102,18 @@ test.describe('Export & Import', () => {
     const tmpDir = fs.mkdtempSync('backup-')
     const backupPath = path.join(tmpDir, 'backup.json')
     await download.saveAs(backupPath)
+
+    // Verify backup file contents
+    const backupContent = fs.readFileSync(backupPath, 'utf-8')
+    const backupData = JSON.parse(backupContent)
+    expect(backupData.version).toBe(2)
+    expect(backupData.exportedAt).toBeGreaterThan(0)
+    expect(backupData.state).toBeDefined()
+    expect(backupData.auth).toBeDefined()
+    expect(backupData.checksum).toBeDefined()
+    expect(Array.isArray(backupData.state.classes)).toBe(true)
+    expect(backupData.state.classes.length).toBeGreaterThanOrEqual(1)
+    expect(backupData.state.classes[0].students.length).toBeGreaterThanOrEqual(1)
 
     // Close backup modal
     await page.locator('#backupModalClose').click()

@@ -44,8 +44,8 @@ export interface UndoEntry {
 
 type StateListener = (state: Readonly<AppState>) => void
 
-/** Callback invoked after each mutation, with the mutation label and whether it's from network sync. */
-type MutationListener = (label: string, fromNetwork: boolean) => void
+/** Callback invoked after each mutation, with the mutation label, network flag, and optional patches. */
+type MutationListener = (label: string, fromNetwork: boolean, patches?: Patch[], inversePatches?: Patch[]) => void
 
 // ============================================================
 // State Manager
@@ -129,10 +129,10 @@ export class StateManager {
     }
   }
 
-  private notifyMutation(label: string, fromNetwork: boolean): void {
+  private notifyMutation(label: string, fromNetwork: boolean, patches?: Patch[], inversePatches?: Patch[]): void {
     for (const listener of this.mutationListeners) {
       try {
-        listener(label, fromNetwork)
+        listener(label, fromNetwork, patches, inversePatches)
       } catch (e) {
         logger.error('Mutation listener error:', e)
       }
@@ -183,7 +183,7 @@ export class StateManager {
     }
 
     this.notify()
-    this.notifyMutation(label, !!options.fromNetwork)
+    this.notifyMutation(label, !!options.fromNetwork, patches, inversePatches)
   }
 
   /**
@@ -503,6 +503,22 @@ export class StateManager {
       isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     }
     document.documentElement.classList.toggle('dark', isDark)
+
+    // Apply custom accent color variables
+    const accent = localStorage.getItem('app-accent') || 'blue'
+    const presets = [
+      { name: 'blue', primary: '#2563eb', hover: '#1d4ed8', soft: '#eff6ff', softHover: '#dbeafe', darkSoft: '#1e3a5f' },
+      { name: 'purple', primary: '#8b5cf6', hover: '#7c3aed', soft: '#f5f3ff', softHover: '#ede9fe', darkSoft: '#2e1065' },
+      { name: 'green', primary: '#10b981', hover: '#059669', soft: '#ecfdf5', softHover: '#d1fae5', darkSoft: '#064e3b' },
+      { name: 'rose', primary: '#f43f5e', hover: '#e11d48', soft: '#fff1f2', softHover: '#ffe4e6', darkSoft: '#4c0519' },
+      { name: 'teal', primary: '#0d9488', hover: '#0f766e', soft: '#f0fdfa', softHover: '#ccfbf1', darkSoft: '#115e59' }
+    ]
+    const preset = presets.find(p => p.name === accent) || presets[0]
+    const root = document.documentElement
+    root.style.setProperty('--color-primary', preset.primary)
+    root.style.setProperty('--color-primary-hover', preset.hover)
+    root.style.setProperty('--color-primary-soft', isDark ? preset.darkSoft : preset.soft)
+    root.style.setProperty('--color-primary-soft-hover', preset.softHover)
   }
 
   // ============================================================
@@ -848,7 +864,9 @@ export class StateManager {
       })
 
       this.redoStack.push(entry)
+      this.schedulePersist()
       this.notify()
+      this.notifyMutation(`Hoàn tác: ${entry.label}`, false, entry.inversePatches, entry.patches)
       return true
     } finally {
       this.isApplyingUndoRedo = false
@@ -870,7 +888,9 @@ export class StateManager {
       })
 
       this.undoStack.push(entry)
+      this.schedulePersist()
       this.notify()
+      this.notifyMutation(`Làm lại: ${entry.label}`, false, entry.patches, entry.inversePatches)
       return true
     } finally {
       this.isApplyingUndoRedo = false

@@ -1,0 +1,181 @@
+/* ============================================================
+   Profile / Trang Cá Nhân
+   ============================================================ */
+
+.me-view {
+  padding: var(--space-4) var(--space-4) var(--space-8);
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.me-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: linear-gradient(135deg, var(--color-primary-soft), var(--color-bg-elevated));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.me-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-purple));
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
+}
+
+.me-name {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.me-role {
+  margin: 2px 0 0;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.me-user {
+  margin: 2px 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+/* Accordion sections */
+details.me-section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-elevated);
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+details.me-section[open] {
+  box-shadow: var(--shadow-sm);
+  border-color: var(--color-border-strong);
+}
+
+details.me-section summary.me-section-title {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  font-size: 0.9rem;
+  font-weight: 750;
+  color: var(--color-text);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  background: var(--color-bg-elevated);
+}
+
+details.me-section summary.me-section-title::-webkit-details-marker {
+  display: none;
+}
+
+details.me-section summary.me-section-title::after {
+  content: '▸';
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  transition: transform 0.2s ease;
+}
+
+details.me-section[open] summary.me-section-title::after {
+  transform: rotate(90deg);
+}
+
+details.me-section .me-section-content {
+  padding: 8px 12px 14px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-bg);
+}
+
+/* Rows inside sections */
+.me-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  min-height: 58px;
+  transition: all 150ms ease;
+}
+
+.me-row:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+.me-row:active {
+  background: var(--color-bg-active);
+}
+
+.me-row-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.me-row-txt strong {
+  font-size: var(--font-size-sm);
+  font-weight: 750;
+  color: var(--color-text);
+}
+
+.me-row-txt small {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.me-row-chev {
+  color: var(--color-text-muted);
+  font-size: 1rem;
+}
+
+.me-logout {
+  background: var(--color-danger-soft);
+  border-color: rgba(220, 38, 38, 0.15);
+  color: var(--color-danger);
+}
+
+.me-logout:hover {
+  background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.me-logout .me-row-txt strong {
+  color: var(--color-danger);
+}
+
+.me-logout .me-row-txt small {
+  color: color-mix(in srgb, var(--color-danger) 70%, transparent);
+}

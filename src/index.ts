@@ -19,7 +19,9 @@ export type { AppState, ClassData, StudentData, ColumnWeights, ScoreColumnDef, P
 // UI
 export { App } from './ui/App'
 export { LoginView } from './ui/views/LoginView'
-export { AppView } from './ui/views/AppView'
+export { GlLoginView } from './ui/views/gl-login-view'
+export { GlProfileView } from './ui/views/gl-profile-view'
+export { GlAppShell } from './ui/views/gl-app-shell'
 
 // Utils
 export * from './config/constants.ts'

@@ -24,14 +24,100 @@ export interface ConfirmOptions {
 
 import { createFocusTrap } from '../utils/focusTrap.ts'
 
+export interface WebNotificationOptions {
+  body: string
+  icon?: string
+  tag?: string
+  onClick?: () => void
+}
+
 export class NotificationManager {
   private container: HTMLElement | null = null
   private maxToasts = 4
   private dialogResolve: ((value: boolean) => void) | null = null
   private _dialogFocusTrap: ReturnType<typeof createFocusTrap> | null = null
   private _dialogKeyHandler: ((e: KeyboardEvent) => void) | null = null
+  private _permissionListeners: Array<(granted: boolean) => void> = []
+  private _lastWebNotifTime = 0
 
   constructor() {}
+
+  get isWebPermissionGranted(): boolean {
+    return 'Notification' in window && Notification.permission === 'granted'
+  }
+
+  get isWebPermissionDenied(): boolean {
+    return 'Notification' in window && Notification.permission === 'denied'
+  }
+
+  onWebPermissionChange(fn: (granted: boolean) => void): () => void {
+    this._permissionListeners.push(fn)
+    return () => {
+      const i = this._permissionListeners.indexOf(fn)
+      if (i !== -1) this._permissionListeners.splice(i, 1)
+    }
+  }
+
+  async requestWebPermission(): Promise<boolean> {
+    if (!('Notification' in window)) return false
+    if (Notification.permission === 'granted') return true
+    if (Notification.permission === 'denied') return false
+
+    const result = await Notification.requestPermission()
+    const granted = result === 'granted'
+    for (const fn of this._permissionListeners) fn(granted)
+    return granted
+  }
+
+  sendWebNotification(title: string, options?: WebNotificationOptions): void {
+    if (!this.isWebPermissionGranted) return
+    const notif = new Notification(title, {
+      body: options?.body,
+      icon: options?.icon || '/icon.svg',
+      tag: options?.tag,
+      silent: true
+    })
+    if (options?.onClick) {
+      notif.onclick = () => {
+        window.focus()
+        notif.close()
+        options.onClick!()
+      }
+    }
+    setTimeout(() => notif.close(), 8000)
+  }
+
+  sendMissingScoreReminder(count: number, classNames: string[]): void {
+    const now = Date.now()
+    if (now - this._lastWebNotifTime < 60000) return
+    this._lastWebNotifTime = now
+
+    const title = 'Thiếu điểm học viên'
+    const body = classNames.length <= 3
+      ? `Lớp ${classNames.join(', ')} còn ${count} học viên thiếu điểm.`
+      : `Còn ${count} học viên thiếu điểm trên ${classNames.length} lớp.`
+
+    this.sendWebNotification(title, {
+      body,
+      tag: 'missing-scores',
+      onClick: () => {
+        window.dispatchEvent(new CustomEvent('gl:nav-dashboard'))
+      }
+    })
+  }
+
+  sendRemoteChangeNotification(className: string, changeType: string): void {
+    const labels: Record<string, string> = {
+      INSERT: 'được thêm',
+      UPDATE: 'được cập nhật',
+      DELETE: 'bị xóa'
+    }
+    this.show(
+      `Máy khác vừa ${labels[changeType] || 'cập nhật'} lớp "${className}"`,
+      'info',
+      { title: 'Đồng bộ', duration: 5000 }
+    )
+  }
 
   init(): void {
     this.container = document.getElementById('toastHost')

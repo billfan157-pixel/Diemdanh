@@ -32,7 +32,7 @@ body {
 
 /* Focus visible for keyboard navigation */
 :focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.4);
+  outline: 3px solid color-mix(in srgb, var(--color-primary) 50%, transparent);
   outline-offset: 2px;
 }
 
@@ -42,7 +42,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.4);
+  outline: 3px solid color-mix(in srgb, var(--color-primary) 50%, transparent);
   outline-offset: 2px;
 }
 
@@ -86,21 +86,60 @@ textarea:focus-visible,
 
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
+  font-family: var(--font-family-display);
   font-weight: 700;
   line-height: 1.25;
   color: var(--color-text);
+  letter-spacing: -0.015em;
 }
 
-h1 { font-size: var(--font-size-3xl); }
-h2 { font-size: var(--font-size-2xl); }
-h3 { font-size: var(--font-size-xl); }
-h4 { font-size: var(--font-size-lg); }
-h5 { font-size: var(--font-size-base); }
-h6 { font-size: var(--font-size-sm); }
+h1 { font-size: var(--font-size-3xl); font-weight: 800; }
+h2 { font-size: var(--font-size-2xl); font-weight: 700; }
+h3 { font-size: var(--font-size-xl); font-weight: 700; }
+h4 { font-size: var(--font-size-lg); font-weight: 600; }
+h5 { font-size: var(--font-size-base); font-weight: 600; }
+h6 { font-size: var(--font-size-sm); font-weight: 600; }
 
 p { margin: 0 0 var(--space-4); }
 
 small { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+
+/* Numeric Tabular figures for aligned score presentation */
+.font-numeric,
+.score-cell,
+.badge-score,
+.stat-number,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
+  transition: transform var(--duration-normal) var(--easing-standard),
+              box-shadow var(--duration-normal) var(--easing-standard),
+              border-color var(--duration-normal) var(--easing-standard);
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--glass-border));
+}
 
 /* ============================================================
    Utility Classes
@@ -479,10 +518,52 @@ small { font-size: var(--font-size-xs); color: var(--color-text-muted); }
   transform: scale(0.97);
 }
 
-@media (min-width: 1024px) {
-  :root {
-    --touch-target-min: 36px;
-    --touch-min: var(--touch-target-min);
-  }
-}
 .lowercase { text-transform: lowercase; }
+
+/* ============================================================
+   Glassmorphism & Royal Sanctum v3.0 Utility Classes
+   ============================================================ */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-lg);
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-md);
+  transition: transform var(--duration-normal) var(--easing-spring), box-shadow var(--duration-normal) var(--easing-standard);
+}
+
+.glass-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-gold {
+  background: linear-gradient(135deg, var(--color-gold), #b45309);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glow-gold {
+  box-shadow: var(--shadow-gold-glow);
+}
+
+.glow-primary {
+  box-shadow: var(--shadow-glow);
+}
+

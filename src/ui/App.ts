@@ -125,12 +125,12 @@ export class App extends EventEmitter {
   }
 
   private showLogin(): void {
-    // Dynamic import to avoid circular deps
-    import('./views/LoginView').then(({ LoginView }) => {
-      const view = new LoginView(this.authManager, this.notificationManager)
+    import('./views/gl-login-view').then(() => {
+      const el = document.createElement('gl-login-view') as any
+      el.authManager = this.authManager
+      el.notificationManager = this.notificationManager
       this.mountPoint.innerHTML = ''
-      this.mountPoint.appendChild(view.render())
-      view.bindEvents()
+      this.mountPoint.appendChild(el)
     }).catch(e => {
       console.error('Failed to load view:', e)
       this.mountPoint.innerHTML = '<p class="text-center mt-4">Không thể tải giao diện. Vui lòng thử lại.</p>'
@@ -138,17 +138,15 @@ export class App extends EventEmitter {
   }
 
   async showApp(): Promise<void> {
-    import('./views/AppView').then(({ AppView }) => {
-      const view = new AppView(
-        this.stateManager,
-        this.authManager,
-        this.syncManager,
-        this.notificationManager,
-        this.backupService
-      )
+    import('./views/gl-app-shell').then(() => {
+      const el = document.createElement('gl-app-shell') as any
+      el.stateManager = this.stateManager
+      el.authManager = this.authManager
+      el.syncManager = this.syncManager
+      el.notificationManager = this.notificationManager
+      el.backupService = this.backupService
       this.mountPoint.innerHTML = ''
-      this.mountPoint.appendChild(view.render())
-      view.bindEvents()
+      this.mountPoint.appendChild(el)
     }).catch(e => {
       console.error('Failed to load view:', e)
       this.mountPoint.innerHTML = '<p class="text-center mt-4">Không thể tải giao diện. Vui lòng thử lại.</p>'

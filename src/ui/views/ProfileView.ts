@@ -30,129 +30,143 @@ export class ProfileView {
           </div>
         </div>
 
-        <div class="me-section">
-          <div class="me-section-title">Tài khoản</div>
-          <button class="me-row" data-me-action="pin">
-            <div class="me-row-txt">
-              <strong>Đổi PIN</strong>
-              <small>Thay đổi mã PIN đăng nhập</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row" data-me-action="biometric">
-            <div class="me-row-txt">
-              <strong>Sinh trắc học</strong>
-              <small>${user?.biometricEnabled ? 'Đã bật' : 'Chưa bật'}</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-        </div>
+        <details class="me-section" open>
+          <summary class="me-section-title">👤 Tài khoản</summary>
+          <div class="me-section-content">
+            <button class="me-row" data-me-action="pin">
+              <div class="me-row-txt">
+                <strong>Đổi PIN</strong>
+                <small>Thay đổi mã PIN đăng nhập</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="biometric">
+              <div class="me-row-txt">
+                <strong>Sinh trắc học</strong>
+                <small>${user?.biometricEnabled ? 'Đã bật' : 'Chưa bật'}</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+          </div>
+        </details>
+
+        <details class="me-section">
+          <summary class="me-section-title">📂 Dữ liệu học vụ</summary>
+          <div class="me-section-content">
+            <button class="me-row" data-me-action="backup">
+              <div class="me-row-txt">
+                <strong>Sao lưu JSON</strong>
+                <small>Tải file backup toàn bộ dữ liệu</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="restore">
+              <div class="me-row-txt">
+                <strong>Khôi phục backup</strong>
+                <small>Chọn file để khôi phục</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="parish-report">
+              <div class="me-row-txt">
+                <strong>Báo cáo Ban GL</strong>
+                <small>Xuất CSV / bản in họp Ban</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="year-compare">
+              <div class="me-row-txt">
+                <strong>So sánh năm học</strong>
+                <small>TB và % đủ điểm giữa các năm</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="archive-year">
+              <div class="me-row-txt">
+                <strong>Lưu trữ / mở năm học</strong>
+                <small>Khóa sửa điểm năm đã chọn</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="columns">
+              <div class="me-row-txt">
+                <strong>Cột điểm lớp</strong>
+                <small>Thêm / sửa / hệ số cột điểm</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="invite">
+              <div class="me-row-txt">
+                <strong>Phiếu phụ huynh</strong>
+                <small>Tạo link chỉ xem, có hết hạn</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+          </div>
+        </details>
+
+        <details class="me-section">
+          <summary class="me-section-title">⚙️ Cài đặt hệ thống</summary>
+          <div class="me-section-content">
+            <button class="me-row" data-me-action="settings">
+              <div class="me-row-txt">
+                <strong>Cài đặt ứng dụng</strong>
+                <small>Cấu hình Supabase, sao lưu tự động...</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="theme">
+              <div class="me-row-txt">
+                <strong>Giao diện</strong>
+                <small>${this.getThemeLabel()}</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="print-settings">
+              <div class="me-row-txt">
+                <strong>Mẫu in / Phiếu mời</strong>
+                <small>Cấu hình giáo hạt, giáo xứ, tiêu đề...</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="notification-permission">
+              <div class="me-row-txt">
+                <strong>Thông báo</strong>
+                <small id="meNotifStatus">${'Notification' in window && Notification.permission === 'granted' ? 'Đã bật' : Notification.permission === 'denied' ? 'Đã tắt' : 'Chưa thiết lập'}</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row hidden" data-me-action="install" id="meInstallRow">
+              <div class="me-row-txt">
+                <strong>Cài đặt ứng dụng</strong>
+                <small>Cài Sổ Điểm GL lên màn hình chính</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+          </div>
+        </details>
+
+        <details class="me-section">
+          <summary class="me-section-title">💬 Hỗ trợ & Phản hồi</summary>
+          <div class="me-section-content">
+            <button class="me-row" data-me-action="help">
+              <div class="me-row-txt">
+                <strong>Hướng dẫn</strong>
+                <small>Xem cách sử dụng ứng dụng</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+            <button class="me-row" data-me-action="feedback">
+              <div class="me-row-txt">
+                <strong>Góp ý / Báo lỗi</strong>
+                <small>Gửi phản hồi cho nhà phát triển</small>
+              </div>
+              <span class="me-row-chev">▸</span>
+            </button>
+          </div>
+        </details>
 
         <div class="me-section">
-          <div class="me-section-title">Dữ liệu</div>
-          <button class="me-row" data-me-action="backup">
-            <div class="me-row-txt">
-              <strong>Sao lưu JSON</strong>
-              <small>Tải file backup toàn bộ dữ liệu</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row" data-me-action="restore">
-            <div class="me-row-txt">
-              <strong>Khôi phục backup</strong>
-              <small>Chọn file để khôi phục</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row" data-me-action="parish-report">
-            <div class="me-row-txt">
-              <strong>Báo cáo Ban GL</strong>
-              <small>Xuất CSV / bản in họp Ban</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row" data-me-action="year-compare">
-            <div class="me-row-txt">
-              <strong>So sánh năm học</strong>
-              <small>TB và % đủ điểm giữa các năm</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row" data-me-action="archive-year">
-            <div class="me-row-txt">
-              <strong>Lưu trữ / mở năm học</strong>
-              <small>Khóa sửa điểm năm đã chọn</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row" data-me-action="columns">
-            <div class="me-row-txt">
-              <strong>Cột điểm lớp</strong>
-              <small>Thêm / sửa / hệ số cột điểm</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row" data-me-action="invite">
-            <div class="me-row-txt">
-              <strong>Phiếu phụ huynh</strong>
-              <small>Tạo link chỉ xem, có hết hạn</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-        </div>
-
-        <div class="me-section">
-          <div class="me-section-title">Cài đặt</div>
-          <button class="me-row" data-me-action="settings">
-            <div class="me-row-txt">
-              <strong>Cài đặt ứng dụng</strong>
-              <small>Cấu hình Supabase, sao lưu tự động...</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row" data-me-action="theme">
-            <div class="me-row-txt">
-              <strong>Giao diện</strong>
-              <small>${this.getThemeLabel()}</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row" data-me-action="print-settings">
-            <div class="me-row-txt">
-              <strong>Mẫu in / Phiếu mời</strong>
-              <small>Cấu hình giáo hạt, giáo xứ, tiêu đề...</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row hidden" data-me-action="install" id="meInstallRow">
-            <div class="me-row-txt">
-              <strong>Cài đặt ứng dụng</strong>
-              <small>Cài Sổ Điểm GL lên màn hình chính</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-        </div>
-
-        <div class="me-section">
-          <div class="me-section-title">Hỗ trợ</div>
-          <button class="me-row" data-me-action="help">
-            <div class="me-row-txt">
-              <strong>Hướng dẫn</strong>
-              <small>Xem cách sử dụng ứng dụng</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-          <button class="me-row" data-me-action="feedback">
-            <div class="me-row-txt">
-              <strong>Góp ý / Báo lỗi</strong>
-              <small>Gửi phản hồi cho nhà phát triển</small>
-            </div>
-            <span class="me-row-chev">▸</span>
-          </button>
-        </div>
-
-        <div class="me-section">
-          <div class="me-section-title">Tài khoản</div>
           <button class="me-row me-logout" data-me-action="logout">
             <div class="me-row-txt">
               <strong>Đăng xuất</strong>

@@ -101,6 +101,63 @@ function normalizeLabel(label: string): string {
 }
 
 /**
+ * Find the row index that contains table headers by scanning the first 15 rows.
+ */
+export function findHeaderRowIndex(rows: any[][]): number {
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    const row = rows[i]
+    if (!Array.isArray(row)) continue
+    const rowStr = row.map(cell => normalizeLabel(String(cell || ''))).join(' ')
+    if (
+      rowStr.includes('ten') ||
+      rowStr.includes('name') ||
+      rowStr.includes('ho dem') ||
+      rowStr.includes('stt') ||
+      rowStr.includes('ten thanh') ||
+      rowStr.includes('khao kinh') ||
+      rowStr.includes('chuyen can') ||
+      rowStr.includes('kiem tra')
+    ) {
+      return i
+    }
+  }
+  return 0
+}
+
+/**
+ * Split full name into tenThanh, hoDem, ten.
+ */
+export function splitFullName(fullName: string): { tenThanh: string; hoDem: string; ten: string } {
+  let text = fullName.trim().replace(/\s+/g, ' ')
+  if (!text) return { tenThanh: '', hoDem: '', ten: '' }
+
+  const saintNames = [
+    'Giuse', 'Maria', 'Phêrô', 'Phaolô', 'Gioan', 'Têrêsa', 'Têrêxa', 'Phanxicô',
+    'Matthêu', 'Giaacôbê', 'Anrê', 'Tôma', 'Phúclíp', 'Bactôlômêo', 'Simôn', 'Giuđa',
+    'Inhaxiô', 'Đaminh', 'Bênêđictô', 'Vinhsơn', 'Anphôngsô', 'Câyêtanô', 'Giêrônimô',
+    'Ambôngsiô', 'Augustinô', 'Giópxép', 'Cecilia', 'Anna', 'Elisabeth', 'Isave', 'Mattha',
+    'Lucia', 'Agnes', 'Catarina'
+  ]
+
+  let tenThanh = ''
+  for (const s of saintNames) {
+    if (text.toLowerCase().startsWith(s.toLowerCase() + ' ')) {
+      tenThanh = s
+      text = text.slice(s.length).trim()
+      break
+    }
+  }
+
+  const parts = text.split(' ')
+  if (parts.length === 1) {
+    return { tenThanh, hoDem: '', ten: parts[0] }
+  }
+  const ten = parts.pop() || ''
+  const hoDem = parts.join(' ')
+  return { tenThanh, hoDem, ten }
+}
+
+/**
  * Match Excel column headers to class ScoreColumnDef labels.
  */
 function matchColumns(
@@ -119,8 +176,27 @@ function matchColumns(
     colLookup.set(normalizeLabel(col.key), col.key)
   }
 
-  // Also add common Vietnamese aliases
-  const aliasMap: Record<string, string> = {
+  // Common Vietnamese score column aliases
+  const scoreAliases: Record<string, string[]> = {
+    khaoKinh: ['khao kinh', 'kk', 'mieng', 'khao kinh hoc thuoc', 'thuoc bai'],
+    thuocBai: ['thuoc bai', 'tb', 'hoc thuoc'],
+    chuyenCan: ['chuyen can', 'cc', 'diem danh', 'chuyen can diem danh'],
+    baiTap: ['bai tap', 'bt', 'vo'],
+    thaiDo: ['thai do', 'td', 'y thuc'],
+    kiemTra: ['kiem tra', 'kt', '15p', '15 phut', '45p', '1 tiet', 'kt 15p', 'kt 45p', 'thi', 'cuoi ky', 'thi hk']
+  }
+
+  // Add alias lookups for available class columns
+  for (const col of classCols) {
+    const aliases = scoreAliases[col.key] || []
+    for (const alias of aliases) {
+      if (!colLookup.has(alias)) {
+        colLookup.set(alias, col.key)
+      }
+    }
+  }
+
+  const infoAliases: Record<string, string> = {
     'ten thanh': 'tenThanh',
     'tên thánh': 'tenThanh',
     'ho dem': 'hoDem',
@@ -155,23 +231,18 @@ function matchColumns(
 
     const normal = normalizeLabel(raw)
 
-    // Check if it's a student info column
     if (normal === 'stt' || normal === 'sothutu' || normal === 'so thu tu' || normal === 'số thứ tự' || normal === '#') {
-      continue // skip STT
+      continue
     }
 
-    const mappedByAlias = aliasMap[normal]
-    if (mappedByAlias === 'tenThanh' || mappedByAlias === 'hoDem' || mappedByAlias === 'ten' || mappedByAlias === 'ghiChu' || mappedByAlias === 'maHV' || mappedByAlias === 'lop') {
-      continue // skip info columns, handled separately
-    }
+    const mappedInfo = infoAliases[normal]
+    if (mappedInfo) continue
 
-    // Try to match to a score column
     const matchedKey = colLookup.get(normal)
     if (matchedKey) {
       colIndexMap.set(i, matchedKey)
       matchedCols.push({ excelLabel: raw, mappedTo: matchedKey })
     } else {
-      // Check if it could be a score column by normalized matching against label parts
       let found = false
       for (const col of classCols) {
         if (
@@ -218,8 +289,7 @@ function detectInfoColumns(headers: string[]): {
       result.tenThanhIdx = i
     } else if (normal.includes('ho dem') || normal.includes('họ đệm') || normal.includes('ho lot') || normal.includes('họ lót')) {
       result.hoDemIdx = i
-    } else if (normal === 'ten' || normal === 'tên' || normal === 'name' || normal === 'ho ten' || normal === 'họ tên') {
-      // Prefer the simple 'tên' over 'họ tên' if both exist
+    } else if (normal === 'ten' || normal === 'tên' || normal === 'name') {
       if (result.tenIdx === -1 || normal === 'ten' || normal === 'tên') {
         result.tenIdx = i
       }
@@ -257,7 +327,6 @@ function parseRow(
   _term: 'hk1' | 'hk2',
   classCols: ScoreColumnDef[]
 ): ImportedRow | null {
-  // Extract name parts
   let tenThanh = ''
   let hoDem = ''
   let ten = ''
@@ -267,12 +336,23 @@ function parseRow(
   if (infoCols.tenThanhIdx >= 0 && infoCols.tenThanhIdx < row.length) {
     tenThanh = String(row[infoCols.tenThanhIdx] || '').trim()
   }
-  if (infoCols.hoDemIdx >= 0 && infoCols.hoDemIdx < row.length) {
-    hoDem = String(row[infoCols.hoDemIdx] || '').trim()
+
+  if (infoCols.hoDemIdx >= 0 && infoCols.hoDemIdx === infoCols.tenIdx) {
+    // Combined full name column
+    const full = String(row[infoCols.tenIdx] || '').trim()
+    const parsed = splitFullName(full)
+    if (!tenThanh) tenThanh = parsed.tenThanh
+    hoDem = parsed.hoDem
+    ten = parsed.ten
+  } else {
+    if (infoCols.hoDemIdx >= 0 && infoCols.hoDemIdx < row.length) {
+      hoDem = String(row[infoCols.hoDemIdx] || '').trim()
+    }
+    if (infoCols.tenIdx >= 0 && infoCols.tenIdx < row.length) {
+      ten = String(row[infoCols.tenIdx] || '').trim()
+    }
   }
-  if (infoCols.tenIdx >= 0 && infoCols.tenIdx < row.length) {
-    ten = String(row[infoCols.tenIdx] || '').trim()
-  }
+
   if (infoCols.ghiChuIdx >= 0 && infoCols.ghiChuIdx < row.length) {
     ghiChu = String(row[infoCols.ghiChuIdx] || '').trim()
   }
@@ -280,10 +360,8 @@ function parseRow(
     lop = String(row[infoCols.lopIdx] || '').trim()
   }
 
-  // Must have at least a first name or some name
   if (!ten && !hoDem && !tenThanh) return null
 
-  // Parse scores
   const scores: Record<string, number[]> = {}
   for (const col of classCols) {
     scores[col.key] = []
@@ -310,20 +388,17 @@ function parseRow(
 function parseExcelCell(value: any): number | null {
   if (value === '' || value === null || value === undefined) return null
 
-  // If it's already a number
   if (typeof value === 'number' && !isNaN(value)) {
     const rounded = Math.round(value * 100) / 100
     return rounded >= 0 && rounded <= 10 ? rounded : null
   }
 
-  // If it's a string like "8.5" or "8,5"
   const str = String(value).trim()
   return parseScore(str)
 }
 
 /**
  * Parse the entire sheet as a student list (no class context needed).
- * Detects columns, extracts student info + class info.
  */
 export function parseStudentList(rows: any[][]): StudentListResult {
   const errors: string[] = []
@@ -332,7 +407,8 @@ export function parseStudentList(rows: any[][]): StudentListResult {
     return { rows: [], detectedClasses: [], errors: ['File không có dữ liệu'], totalRows: 0, validRows: 0 }
   }
 
-  const headers = rows[0].map((h: any) => String(h || '').trim())
+  const headerRowIdx = findHeaderRowIndex(rows)
+  const headers = rows[headerRowIdx].map((h: any) => String(h || '').trim())
   const infoCols = detectInfoColumns(headers)
 
   if (infoCols.tenThanhIdx === -1 && infoCols.hoDemIdx === -1 && infoCols.tenIdx === -1) {
@@ -343,17 +419,25 @@ export function parseStudentList(rows: any[][]): StudentListResult {
   const studentRows: StudentListRow[] = []
   const classSet = new Set<string>()
   let validRows = 0
-  const totalRows = rows.length - 1
+  const totalRows = rows.length - (headerRowIdx + 1)
 
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
     const row = rows[i]
     if (!row || row.every((cell: any) => cell === '' || cell === null || cell === undefined)) continue
 
     let tenThanh = '', hoDem = '', ten = '', lop = '', maHV = '', ghiChu = ''
 
     if (infoCols.tenThanhIdx >= 0 && infoCols.tenThanhIdx < row.length) tenThanh = String(row[infoCols.tenThanhIdx] || '').trim()
-    if (infoCols.hoDemIdx >= 0 && infoCols.hoDemIdx < row.length) hoDem = String(row[infoCols.hoDemIdx] || '').trim()
-    if (infoCols.tenIdx >= 0 && infoCols.tenIdx < row.length) ten = String(row[infoCols.tenIdx] || '').trim()
+    if (infoCols.hoDemIdx >= 0 && infoCols.hoDemIdx === infoCols.tenIdx) {
+      const full = String(row[infoCols.tenIdx] || '').trim()
+      const parsed = splitFullName(full)
+      if (!tenThanh) tenThanh = parsed.tenThanh
+      hoDem = parsed.hoDem
+      ten = parsed.ten
+    } else {
+      if (infoCols.hoDemIdx >= 0 && infoCols.hoDemIdx < row.length) hoDem = String(row[infoCols.hoDemIdx] || '').trim()
+      if (infoCols.tenIdx >= 0 && infoCols.tenIdx < row.length) ten = String(row[infoCols.tenIdx] || '').trim()
+    }
     if (infoCols.lopIdx >= 0 && infoCols.lopIdx < row.length) lop = String(row[infoCols.lopIdx] || '').trim()
     if (infoCols.maHVIdx >= 0 && infoCols.maHVIdx < row.length) maHV = String(row[infoCols.maHVIdx] || '').trim()
     if (infoCols.ghiChuIdx >= 0 && infoCols.ghiChuIdx < row.length) ghiChu = String(row[infoCols.ghiChuIdx] || '').trim()
@@ -393,9 +477,9 @@ export function parseExcelSheet(
     return { ok: false, rows: [], errors: ['File Excel không có dữ liệu (cần ít nhất 1 dòng header + 1 dòng dữ liệu)'], totalRows: 0, validRows: 0, term, matchedCols: [], unmatchedCols: [] }
   }
 
-  const headers = rows[0].map((h: any) => String(h || '').trim())
+  const headerRowIdx = findHeaderRowIndex(rows)
+  const headers = rows[headerRowIdx].map((h: any) => String(h || '').trim())
 
-  // Match columns
   const { matchedCols, unmatchedCols, colIndexMap } = matchColumns(headers, classCols)
   const infoCols = detectInfoColumns(headers)
 
@@ -404,14 +488,12 @@ export function parseExcelSheet(
     return { ok: false, rows: [], errors, totalRows: 0, validRows: 0, term, matchedCols, unmatchedCols }
   }
 
-  // Parse data rows (skip header row)
   const importedRows: ImportedRow[] = []
   let validRows = 0
-  const totalRows = rows.length - 1
+  const totalRows = rows.length - (headerRowIdx + 1)
 
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
     const row = rows[i]
-    // Skip empty rows
     if (!row || row.every((cell: any) => cell === '' || cell === null || cell === undefined)) continue
 
     const parsed = parseRow(row, colIndexMap, infoCols, term, classCols)
@@ -437,7 +519,6 @@ export function parseExcelSheet(
 
 /**
  * Convert imported rows into StudentData and apply to a class.
- * Returns the updated students array.
  */
 export function applyImportedRows(
   cls: ClassData,
@@ -448,19 +529,24 @@ export function applyImportedRows(
   const classCols = resolveClassColumns(cls)
   const { overwrite = false, append = true } = options
 
-  // Build a map of existing students by name for matching
   const existingByName = new Map<string, StudentData>()
   for (const st of cls.students) {
-    const key = [st.tenThanh, st.hoDem, st.ten].filter(Boolean).join('|').toLowerCase()
-    existingByName.set(key, st)
-    // Also index without tenThanh
+    const key1 = [st.tenThanh, st.hoDem, st.ten].filter(Boolean).join('|').toLowerCase()
+    existingByName.set(key1, st)
     const key2 = [st.hoDem, st.ten].filter(Boolean).join('|').toLowerCase()
     if (!existingByName.has(key2)) {
       existingByName.set(key2, st)
     }
+    const key3 = normalizeLabel(`${st.tenThanh} ${st.hoDem} ${st.ten}`)
+    if (!existingByName.has(key3)) {
+      existingByName.set(key3, st)
+    }
+    const key4 = normalizeLabel(`${st.hoDem} ${st.ten}`)
+    if (!existingByName.has(key4)) {
+      existingByName.set(key4, st)
+    }
   }
 
-  // Deep clone each student to avoid mutating state objects outside Immer
   const result: StudentData[] = cls.students.map(s => ({
     ...s,
     scoresByTerm: {
@@ -470,12 +556,14 @@ export function applyImportedRows(
   }))
 
   for (const row of rows) {
-    const nameKey = [row.tenThanh, row.hoDem, row.ten].filter(Boolean).join('|').toLowerCase()
-    const nameKey2 = [row.hoDem, row.ten].filter(Boolean).join('|').toLowerCase()
-    const existing = existingByName.get(nameKey) || existingByName.get(nameKey2)
+    const key1 = [row.tenThanh, row.hoDem, row.ten].filter(Boolean).join('|').toLowerCase()
+    const key2 = [row.hoDem, row.ten].filter(Boolean).join('|').toLowerCase()
+    const key3 = normalizeLabel(`${row.tenThanh} ${row.hoDem} ${row.ten}`)
+    const key4 = normalizeLabel(`${row.hoDem} ${row.ten}`)
+
+    const existing = existingByName.get(key1) || existingByName.get(key2) || existingByName.get(key3) || existingByName.get(key4)
 
     if (existing) {
-      // Update existing student
       const idx = result.findIndex(s => s.id === existing.id)
       if (idx >= 0) {
         const st = result[idx]
@@ -485,10 +573,8 @@ export function applyImportedRows(
           const importedScores = row.scores[col.key]
           if (importedScores && importedScores.length > 0) {
             if (overwrite) {
-              // Replace all scores for this column
               st.scoresByTerm[term][col.key] = [...importedScores]
             } else if (append) {
-              // Append scores that don't already exist
               const existingVals = new Set(currentScores[col.key] || [])
               for (const s of importedScores) {
                 if (!existingVals.has(s)) {
@@ -500,7 +586,6 @@ export function applyImportedRows(
           }
         }
 
-        // Update ghiChu only if imported row has it and existing doesn't
         if (row.ghiChu && !st.ghiChu) {
           st.ghiChu = row.ghiChu
         }
@@ -508,7 +593,6 @@ export function applyImportedRows(
         st.updatedAt = Date.now()
       }
     } else {
-      // Create new student
       const newStudent: StudentData = {
         id: generateId('st'),
         tenThanh: row.tenThanh,

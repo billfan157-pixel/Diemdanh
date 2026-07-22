@@ -7,6 +7,21 @@ import './styles/main.css'
 
 import { App } from './ui/App'
 import { logger } from './services/Logger'
+import { registerSW } from 'virtual:pwa-register'
+
+// Register service worker with update prompt
+const updateSW = registerSW({
+  onNeedRefresh() {
+    window.dispatchEvent(new CustomEvent('gl:pwa-update', {
+      detail: {
+        update: () => updateSW(true)
+      }
+    }))
+  },
+  onOfflineReady() {
+    logger.info('App is ready to run offline.')
+  }
+})
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {

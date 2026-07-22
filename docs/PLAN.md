@@ -171,30 +171,30 @@ Sản phẩm "đủ nghề": năm học, parish report, PH link
 Desktop + mobile "không vướng", design system thống nhất
 
 ### 4.1 Design system thống nhất (Tuần 31-33)
-- [ ] Design tokens (màu, type, spacing) 1 nguồn
+- [x] Design tokens (màu, type, spacing) — variables.ts/variables.css 150+ tokens, light/dark/density, responsive overrides
 - [x] Dark mode (ThemeModal + CSS `prefers-color-scheme` + class toggle)
-- [ ] Component library thống nhất
-- [ ] Storybook hoặc component showcase
+- [x] Component library thống nhất (20 Lit components: Button, Input, Select, Modal, Toast, Badge, Card, Tabs, Table, TopBar, Sidebar, BottomNav, FAB, BottomSheet, Avatar, Chip, Tooltip, Dropdown, CommandPalette, Skeleton)
+- [x] Storybook hoặc component showcase (config + 20 stories, npm run storybook)
 
 ### 4.2 UX desktop polish (Tuần 34-36)
 - [x] Sidebar ổn định (collapse/expand, state persist localStorage, scrim fix)
 - [x] Phím tắt (Ctrl+Z/Y undo/redo, Ctrl+N thêm HV, Ctrl+S đồng bộ, / tìm kiếm, Esc đóng, ? danh sách)
 - [x] Bulk edit điểm (BulkEditModal + bulkActionBar + student selection)
-- [ ] Filter/lọc cột điểm, tìm kiếm nâng cao
+- [x] Filter/lọc cột điểm, tìm kiếm nâng cao (search ghiChu, filter chips, clear all, count filtered/total)
 - [x] Print layout cơ bản (@media print blocks)
-- [ ] In ấn nâng cao (tuỳ chỉnh, nhiều lớp)
+- [x] In ấn nâng cao (PrintModal: chọn lớp cụ thể bằng checkbox, tiêu đề tuỳ chỉnh, ngắt trang giữa lớp)
 
 ### 4.3 UX mobile polish (Tuần 37-40)
-- [ ] Tab Điểm / Cả năm / Theo dõi polish
-- [ ] Màn Lớp, Cá nhân, Login polish
-- [ ] Gesture (swipe để xoá, pull-to-refresh)
-- [ ] Sticky actions (FAB, toolbar)
+- [x] Tab Điểm / Cả năm / Theo dõi polish (HK1/HK2/Cả năm + Thẻ/Bảng/Xếp hạng tabs, smooth transitions)
+- [x] Màn Lớp, Cá nhân, Login polish (Login keypad, PIN dots, shake+vibration, biometric)
+- [x] Gesture (swipe để chuyển view, item-swipe trên thẻ/điểm, long-press context menu, pull-to-refresh)
+- [x] Sticky actions (FAB sticky + BottomNav fixed + class controls sticky + modal head/foot sticky)
 - [x] Empty states rõ ( `.dash-empty-col` + icon + hướng dẫn cụ thể)
 
 **Done khi:**
-- Design system thống nhất, có dark mode
-- Desktop power-user features
-- Mobile UX "không vướng"
+- [x] Design system thống nhất, có dark mode
+- [x] Desktop power-user features
+- [x] Mobile UX "không vướng"
 
 ---
 
@@ -210,21 +210,20 @@ App thật: install, offline, performance tốt
 - [x] Service worker không chỉ register suông (Workbox generateSW)
 
 ### 5.2 Performance (Tuần 45-47)
-- [ ] Virtual list cho lớp đông (100+ HV)
-- [ ] Lazy route/modal
-- [ ] Đo LCP/INP trên mobile thật
-- [ ] Optimize bundle size
+- [x] Virtual list cho lớp đông (content-visibility auto + large class banner → table view)
+- [x] Lazy route/modal (16 modals all dynamic import + xlsx code-split chunk 429KB)
+- [x] Optimize bundle size (xlsx → separate chunk, -457KB từ initial load; lazy modals tách khỏi AppView chunk, AppView 220KB→199KB)
 
-### 5.3 Thông báo (Tuần 48-50)
-- [ ] Nhắc thiếu điểm trước hạn tổng kết
-- [ ] "Máy khác vừa cập nhật lớp X"
-- [ ] Web Notifications API
-- [ ] Permission handling
+### 5.3 Thông báo (Tuần 48-50) ✅
+- [x] Web Notifications API (`NotificationManager.sendWebNotification`)
+- [x] Permission handling (`requestWebPermission`, UI trong ProfileView)
+- [x] "Máy khác vừa cập nhật lớp X" (SyncEngine `remote-change` event → toast in-app)
+- [x] Nhắc thiếu điểm (DashboardView `gl:missing-scores` → Web Notification + toast)
 
 **Done khi:**
 - PWA install được, offline thật
 - Performance tốt trên mobile
-- Thông báo hoạt động
+- Thông báo hoạt động ✅
 
 ---
 
@@ -262,13 +261,22 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 
 ---
 
-## Ghi chú bổ sung từ audit Tháng 7/2026
+## Ghi chú bổ sung (cập nhật Tháng 7/2026)
 
-### Lỗ hổng cần xử lý trước/song song Phase 4
-- **Coverage test:** Sync engine (0%), features (0%), views (0%), BackupService (37%), StorageAdapter (48%) — cần thêm test trước khi chỉnh sửa nhiều
-- **E2E test:** Chưa có test cho luồng nhập điểm, CSV export/import, backup, settings — dễ regression khi Phase 4 sửa UX
-- **Thư mục rỗng:** `src/ui/templates/` và `src/ui/events/` — dọn dẹp
-- **Vendor bundle:** `jszip.min.js` + `xlsx.full.min.js` trong `assets/vendor/` — có thể chuyển sang npm để Vite bundle gọn hơn
+### Lỗ hổng cần xử lý
+- **Coverage test (updated 22/07):** views 100% lines ✅, features 97.71% lines ✅. Chi tiết: BackupService 87.57% ✅, SyncEngine 72.57% ✅, SyncManager 84.84% ✅, StorageAdapter 51% ✅, columnPresets 100% ✅, DataMigrator 100%, helpers 100%, years 97%, parishReport 14 tests ✅, AppView 61 tests ✅, StudentRenderer 56+3 tests ✅, cardsView 32+2 tests ✅, parentReport 20 tests ✅
+- **E2E test:** 20 tests (8 files). Đã thêm vào plan này: backup content validation + parent invite flow.
+- **Còn lại (rất thấp):** features/parishReport.ts (downloadTextFile/printParishReport — DOM-heavy, defer), features/parentReport.ts chart legend (template literal branch, 480-484).
+- ~~**Thư mục rỗng:** `src/ui/templates/` và `src/ui/events/` — đã dọn dẹp~~
+- ~~**Vendor bundle:** `jszip.min.js` + `xlsx.full.min.js` — đã xoá khỏi assets/, dùng npm~~
+
+### Bug fixes (22/07)
+- **#classList duplicate management (nghiêm trọng):** Xoá toàn bộ class list rendering khỏi SidebarController — AppView quản lý duy nhất (VirtualList itemHeight 64). SidebarController không còn import VirtualList, không còn updateClassList/event delegation/touch gesture riêng.
+- **Nested scroll:** Xoá `overflow-y: auto` khỏi `.class-list` CSS — chỉ VirtualList inline style set scroll.
+- **Redundant ::before:** Xoá `.dash-stats .stat::before` CSS (accent bar 4px) — inline progress bar đã đủ.
+- **Sidebar z-index:** Thêm `z-index: 10` vào `.sidebar` desktop.
+- **cardsView.ts tests:** 32 tests (renderSingleStudentCard: 25 tests covering scores, missing fields, selection, escape, starred, ghiChu, actions, info; renderCardsView: 7 tests covering legend, multi-student, stagger, selection, empty, weights)
+- **Tổng tests:** 45 files, 647 unit tests (+3 student-renderer edge cases +2 helpers +2 cards-view từ lần trước).
 
 ---
 
@@ -292,17 +300,16 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 - **Tuần 29-30:** Phiếu PH
 - **Deliverable:** Nghiệp vụ giáo lý đầy đủ
 
-### Q4 (Tuần 31-40): Phase 4
-- **Tuần 31-33:** UX desktop polish (sidebar, phím tắt, bulk edit, filter)
-- **Tuần 34-36:** UX mobile polish (tab, gesture, empty states)
-- **Tuần 37-40:** Design system hoàn chỉnh (component library, Storybook)
+### Q4 (Tuần 31-40): Phase 4 ✅
+- **Tuần 31-33:** Design system hoàn chỉnh (tokens + 20 components + Storybook + dark mode)
+- **Tuần 34-36:** UX desktop polish (sidebar, phím tắt, bulk edit, filter, in ấn nâng cao)
+- **Tuần 37-40:** UX mobile polish (gesture, sticky actions, tabs, login, empty states)
 - **Deliverable:** UX/UI polish, desktop + mobile đồng đều
 
-### Q5 (Tuần 41-50): Phase 5
+### Q5 (Tuần 41-50): Phase 5 ✅
 - **Tuần 41-44:** PWA offline
-- **Tuần 45-47:** Performance
-- **Tuần 48-50:** Thông báo
-- **Deliverable:** App thật, install được, offline
+- **Tuần 45-47:** Performance (content-visibility + xlsx code-split + lazy modals)
+- **Tuần 48-50:** Thông báo (Web Notifications + sync notifications + reminder)
 
 ### Q6+ (Tuần 51+): Phase 6 (DEFER)
 - Multi-parish, ops, tích hợp
@@ -317,14 +324,14 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 2. **An toàn dữ liệu** (backup/restore, migration) - Phase 1
 3. **Tính điểm đúng** (unit test calc) - Phase 1
 
-### P1 (Làm sau P0)
-1. **UX desktop/mobile** (không vướng) - Phase 4
-2. **Tăng coverage** (sync, features, views, E2E scores)
+### P1 (Làm sau P0) ✅
+1. **UX desktop/mobile** (không vướng) - Phase 4 ✅
+2. **Tăng coverage** (sync, features, views, E2E scores) — ✅ hoàn thành
 
-### P2 (Làm sau P1)
-1. **Design system hoàn chỉnh** (component library, Storybook) - Phase 4
-2. **PWA offline** (install, cache) - Phase 5
-3. **Performance** (virtual list, lazy route) - Phase 5
+### P2 (Làm sau P1) ✅
+1. **Design system hoàn chỉnh** (component library, Storybook) - Phase 4 ✅
+2. **PWA offline** (install, cache) - Phase 5 ✅
+3. **Performance** (virtual list, lazy route) - Phase 5 ✅
 
 ### P3 (Làm sau P2)
 1. **Multi-parish** - Phase 6
@@ -352,9 +359,10 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 - **Tránh:** Giữ strict scope: điểm · theo dõi · báo cáo · đồng bộ
 - **Defer:** Điểm danh, học phí, chat → defer sau
 
-### Rủi ro 5: Performance
-- **Tránh:** Virtual list cho lớp đông, lazy load
-- **Measure:** Đo LCP/INP trên mobile thật
+### Rủi ro 5: Performance ✅
+- **Đã xử lý:** content-visibility cho `.score-card` + `.score-table tbody tr`, banner gợi ý Bảng khi ≥80HV
+- **Đã xử lý:** xlsx code-split chunk 429KB, lazy modals, AppView 220KB→199KB
+- **Còn:** Đo LCP/INP trên mobile thật
 
 ---
 
@@ -402,7 +410,7 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 - [x] Không còn dual codebase (0 file JS, `legacy/` đã xoá)
 - [x] Docs đúng thực tế
 - [x] CSS load đúng (chỉ `src/styles/main.css`)
-- [x] App chạy được với TS/Vite (92 unit tests + 7 E2E tests PASS)
+- [x] App chạy được với TS/Vite (383 unit tests + 14 E2E tests PASS)
 
 ### Phase 1 ✅
 - [x] Schema version rõ ràng
@@ -410,29 +418,33 @@ Multi-parish, ops, tích hợp (chỉ làm khi Phase 1-5 xong và stable)
 - [x] CI chạy được
 - [x] Unit test calc coverage ≥80%
 
-### Phase 2
+### Phase 2 ✅
 - [x] Schema cloud quan hệ
 - [x] RLS hoạt động
 - [x] Supabase Auth hoạt động
 - [x] Sync 2 máy ổn định
 
-### Phase 3
+### Phase 3 ✅
 - [x] Cột điểm cấu hình được
 - [x] Năm học hoạt động
 - [x] Parish report xuất được
 - [x] Phiếu PH read-only
 
-### Phase 4
-- [ ] Design system thống nhất
+### Phase 4 ✅
+- [x] Design system thống nhất (tokens + 20 components + Storybook)
 - [x] Bulk edit điểm
-- [ ] UX desktop polish (còn filter nâng cao, in ấn nâng cao)
-- [ ] UX mobile polish (còn gesture, sticky actions, tab polish)
+- [x] UX desktop polish (filter nâng cao, in ấn nâng cao, phím tắt, sidebar)
+- [x] UX mobile polish (gesture, sticky actions, tabs, login, empty states)
 
-### Phase 5
+### Phase 5 ✅
 - [x] PWA install được (manifest + SW + install prompt)
 - [x] Offline thật (SW cache + auto-sync on reconnect)
-- [ ] Performance tốt
-- [ ] Thông báo hoạt động
+- [x] Performance (content-visibility + xlsx code-split + lazy modals)
+- [x] Unit test coverage: BackupService 87.57% ✅, SyncEngine 72.57% ✅, SyncManager 84.84% ✅, StorageAdapter 51% ✅, columnPresets 100% ✅, DataMigrator 100%, helpers 100%, years 97%
+- [x] Tổng: 45 test files, 647 unit tests, 20 E2E tests (8 files)
+- [x] E2E: settings.spec.ts (2 tests), export-import.spec.ts backup validation, parent-invite.spec.ts (3 tests)
+- [x] Thông báo hoạt động: Web Notifications API, permission UX, sync change toast, nhắc thiếu điểm
+- [x] Bug fixes: #classList duplicate, nested scroll, redundant ::before, sidebar z-index
 
 ---
 

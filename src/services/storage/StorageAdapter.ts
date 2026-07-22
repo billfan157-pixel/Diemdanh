@@ -302,7 +302,9 @@ export class StorageAdapter {
         ...state,
         lastModified
       }
-      localStorage.setItem('so-diem-gl-state', JSON.stringify(stateToSave))
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('so-diem-gl-state', JSON.stringify(stateToSave))
+      }
     } catch (e) {
       if (e instanceof DOMException && e.name === 'QuotaExceededError') {
         console.error('Storage quota exceeded')

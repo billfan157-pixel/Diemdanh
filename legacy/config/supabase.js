@@ -5,18 +5,17 @@
 (function (GL) {
   "use strict";
 
-  GL.SUPABASE_URL = "https://gqmbhvgyoenweiepvrvk.supabase.co";
+  GL.SUPABASE_URL = "https://vugoskzssqhusnzcbfhm.supabase.co";
   GL.SUPABASE_ANON_KEY_STORAGE = "giao-ly-supabase-anon-v2";
   GL.SUPABASE_META_KEY = "giao-ly-supabase-meta-v2";
   /** Snapshot id trên bảng app_cloud */
   GL.SUPABASE_ROW_ID = "main";
 
   /**
-   * anon public key — gắn sẵn để mọi máy dùng chung cloud.
-   * Vẫn có thể ghi đè bằng menu «Đồng bộ cloud».
+   * anon public key — không gắn sẵn để tránh lộ key.
+   * Người dùng tự cấu hình qua menu «Đồng bộ cloud».
    */
-  GL.SUPABASE_ANON_KEY_DEFAULT =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxbWJodmd5b2Vud2VpZXB2cnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxOTE0MDIsImV4cCI6MjA5OTc2NzQwMn0._jPtAkpaepFHzGVqpUZEA5wW8B3dJmrzkymlL_CtiE8";
+  GL.SUPABASE_ANON_KEY_DEFAULT = "";
 
   GL.getSupabaseAnonKey = function getSupabaseAnonKey() {
     try {

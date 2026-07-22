@@ -42,6 +42,11 @@ export class SyncManager extends EventTarget {
     this.syncEngine.addEventListener('conflict', (e: any) => {
       this.dispatchEvent(new CustomEvent('conflict', { detail: e.detail }))
     })
+
+    // Bubble up remote change events from SyncEngine
+    this.syncEngine.addEventListener('remote-change', (e: any) => {
+      this.dispatchEvent(new CustomEvent('remote-change', { detail: e.detail }))
+    })
   }
 
   setStateManager(sm: StateManager): void {
@@ -133,33 +138,26 @@ export class SyncManager extends EventTarget {
       if (errL) throw errL
 
       // 5. Merge all into local StateManager
+      // 5. Merge all into local StateManager (per-record merge to preserve local-only items)
       if (this.stateManager) {
         const sm = this.stateManager
         sm.applyFromNetwork('Tải dữ liệu từ đám mây', (draft: AppState) => {
-          draft.classes = (dbClasses || []).map((c: any) => {
+          for (const c of (dbClasses || [])) {
             const classColumns = resolveClassColumns(c)
             const students = (dbStudents || [])
               .filter((s: any) => s.class_id === c.id)
               .map((s: any) => {
-                // Initialize scoresByTerm with dynamic columns from class
-                const scoresByTerm: any = {
-                  hk1: {} as any,
-                  hk2: {} as any
-                }
-                
-                // Initialize empty arrays for each column
+                const scoresByTerm: any = { hk1: {}, hk2: {} }
                 for (const col of classColumns) {
                   scoresByTerm.hk1[col.key] = []
                   scoresByTerm.hk2[col.key] = []
                 }
-
                 const studentScores = (dbScores || []).filter((sc: any) => sc.student_id === s.id)
                 for (const sc of studentScores) {
                   if (scoresByTerm[sc.term as 'hk1'|'hk2']) {
                     scoresByTerm[sc.term as 'hk1'|'hk2'][sc.col_key] = sc.values
                   }
                 }
-
                 const logs = (dbLogs || [])
                   .filter((l: any) => l.student_id === s.id)
                   .map((l: any) => ({
@@ -170,9 +168,10 @@ export class SyncManager extends EventTarget {
                     text: l.text,
                     byUserId: l.by_user_id,
                     byName: l.by_name,
-                    at: Number(l.at)
+                    at: Number(l.at),
+                    rev: typeof l.rev === 'number' ? l.rev : 1
                   }))
-                  .sort((a, b) => b.at - a.at)
+                  .sort((a: any, b: any) => b.at - a.at)
 
                 return {
                   id: s.id,
@@ -190,22 +189,54 @@ export class SyncManager extends EventTarget {
                   ghiChu: s.ghi_chu || '',
                   scoresByTerm,
                   learningLog: logs,
+                  rev: s.rev || 1,
                   createdAt: new Date(s.created_at).getTime(),
                   updatedAt: new Date(s.updated_at).getTime()
                 }
               })
 
-            return {
+            const cIdx = draft.classes.findIndex(localC => localC.id === c.id)
+            const cloudClassObj = {
               id: c.id,
               name: c.name,
               year: c.year,
-              columns: c.columns,
+              columns: Array.isArray(c.columns) && c.columns.length ? c.columns : classColumns,
               weights: c.weights,
               students,
+              rev: c.rev || 1,
               createdAt: new Date(c.created_at).getTime(),
               updatedAt: new Date(c.updated_at).getTime()
             }
-          })
+
+            if (cIdx === -1) {
+              draft.classes.push(cloudClassObj)
+            } else {
+              const localC = draft.classes[cIdx]
+              if ((c.rev || 1) >= (localC.rev || 1)) {
+                localC.name = c.name
+                localC.year = c.year
+                localC.columns = Array.isArray(c.columns) && c.columns.length ? c.columns : classColumns
+                localC.weights = c.weights
+                localC.rev = c.rev || 1
+                localC.updatedAt = new Date(c.updated_at).getTime()
+              }
+              for (const sCloud of students) {
+                const sIdx = localC.students.findIndex(s => s.id === sCloud.id)
+                if (sIdx === -1) {
+                  localC.students.push(sCloud)
+                } else {
+                  const sLocal = localC.students[sIdx]
+                  if ((sCloud.rev || 1) >= (sLocal.rev || 1)) {
+                    const mergedLogs = mergeLearningLogs((sLocal.learningLog || []), sCloud.learningLog || [])
+                    localC.students[sIdx] = {
+                      ...sCloud,
+                      learningLog: mergedLogs
+                    }
+                  }
+                }
+              }
+            }
+          }
         })
       }
 
@@ -261,4 +292,28 @@ export class SyncManager extends EventTarget {
     await this.refreshPendingCount()
     this.dispatchEvent(new CustomEvent('syncstatuschange', { detail: this.getStatus() }))
   }
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
+function mergeLearningLogs(localLogs: any[], cloudLogs: any[]): any[] {
+  const byId = new Map<string, any>()
+  const add = (logs: any[]) => {
+    for (const log of logs) {
+      if (!log || !log.id) continue
+      const existing = byId.get(log.id)
+      if (!existing) {
+        byId.set(log.id, log)
+      } else {
+        if ((typeof log.rev === 'number' ? log.rev : 0) > (typeof existing.rev === 'number' ? existing.rev : 0)) {
+          byId.set(log.id, log)
+        }
+      }
+    }
+  }
+  add(localLogs)
+  add(cloudLogs)
+  return Array.from(byId.values()).sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0))
 }

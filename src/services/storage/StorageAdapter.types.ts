@@ -67,6 +67,7 @@ export interface LearningLogEntry {
   byUserId: string
   byName: string
   at: number
+  rev?: number
 }
 
 /** Expiring read-only link for phụ huynh. */

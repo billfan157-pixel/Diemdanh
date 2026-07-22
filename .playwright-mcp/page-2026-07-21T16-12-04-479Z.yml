@@ -1,0 +1,37 @@
+- generic [active] [ref=e1]:
+  - link "Chuyển đến nội dung chính" [ref=e2] [cursor=pointer]:
+    - /url: "#appMount"
+  - generic [ref=e5]:
+    - generic [ref=e6]: ✝
+    - heading "Sổ Điểm Giáo Lý" [level=1] [ref=e7]
+    - paragraph [ref=e8]: Đăng nhập để tiếp tục
+    - tablist "Phương thức đăng nhập" [ref=e9]:
+      - tab "Mã PIN (Offline)" [selected] [ref=e10] [cursor=pointer]
+      - tab "Email Cloud" [ref=e11] [cursor=pointer]
+    - generic [ref=e12]:
+      - tabpanel [ref=e13]:
+        - generic [ref=e14]: Tài khoản
+        - textbox "Tài khoản" [ref=e15]:
+          - /placeholder: admin
+        - generic [ref=e16]: PIN
+        - textbox "PIN" [ref=e17]:
+          - /placeholder: ••••
+      - generic [ref=e18] [cursor=pointer]:
+        - checkbox "Ghi nhớ trên máy này" [checked] [ref=e19]
+        - text: Ghi nhớ trên máy này
+      - button "Đăng nhập" [ref=e20] [cursor=pointer]
+    - generic [ref=e21]:
+      - generic [ref=e22]: hoặc
+      - button "Mở bằng Face ID / vân tay" [ref=e24] [cursor=pointer]:
+        - generic [ref=e25]: 🔐
+      - paragraph [ref=e27]: "Lần đầu: đăng nhập PIN → bật sinh trắc trong sidebar."
+    - paragraph [ref=e28]:
+      - text: "Mặc định PIN:"
+      - strong [ref=e29]: admin
+      - text: / PIN
+      - strong [ref=e30]: "1234"
+      - text: (Vào app bấm
+      - strong [ref=e31]: Đổi PIN
+      - text: hoặc
+      - strong [ref=e32]: Cấu hình Cloud
+      - text: )

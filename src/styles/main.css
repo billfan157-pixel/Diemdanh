@@ -9,5 +9,6 @@
 @import url('./mobile.css') layer(views);
 @import url('./auth.css') layer(views);
 @import url('./views.css') layer(views);
+@import url('./views/class-view.css') layer(views);
 @import url('./print.css') layer(utilities);
 

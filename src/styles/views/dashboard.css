@@ -1,0 +1,48 @@
+/* Dashboard Container Queries + Fluid Typography */
+
+/* KPI grid as a container */
+.dash-stats {
+  container-type: inline-size;
+  container-name: kpi-grid;
+}
+
+@container kpi-grid (max-width: 500px) {
+  .dash-stats { grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+  .dash-stats .stat { height: 95px; padding: var(--space-3); }
+}
+
+@container kpi-grid (max-width: 320px) {
+  .dash-stats { grid-template-columns: 1fr; gap: var(--space-2); }
+}
+
+.dashboard-grid {
+  container-type: inline-size;
+  container-name: dash-grid;
+}
+
+@container dash-grid (max-width: 500px) {
+  .dashboard-grid { grid-template-columns: 1fr; }
+}
+
+/* Fluid typography for dashboard headers */
+.dash-header h2 {
+  font-size: clamp(1.1rem, 3.5vw, 1.5rem);
+}
+
+.dash-section h3 {
+  font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+}
+
+.dash-stats .stat-value {
+  font-size: clamp(1.2rem, 4vw, 1.7rem);
+}
+
+/* Empty state illustration enhancements */
+.dash-empty {
+  container-type: inline-size;
+}
+
+.dash-empty .empty-icon {
+  font-size: clamp(2rem, 8vw, 3rem);
+  margin-bottom: var(--space-2);
+}

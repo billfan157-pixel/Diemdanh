@@ -34,21 +34,30 @@ export class SyncEngine extends EventTarget {
 
     if (!this.onMutationAttached) {
       // Use event-based tracking instead of intercepting private methods
-      sm.onMutation((_label: string, fromNetwork: boolean) => {
+      sm.onMutation((_label: string, fromNetwork: boolean, customPatches?: any[], customInversePatches?: any[]) => {
         // If this mutation was loaded from sync/network, do not loop-sync it
         if (fromNetwork) return
 
-        // Parse changes into sync ops and enqueue them
-        const undoStack = sm.getUndoStack()
-        const latestEntry = undoStack[undoStack.length - 1]
-        if (latestEntry && latestEntry.patches) {
+        let patches = customPatches
+        let inversePatches = customInversePatches
+
+        if (!patches || !inversePatches) {
+          const undoStack = sm.getUndoStack()
+          const latestEntry = undoStack[undoStack.length - 1]
+          if (latestEntry && latestEntry.patches) {
+            patches = latestEntry.patches
+            inversePatches = latestEntry.inversePatches
+          }
+        }
+
+        if (patches && inversePatches) {
           const newState = sm.getState()
-          // Reconstruct old state by applying inverse patches to new state
-          const oldState = JSON.parse(JSON.stringify(newState))
-          for (const p of latestEntry.inversePatches) {
+          // Use structuredClone for high performance cloning instead of JSON.parse(JSON.stringify)
+          const oldState = typeof structuredClone === 'function' ? structuredClone(newState) : JSON.parse(JSON.stringify(newState))
+          for (const p of inversePatches) {
             (applyPatch as any)(oldState, p)
           }
-          const ops = parsePatchesToOps(oldState, newState, latestEntry.patches)
+          const ops = parsePatchesToOps(oldState, newState, patches)
           for (const op of ops) {
             this.enqueueOp(op)
           }
@@ -181,9 +190,13 @@ export class SyncEngine extends EventTarget {
 
             // Auto-resolve with keep_local after timeout to prevent queue deadlock
             const fallbackTimer = setTimeout(() => {
+              this.dispatchEvent(new CustomEvent('conflict-auto-resolved', {
+                detail: { table: op.table, id: op.id, choice: 'keep_local', reason: 'timeout' }
+              }))
+              logger.warn(`Xung đột đồng bộ [${op.table}#${op.id}] tự động giữ lại bản ghi local sau 30s timeout.`)
               resolveOnce('keep_local').catch((e) => {
-              console.warn('Conflict resolution failed:', e)
-            })
+                logger.warn('Conflict resolution failed:', e)
+              })
             }, CONFLICT_TIMEOUT)
 
             const conflictEvent = new CustomEvent('conflict', {
@@ -288,6 +301,19 @@ export class SyncEngine extends EventTarget {
     } else if (eventType === 'DELETE') {
       this.deleteRecordLocally(table, oldRec.id)
     }
+
+    // Notify listeners about remote changes (for in-app toast / web notification)
+    const recordId = newRec?.id || oldRec?.id
+    let className = recordId || ''
+    if (table === 'classes' && newRec?.name) {
+      className = newRec.name
+    } else if (recordId && this.stateManager) {
+      const cls = this.stateManager.getState().classes.find(c => c.id === recordId || c.students.some(s => s.id === recordId))
+      if (cls) className = cls.name
+    }
+    this.dispatchEvent(new CustomEvent('remote-change', {
+      detail: { table, eventType, recordId, className }
+    }))
   }
 
   private mergeRecordLocally(table: string, record: any): void {
@@ -430,7 +456,8 @@ export class SyncEngine extends EventTarget {
               text: record.text,
               byUserId: record.by_user_id,
               byName: record.by_name,
-              at: Number(record.at)
+              at: Number(record.at),
+              rev: typeof record.rev === 'number' ? record.rev : 1
             }
             if (logIdx === -1) {
               logs.unshift(logItem)

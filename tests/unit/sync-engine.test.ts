@@ -355,3 +355,297 @@ describe('SyncEngine with state manager integration', () => {
     expect(mutationEvents[mutationEvents.length - 1].fromNetwork).toBe(true)
   })
 })
+
+// ================================================================
+// mergeRecordLocally edge cases
+// ================================================================
+describe('mergeRecordLocally edge cases', () => {
+  let storage: StorageAdapter
+  let syncEngine: SyncEngine
+  let sm: StateManager
+
+  beforeEach(async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    vi.spyOn(supabaseService, 'isConfigured').mockReturnValue(false)
+    vi.spyOn(supabaseService, 'getClient').mockReturnValue(null)
+
+    storage = createMockStorage()
+    syncEngine = new SyncEngine(storage)
+    sm = new StateManager(storage)
+    await sm.init()
+    syncEngine.setStateManager(sm)
+  })
+
+  it('should update existing student fields via merge', () => {
+    const clsId = sm.createClass('Lớp có học viên', '2025')
+    vi.spyOn(sm, 'getClassColumns').mockReturnValue([{ key: 'khaoKinh', short: 'KK', label: 'KK', defaultWeight: 1 }])
+    ;(syncEngine as any).mergeRecordLocally('students', {
+      id: 'st-merge-upd', class_id: clsId,
+      ten_thanh: 'Phêrô', ho_dem: 'Trần', ten: 'Bình',
+      rev: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    ;(syncEngine as any).mergeRecordLocally('students', {
+      id: 'st-merge-upd', class_id: clsId,
+      ten_thanh: 'Phêrô', ho_dem: 'Trần', ten: 'Bình (sửa)',
+      rev: 2,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    const cls = sm.getClass(clsId)!
+    expect(cls.students[0].ten).toBe('Bình (sửa)')
+  })
+
+  it('should skip student update when existing rev >= cloud rev', () => {
+    const clsId = sm.createClass('Lớp Rev Test', '2025')
+    ;(syncEngine as any).mergeRecordLocally('students', {
+      id: 'st-rev', class_id: clsId,
+      ten_thanh: 'Gioan', ho_dem: 'Ng', ten: 'A',
+      rev: 5,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    const cls = sm.getClass(clsId)!
+    expect(cls.students[0].ten).toBe('A')
+    expect(cls.students[0].rev).toBe(5)
+
+    ;(syncEngine as any).mergeRecordLocally('students', {
+      id: 'st-rev', class_id: clsId,
+      ten_thanh: 'Gioan', ho_dem: 'Ng', ten: 'B (should NOT update)',
+      rev: 3,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    expect(sm.getClass(clsId)!.students[0].ten).toBe('A')
+  })
+
+  it('should skip class update when existing rev >= cloud rev', () => {
+    const clsId = sm.createClass('Lớp Rev class', '2025')
+    ;(syncEngine as any).mergeRecordLocally('classes', {
+      id: clsId, name: 'Lớp Rev class', year: '2025', rev: 5,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    const prevName = sm.getClass(clsId)!.name
+    ;(syncEngine as any).mergeRecordLocally('classes', {
+      id: clsId, name: 'Lớp Rev class UPDATED', year: '2025', rev: 2,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    expect(sm.getClass(clsId)!.name).toBe(prevName)
+  })
+
+  it('should not add student to non-existent class', () => {
+    ;(syncEngine as any).mergeRecordLocally('students', {
+      id: 'st-orphan', class_id: 'non-existent',
+      ten_thanh: 'Test', ho_dem: '', ten: '',
+      rev: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    // Should not crash; student should not appear in state
+    const state = sm.getState()
+    expect(state.classes.every(c => c.students.length === 0)).toBe(true)
+  })
+
+  it('should merge learning_logs insert', () => {
+    const clsId = sm.createClass('Lớp logs', '2025')
+    const stId = sm.addStudent(clsId, { tenThanh: 'Test', hoDem: 'NV', ten: 'T', name: 'NV T', maHV: '', ngaySinh: '', gioiTinh: '', tenPhuHuynh: '', sdPhuHuynh: '', diaChi: '', email: '', ghiChu: '' })
+    ;(syncEngine as any).mergeRecordLocally('learning_logs', {
+      id: 'log-1', student_id: stId,
+      date: '2025-01-01', type: 'point', level: 'good', text: 'Chăm chỉ',
+      byUserId: 'u1', byName: 'Admin', at: 1000
+    })
+    const cls = sm.getClass(clsId)!
+    expect(cls.students[0].learningLog).toHaveLength(1)
+    expect(cls.students[0].learningLog[0].text).toBe('Chăm chỉ')
+  })
+
+  it('should merge learning_logs update', () => {
+    const clsId = sm.createClass('Lớp logs upd', '2025')
+    const stId = sm.addStudent(clsId, { tenThanh: 'Test', hoDem: 'NV', ten: 'T', name: 'NV T', maHV: '', ngaySinh: '', gioiTinh: '', tenPhuHuynh: '', sdPhuHuynh: '', diaChi: '', email: '', ghiChu: '' })
+    ;(syncEngine as any).mergeRecordLocally('learning_logs', {
+      id: 'log-2', student_id: stId,
+      date: '2025-01-01', type: 'point', level: 'good', text: 'Chăm chỉ',
+      byUserId: 'u1', byName: 'Admin', at: 1000
+    })
+    ;(syncEngine as any).mergeRecordLocally('learning_logs', {
+      id: 'log-2', student_id: stId,
+      date: '2025-01-01', type: 'point', level: 'good', text: 'Có tiến bộ',
+      byUserId: 'u1', byName: 'Admin', at: 2000
+    })
+    const cls = sm.getClass(clsId)!
+    expect(cls.students[0].learningLog).toHaveLength(1)
+    expect(cls.students[0].learningLog[0].text).toBe('Có tiến bộ')
+  })
+
+  it('should merge scores only for existing column keys', () => {
+    const clsId = sm.createClass('Lớp score col key', '2025')
+    const stId = sm.addStudent(clsId, { tenThanh: 'Test', hoDem: 'NV', ten: 'T', name: 'NV T', maHV: '', ngaySinh: '', gioiTinh: '', tenPhuHuynh: '', sdPhuHuynh: '', diaChi: '', email: '', ghiChu: '' })
+    vi.spyOn(sm, 'getClassColumns').mockReturnValue([{ key: 'khaoKinh', short: 'KK', label: 'KK', defaultWeight: 1 }])
+    ;(syncEngine as any).mergeRecordLocally('scores', {
+      student_id: stId, term: 'hk1', col_key: 'khaoKinh', values: [9, 10]
+    })
+    ;(syncEngine as any).mergeRecordLocally('scores', {
+      student_id: stId, term: 'hk1', col_key: 'nonexistent_col', values: [5]
+    })
+    const cls = sm.getClass(clsId)!
+    expect(cls.students[0].scoresByTerm.hk1.khaoKinh).toEqual([9, 10])
+    expect((cls.students[0].scoresByTerm.hk1 as any).nonexistent_col).toBeUndefined()
+  })
+
+  it('should handle DELETE via handleCloudChange', () => {
+    const clsId = sm.createClass('Lớp bị xóa mây', '2025')
+    const deleteSpy = vi.spyOn(syncEngine as any, 'deleteRecordLocally')
+    ;(syncEngine as any).handleCloudChange('classes', {
+      eventType: 'DELETE', new: null, old: { id: clsId }
+    })
+    expect(deleteSpy).toHaveBeenCalledWith('classes', clsId)
+  })
+
+  it('should handle INSERT via handleCloudChange', () => {
+    const mergeSpy = vi.spyOn(syncEngine as any, 'mergeRecordLocally')
+    ;(syncEngine as any).handleCloudChange('students', {
+      eventType: 'INSERT', new: { id: 'st-new', name: 'New' }, old: null
+    })
+    expect(mergeSpy).toHaveBeenCalledWith('students', { id: 'st-new', name: 'New' })
+  })
+
+  it('should delete student record locally', () => {
+    const clsId = sm.createClass('Lớp xóa st', '2025')
+    const stId = sm.addStudent(clsId, { tenThanh: 'A', hoDem: 'B', ten: 'C', name: 'B C', maHV: '', ngaySinh: '', gioiTinh: '', tenPhuHuynh: '', sdPhuHuynh: '', diaChi: '', email: '', ghiChu: '' })
+    expect(sm.getClass(clsId)!.students).toHaveLength(1)
+    ;(syncEngine as any).deleteRecordLocally('students', stId)
+    expect(sm.getClass(clsId)!.students).toHaveLength(0)
+  })
+
+  it('should handle learning_logs via handleCloudChange', () => {
+    const mergeSpy = vi.spyOn(syncEngine as any, 'mergeRecordLocally')
+    ;(syncEngine as any).handleCloudChange('learning_logs', {
+      eventType: 'UPDATE', new: { id: 'log-3' }, old: null
+    })
+    expect(mergeSpy).toHaveBeenCalledWith('learning_logs', { id: 'log-3' })
+  })
+})
+
+// ================================================================
+// processSyncOp tests (with Supabase mocks)
+// ================================================================
+describe('processSyncOp', () => {
+  let storage: StorageAdapter
+  let syncEngine: SyncEngine
+
+  beforeEach(async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    const mockSupabase = {
+      from: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      upsert: vi.fn().mockResolvedValue({ error: null }),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      channel: vi.fn().mockReturnThis(),
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn().mockReturnThis(),
+      removeChannel: vi.fn()
+    }
+    vi.spyOn(supabaseService, 'getClient').mockReturnValue(mockSupabase as any)
+    vi.spyOn(supabaseService, 'isConfigured').mockReturnValue(true)
+
+    storage = createMockStorage()
+    syncEngine = new SyncEngine(storage)
+  })
+
+  it('should process an insert op', async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    const mockClient = supabaseService.getClient()!
+    const insertSpy = vi.spyOn(mockClient as any, 'insert')
+
+    await (syncEngine as any).processSyncOp({
+      table: 'classes', action: 'insert', id: 'cls-new', data: { name: 'New Class' }
+    })
+
+    expect(insertSpy).toHaveBeenCalledWith({ name: 'New Class' })
+  })
+
+  it('should process an update op (no conflict)', async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    const mockClient = supabaseService.getClient()!
+    const upsertSpy = vi.spyOn(mockClient as any, 'upsert')
+
+    await (syncEngine as any).processSyncOp({
+      table: 'classes', action: 'update', id: 'cls-upd', data: { name: 'Updated', rev: 2 }
+    })
+
+    expect(upsertSpy).toHaveBeenCalledWith({ id: 'cls-upd', name: 'Updated', rev: 2 })
+  })
+
+  it('should process a delete op', async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    const mockClient = supabaseService.getClient()!
+    const deleteSpy = vi.spyOn(mockClient as any, 'delete')
+
+    await (syncEngine as any).processSyncOp({
+      table: 'classes', action: 'delete', id: 'cls-del', data: {}
+    })
+
+    expect(deleteSpy).toHaveBeenCalled()
+  })
+
+  it('should throw when insert fails', async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    const mockClient = supabaseService.getClient()!
+    vi.spyOn(mockClient as any, 'insert').mockResolvedValue({ error: new Error('DB error') } as any)
+
+    await expect((syncEngine as any).processSyncOp({
+      table: 'classes', action: 'insert', id: 'cls-err', data: { name: 'Err' }
+    })).rejects.toThrow()
+  })
+
+  it('should process legacy sync item', async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    const mockClient = supabaseService.getClient()!
+    const upsertSpy = vi.spyOn(mockClient as any, 'upsert')
+
+    await (syncEngine as any).processLegacySync({
+      type: 'state', data: { version: 6 }
+    })
+
+    expect(upsertSpy).toHaveBeenCalled()
+  })
+
+  it('should include columns when inserting class op', async () => {
+    const mockStorage = createMockStorage()
+    const sm = new StateManager(mockStorage)
+    await sm.init()
+    const engine = new SyncEngine(mockStorage)
+    engine.setStateManager(sm)
+
+    sm.createClass('Lớp có cột', '2026')
+    const calls = (mockStorage.enqueueSync as any).mock.calls
+    const classCall = calls.find((c: any) => c[0]?.data?.op?.table === 'classes')
+    expect(classCall).toBeDefined()
+    expect(classCall[0]?.data?.op?.data?.columns).toBeDefined()
+    expect(classCall[0]?.data?.op?.data?.columns.length).toBeGreaterThan(0)
+  })
+
+  it('should enqueue sync op when undo and redo are called', async () => {
+    const mockStorage = createMockStorage()
+    const sm = new StateManager(mockStorage)
+    await sm.init()
+    const engine = new SyncEngine(mockStorage)
+    engine.setStateManager(sm)
+
+    const classId = sm.createClass('Lớp Test Undo', '2026')
+    ;(mockStorage.enqueueSync as any).mockClear()
+
+    sm.undo()
+    expect(mockStorage.enqueueSync).toHaveBeenCalled()
+
+    ;(mockStorage.enqueueSync as any).mockClear()
+    sm.redo()
+    expect(mockStorage.enqueueSync).toHaveBeenCalled()
+  })
+})

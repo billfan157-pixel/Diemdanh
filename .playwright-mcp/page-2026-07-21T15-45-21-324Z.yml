@@ -1,0 +1,39 @@
+- generic [ref=f16e1]:
+  - link "Chuyển đến nội dung chính" [ref=f16e2] [cursor=pointer]:
+    - /url: "#appMount"
+  - generic [ref=f16e5]:
+    - generic [ref=f16e6]: ✝
+    - heading "Sổ Điểm Giáo Lý" [level=1] [ref=f16e7]
+    - paragraph [ref=f16e8]: Đăng nhập để tiếp tục
+    - generic [ref=f16e9]:
+      - button "Mã PIN (Offline)" [ref=f16e10] [cursor=pointer]
+      - button "Email Cloud" [ref=f16e11] [cursor=pointer]
+    - generic [ref=f16e12]:
+      - generic [ref=f16e13]:
+        - generic [ref=f16e14]: Tài khoản
+        - textbox "Tài khoản" [ref=f16e15]:
+          - /placeholder: admin
+          - text: admin
+        - generic [ref=f16e16]: PIN
+        - textbox "PIN" [ref=f16e17]:
+          - /placeholder: ••••
+      - generic [ref=f16e18] [cursor=pointer]:
+        - checkbox "Ghi nhớ trên máy này" [checked] [ref=f16e19]
+        - text: Ghi nhớ trên máy này
+      - button "Đăng nhập" [ref=f16e20] [cursor=pointer]
+    - generic [ref=f16e21]:
+      - generic [ref=f16e22]: hoặc
+      - button "Mở bằng Face ID / vân tay" [active] [ref=f16e24] [cursor=pointer]:
+        - generic [ref=f16e25]: 🔐
+      - paragraph [ref=f16e27]: "Lần đầu: đăng nhập PIN → bật sinh trắc trong sidebar."
+    - paragraph [ref=f16e28]:
+      - text: "Mặc định PIN:"
+      - strong [ref=f16e29]: admin
+      - text: / PIN
+      - strong
+      - text: (Vào app bấm
+      - strong [ref=f16e30]: Đổi PIN
+      - text: hoặc
+      - strong [ref=f16e31]: Cấu hình Cloud
+      - text: )
+    - paragraph [ref=f16e32]: Chưa bật sinh trắc học

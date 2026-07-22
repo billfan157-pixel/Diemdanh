@@ -9,6 +9,7 @@ export class LoginView {
   private authManager: AuthManager
   private notificationManager: NotificationManager
   private element: HTMLElement | null = null
+  private enteredPin: string = ''
 
   constructor(authManager: AuthManager, notificationManager: NotificationManager) {
     this.authManager = authManager
@@ -44,6 +45,12 @@ export class LoginView {
     const emailInput = this.element.querySelector('#loginEmail') as HTMLInputElement
     const passwordInput = this.element.querySelector('#loginPassword') as HTMLInputElement
 
+    // Listen to changes on the hidden input field (essential for Playwright E2E compatibility)
+    pinInput?.addEventListener('input', () => {
+      this.enteredPin = pinInput.value
+      this.updatePinIndicators()
+    })
+
     tabPinBtn?.addEventListener('click', () => {
       tabPinBtn.classList.add('active')
       tabEmailBtn.classList.remove('active')
@@ -69,6 +76,26 @@ export class LoginView {
       tabPinBtn.setAttribute('aria-selected', String(tabPinBtn.classList.contains('active')))
       tabEmailBtn.setAttribute('aria-selected', String(tabEmailBtn.classList.contains('active')))
     })
+
+    // Keypad click handlers
+    this.element.querySelectorAll('.keypad-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = (btn as HTMLElement).dataset.key
+        if (key === 'clear') {
+          this.enteredPin = ''
+        } else if (key === 'del') {
+          this.enteredPin = this.enteredPin.slice(0, -1)
+        } else if (key && this.enteredPin.length < 4) {
+          this.enteredPin += key
+        }
+        this.updatePinIndicators()
+
+        // Auto submit on 4 digits
+        if (this.enteredPin.length === 4) {
+          form.requestSubmit()
+        }
+      })
+    })
   }
 
   private getTemplate(): string {
@@ -88,8 +115,30 @@ export class LoginView {
             <label class="field-label" for="loginUser">Tài khoản</label>
             <input id="loginUser" class="input" type="text" placeholder="admin" required autocomplete="username" />
 
-            <label class="field-label" for="loginPin" style="margin-top:10px">PIN</label>
-            <input id="loginPin" class="input" type="password" inputmode="numeric" placeholder="••••" required autocomplete="current-password" />
+            <input id="loginPin" type="password" style="width: 1px; height: 1px; opacity: 0; border: none; padding: 0; margin: 0; pointer-events: none; position: absolute;" required autocomplete="current-password" />
+            
+            <label class="field-label" style="margin-top:14px; display:block; text-align:center;">Mã PIN đăng nhập</label>
+            <div class="passcode-dots-container" style="display:flex; justify-content:center; gap:16px; margin: 10px 0 18px;">
+              <span class="passcode-dot" style="width:14px; height:14px; border-radius:50%; border:2px solid var(--color-border-strong); transition: background 150ms, border-color 150ms;"></span>
+              <span class="passcode-dot" style="width:14px; height:14px; border-radius:50%; border:2px solid var(--color-border-strong); transition: background 150ms, border-color 150ms;"></span>
+              <span class="passcode-dot" style="width:14px; height:14px; border-radius:50%; border:2px solid var(--color-border-strong); transition: background 150ms, border-color 150ms;"></span>
+              <span class="passcode-dot" style="width:14px; height:14px; border-radius:50%; border:2px solid var(--color-border-strong); transition: background 150ms, border-color 150ms;"></span>
+            </div>
+
+            <div class="pin-keypad" id="pinKeypad">
+              <button type="button" class="keypad-btn" data-key="1">1</button>
+              <button type="button" class="keypad-btn" data-key="2">2</button>
+              <button type="button" class="keypad-btn" data-key="3">3</button>
+              <button type="button" class="keypad-btn" data-key="4">4</button>
+              <button type="button" class="keypad-btn" data-key="5">5</button>
+              <button type="button" class="keypad-btn" data-key="6">6</button>
+              <button type="button" class="keypad-btn" data-key="7">7</button>
+              <button type="button" class="keypad-btn" data-key="8">8</button>
+              <button type="button" class="keypad-btn" data-key="9">9</button>
+              <button type="button" class="keypad-btn btn-clear" data-key="clear">C</button>
+              <button type="button" class="keypad-btn" data-key="0">0</button>
+              <button type="button" class="keypad-btn btn-del" data-key="del">⌫</button>
+            </div>
           </div>
 
           <div id="emailFields" class="hidden" role="tabpanel" hidden>
@@ -152,8 +201,9 @@ export class LoginView {
 
         if (!result.ok) {
           this.showError(errorEl, result.error || 'Sai tài khoản hoặc PIN.')
-          pinInput.value = ''
-          pinInput.focus()
+          this.enteredPin = ''
+          this.updatePinIndicators()
+          this.triggerErrorEffects()
           return
         }
       } else {
@@ -182,6 +232,7 @@ export class LoginView {
           this.showError(errorEl, result.error || 'Đăng nhập Cloud thất bại.')
           passwordInput.value = ''
           passwordInput.focus()
+          this.triggerErrorEffects()
           return
         }
       }
@@ -193,6 +244,7 @@ export class LoginView {
       window.dispatchEvent(new CustomEvent('gl:login', { detail: result }))
     } catch (e: any) {
       this.showError(errorEl, e.message || 'Lỗi đăng nhập')
+      this.triggerErrorEffects()
     }
   }
 
@@ -202,6 +254,7 @@ export class LoginView {
 
     if (!result.ok) {
       this.showError(errorEl, result.error || 'Xác thực sinh trắc học thất bại')
+      this.triggerErrorEffects()
       return
     }
 
@@ -219,5 +272,36 @@ export class LoginView {
     if (!el) return
     el.classList.add('hidden')
     el.textContent = ''
+  }
+
+  private updatePinIndicators(): void {
+    if (!this.element) return
+    const dots = this.element.querySelectorAll('.passcode-dot')
+    dots.forEach((dot, idx) => {
+      if (idx < this.enteredPin.length) {
+        dot.classList.add('active')
+        dot.setAttribute('style', 'width:14px; height:14px; border-radius:50%; background:var(--color-primary); border-color:var(--color-primary);')
+      } else {
+        dot.classList.remove('active')
+        dot.setAttribute('style', 'width:14px; height:14px; border-radius:50%; border:2px solid var(--color-border-strong);')
+      }
+    })
+    const pinInput = this.element.querySelector('#loginPin') as HTMLInputElement
+    if (pinInput) pinInput.value = this.enteredPin
+  }
+
+  private triggerErrorEffects(): void {
+    if (!this.element) return
+    const card = this.element.querySelector('.login-card')
+    if (card) {
+      card.classList.remove('shake')
+      void (card as HTMLElement).offsetWidth // trigger reflow
+      card.classList.add('shake')
+    }
+    
+    // Vibrate device
+    if ('vibrate' in navigator) {
+      navigator.vibrate([100, 50, 100])
+    }
   }
 }

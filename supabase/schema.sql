@@ -116,6 +116,7 @@ create table if not exists public.learning_logs (
   by_user_id text,
   by_name text,
   at bigint not null,
+  rev bigint default 1,
   created_at timestamptz not null default now()
 );
 
@@ -354,6 +355,12 @@ create trigger update_students_updated_at
 drop trigger if exists increment_students_rev on public.students;
 create trigger increment_students_rev
   before update on public.students
+  for each row execute function increment_rev();
+
+-- Create triggers for learning_logs
+drop trigger if exists increment_learning_logs_rev on public.learning_logs;
+create trigger increment_learning_logs_rev
+  before update on public.learning_logs
   for each row execute function increment_rev();
 
 -- =========================================================

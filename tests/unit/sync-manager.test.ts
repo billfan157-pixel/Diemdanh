@@ -160,18 +160,142 @@ describe('SyncManager with Supabase mock', () => {
     vi.spyOn(supabaseService, 'isConfigured').mockReturnValue(true)
     vi.spyOn(supabaseService, 'getClient').mockReturnValue({
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            data: [],
-            error: null
-          })
-        })
+        select: vi.fn().mockResolvedValue({ data: [], error: null })
       })
     } as any)
     
     const result = await syncManager.pull()
     
     // Should not error due to configuration
-    expect(result.ok).toBeDefined()
+    expect(result.ok).toBe(true)
+  })
+
+  it('should pull and merge real data into state', async () => {
+    const storage = createMockStorage()
+    const stateManager = new StateManager(storage)
+    const syncManager = new SyncManager(storage)
+    
+    await stateManager.init()
+    syncManager.setStateManager(stateManager)
+
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    vi.spyOn(supabaseService, 'isConfigured').mockReturnValue(true)
+    const mockFrom = vi.fn().mockImplementation((table: string) => ({
+      select: vi.fn().mockResolvedValue(
+        table === 'classes'
+          ? { data: [{ id: 'c1', name: 'Lớp Cloud', year: '2025', columns: [{ key: 'khaoKinh', short: 'KK', label: 'KK', defaultWeight: 1 }], weights: { khaoKinh: 1 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }], error: null }
+          : table === 'students'
+          ? { data: [{ id: 's1', class_id: 'c1', ten_thanh: 'Phêrô', ho_dem: 'Trần', ten: 'An', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }], error: null }
+          : table === 'scores'
+          ? { data: [{ student_id: 's1', term: 'hk1', col_key: 'khaoKinh', values: [9] }], error: null }
+          : { data: [], error: null }
+      )
+    }))
+    vi.spyOn(supabaseService, 'getClient').mockReturnValue({ from: mockFrom } as any)
+
+    const result = await syncManager.pull()
+    expect(result.ok).toBe(true)
+
+    const state = stateManager.getState()
+    expect(state.classes).toHaveLength(1)
+    expect(state.classes[0].name).toBe('Lớp Cloud')
+    expect(state.classes[0].students).toHaveLength(1)
+    expect(state.classes[0].students[0].ten).toBe('An')
+    expect(state.classes[0].students[0].scoresByTerm.hk1.khaoKinh).toEqual([9])
+  })
+
+  it('should handle pull fetch error gracefully', async () => {
+    const storage = createMockStorage()
+    const syncManager = new SyncManager(storage)
+
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    vi.spyOn(supabaseService, 'isConfigured').mockReturnValue(true)
+    vi.spyOn(supabaseService, 'getClient').mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockResolvedValue({ data: null, error: new Error('DB error') })
+      })
+    } as any)
+
+    const result = await syncManager.pull()
+    expect(result.ok).toBe(false)
+  })
+
+  it('should configure Supabase and persist settings', async () => {
+    const storage = createMockStorage()
+    const syncManager = new SyncManager(storage)
+
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    const configureSpy = vi.spyOn(supabaseService, 'configure')
+
+    const setItemSpy = vi.spyOn(localStorage, 'setItem')
+    syncManager.configureSupabase('https://test.supabase.co', 'test-key')
+    expect(configureSpy).toHaveBeenCalledWith('https://test.supabase.co', 'test-key')
+    expect(setItemSpy).toHaveBeenCalledWith('so-diem-gl-supabase', expect.any(String))
+  })
+})
+
+describe('SyncManager auto-sync', () => {
+  let storage: StorageAdapter
+  let syncManager: SyncManager
+
+  beforeEach(() => {
+    storage = createMockStorage()
+    syncManager = new SyncManager(storage)
+  })
+
+  it('should start and stop auto-sync', () => {
+    const syncSpy = vi.spyOn(syncManager, 'sync').mockResolvedValue({ ok: true })
+    syncManager.startAutoSync(500)
+    expect(syncManager['syncInterval']).not.toBeNull()
+    syncManager.stopAutoSync()
+    expect(syncManager['syncInterval']).toBeNull()
+  })
+
+  it('should not start duplicate auto-sync intervals', () => {
+    syncManager.startAutoSync(500)
+    const firstInterval = syncManager['syncInterval']
+    syncManager.startAutoSync(500)
+    expect(syncManager['syncInterval']).toBe(firstInterval)
+    syncManager.stopAutoSync()
+  })
+
+  it('should get Supabase URL', async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    vi.spyOn(supabaseService, 'getUrl').mockReturnValue('https://test.supabase.co')
+    expect(syncManager.getSupabaseUrl()).toBe('https://test.supabase.co')
+  })
+
+  it('should return configured status', async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    vi.spyOn(supabaseService, 'isConfigured').mockReturnValue(true)
+    expect(syncManager.isConfigured()).toBe(true)
+  })
+
+  it('should refresh pending count', async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    vi.spyOn(supabaseService, 'isConfigured').mockReturnValue(false)
+    await syncManager.refreshPendingCount()
+    const status = syncManager.getStatus()
+    expect(status).toHaveProperty('pendingCount')
+  })
+
+  it('should handle sync when supabase is configured', async () => {
+    const { supabaseService } = await import('../../src/services/SupabaseClient')
+    vi.spyOn(supabaseService, 'isConfigured').mockReturnValue(true)
+    const mockClient = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockResolvedValue({ data: [], error: null })
+      })
+    }
+    vi.spyOn(supabaseService, 'getClient').mockReturnValue(mockClient as any)
+
+    const result = await syncManager.sync()
+    expect(result.ok).toBe(true)
+  })
+
+  it('should set auth manager (backward compat)', () => {
+    const am = { getCurrentUser: vi.fn() } as any
+    syncManager.setAuthManager(am)
+    // Should not throw
   })
 })

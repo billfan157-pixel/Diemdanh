@@ -1,12 +1,7 @@
-// ============================================================
-// Columns + Weights config modal (Phase 3.1)
-// ============================================================
-
 import { StateManager } from '../../StateManager'
 import { NotificationManager } from '../../../services/NotificationManager'
 import { ScoreColumnDef } from '../../../services/storage/StorageAdapter.types'
 import { resolveClassColumns } from '../../../config/columns.ts'
-import { createFocusTrap } from '../../../utils/focusTrap.ts'
 import { loadColumnPresets, saveColumnPreset, deleteColumnPreset } from '../../../features/columnPresets.ts'
 
 export class ColumnsModal {
@@ -16,7 +11,6 @@ export class ColumnsModal {
   private classId: string | null = null
   private draft: ScoreColumnDef[] = []
   private onSaved: (() => void) | null = null
-  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
 
   constructor(stateManager: StateManager, notification: NotificationManager) {
     this.stateManager = stateManager
@@ -43,63 +37,47 @@ export class ColumnsModal {
     this.ensureModal()
     this.renderBody()
     this.populatePresetSelect('#columnsPresetSelect')
-    this.element?.classList.remove('hidden')
-    if (this.element) this._focusTrap = createFocusTrap(this.element)
+    const modal = this.element as any
+    if (modal) { modal.open = true }
   }
 
   close(): void {
-    this._focusTrap?.destroy()
-    this._focusTrap = null
-    this.element?.classList.add('hidden')
+    const modal = this.element as any
+    if (modal) { modal.open = false }
   }
 
   private ensureModal(): void {
     let modal = document.getElementById('columnsModal')
     if (!modal) {
-      modal = document.createElement('div')
+      modal = document.createElement('gl-modal')
       modal.id = 'columnsModal'
-      modal.className = 'modal-overlay hidden'
-      modal.setAttribute('role', 'dialog')
-      modal.setAttribute('aria-modal', 'true')
+      modal.setAttribute('heading', 'Cột điểm & hệ số')
+      modal.setAttribute('subtitle', 'Cấu hình theo lớp · không hardcode')
+      modal.setAttribute('size', 'md')
+
       modal.innerHTML = `
-        <div class="modal-panel max-w-md">
-          <div class="modal-head">
-            <div>
-              <h3>Cột điểm &amp; hệ số</h3>
-              <p class="modal-sub">Cấu hình theo lớp · không hardcode</p>
-            </div>
-            <button type="button" class="icon-btn modal-close" id="columnsModalClose" aria-label="Đóng">×</button>
-          </div>
-          <div class="modal-body">
-            <div class="d-flex gap-2 mb-3 flex-wrap items-center">
-              <label class="field-label mb-0" for="columnsPresetSelect" style="font-size:0.8rem">Bộ mẫu:</label>
-              <select id="columnsPresetSelect" class="input" style="width:auto;flex:1;min-width:120px"></select>
-              <button type="button" class="btn btn-ghost btn-sm" id="columnsApplyPresetBtn">Áp dụng</button>
-              <button type="button" class="btn btn-ghost btn-sm" id="columnsSavePresetBtn">💾 Lưu mẫu</button>
-              <button type="button" class="btn btn-ghost btn-sm" id="columnsDelPresetBtn">🗑️ Xóa mẫu</button>
-            </div>
-            <div id="columnsModalList"></div>
-            <div class="d-flex gap-2 mt-3 flex-wrap">
-              <input type="text" id="columnsNewLabel" class="input flex-1" placeholder="Tên cột mới" style="min-width:140px" />
-              <input type="text" id="columnsNewShort" class="input" placeholder="Viết tắt" maxlength="4" style="width:72px" />
-              <button type="button" class="btn btn-secondary" id="columnsAddBtn">＋ Thêm cột</button>
-            </div>
-            <p class="hint mt-3" style="font-size:0.8rem">
-              Cột trống không tính vào TB. Xóa cột sẽ mất điểm của cột đó trên lớp này.
-            </p>
-          </div>
-          <div class="modal-foot d-flex gap-2 justify-end">
-            <button type="button" class="btn btn-ghost" id="columnsResetBtn">Khôi phục mặc định</button>
-            <button type="button" class="btn btn-primary" id="columnsSaveBtn">Lưu</button>
-          </div>
+        <div class="d-flex gap-2 mb-3 flex-wrap items-center">
+          <label class="field-label mb-0" for="columnsPresetSelect" style="font-size:0.8rem">Bộ mẫu:</label>
+          <select id="columnsPresetSelect" class="input" style="width:auto;flex:1;min-width:120px"></select>
+          <gl-button variant="ghost" size="sm" id="columnsApplyPresetBtn">Áp dụng</gl-button>
+          <gl-button variant="ghost" size="sm" id="columnsSavePresetBtn">💾 Lưu mẫu</gl-button>
+          <gl-button variant="ghost" size="sm" id="columnsDelPresetBtn">🗑️ Xóa mẫu</gl-button>
         </div>
+        <div id="columnsModalList"></div>
+        <div class="d-flex gap-2 mt-3 flex-wrap">
+          <input type="text" id="columnsNewLabel" class="input flex-1" placeholder="Tên cột mới" style="min-width:140px" />
+          <input type="text" id="columnsNewShort" class="input" placeholder="Viết tắt" maxlength="4" style="width:72px" />
+          <gl-button variant="secondary" id="columnsAddBtn">＋ Thêm cột</gl-button>
+        </div>
+        <p class="hint mt-3" style="font-size:0.8rem">
+          Cột trống không tính vào TB. Xóa cột sẽ mất điểm của cột đó trên lớp này.
+        </p>
+        <gl-button slot="footer" variant="ghost" id="columnsResetBtn">Khôi phục mặc định</gl-button>
+        <gl-button slot="footer" variant="primary" id="columnsSaveBtn">Lưu</gl-button>
       `
       document.body.appendChild(modal)
 
-      modal.querySelector('#columnsModalClose')?.addEventListener('click', () => this.close())
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) this.close()
-      })
+      modal.addEventListener('gl-close', () => this.close())
       modal.querySelector('#columnsAddBtn')?.addEventListener('click', () => this.addDraftColumn())
       modal.querySelector('#columnsResetBtn')?.addEventListener('click', () => {
         import('../../../config/columns.ts').then(({ cloneDefaultCols }) => {

@@ -28,8 +28,8 @@ https://github.com/billfan157-pixel/Diemdanh
 
 ## Đồng bộ cloud (Supabase)
 
-Project: `gqmbhvgyoenweiepvrvk`  
-URL: `https://gqmbhvgyoenweiepvrvk.supabase.co`
+Project: `vugoskzssqhusnzcbfhm` (billfan157-pixel's Project)  
+URL: `https://vugoskzssqhusnzcbfhm.supabase.co`
 
 1. Supabase Dashboard → **SQL Editor** → dán & Run file `supabase/schema.sql`
 2. **Settings → API** → copy **anon public** key

@@ -5,9 +5,11 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { logger } from './Logger'
 
+export const DEFAULT_SUPABASE_URL = 'https://vugoskzssqhusnzcbfhm.supabase.co'
+
 export class SupabaseService extends EventTarget {
   private client: SupabaseClient | null = null
-  private url = ''
+  private url = DEFAULT_SUPABASE_URL
   private key = ''
 
   constructor() {
@@ -21,8 +23,8 @@ export class SupabaseService extends EventTarget {
       const settingsData = localStorage.getItem('so-diem-gl-settings')
       if (settingsData) {
         const settings = JSON.parse(settingsData)
-        if (settings.supabaseUrl && settings.supabaseKey) {
-          this.url = settings.supabaseUrl
+        if (settings.supabaseKey) {
+          this.url = settings.supabaseUrl || DEFAULT_SUPABASE_URL
           this.key = settings.supabaseKey
           this.initClient()
           return
@@ -33,17 +35,17 @@ export class SupabaseService extends EventTarget {
       const legacyData = localStorage.getItem('so-diem-gl-supabase')
       if (legacyData) {
         const { url, key } = JSON.parse(legacyData)
-        if (url && key) {
-          this.url = url
+        if (key) {
+          this.url = url || DEFAULT_SUPABASE_URL
           this.key = key
           this.initClient()
           return
         }
       }
 
-      // 3. No fallback - require explicit configuration
+      // 3. No fallback key - require explicit configuration
       logger.warn('Supabase not configured. Please configure via settings.')
-      this.url = ''
+      this.url = DEFAULT_SUPABASE_URL
       this.key = ''
     } catch (e) {
       logger.warn('Failed to load Supabase settings:', e)

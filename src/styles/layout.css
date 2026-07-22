@@ -59,6 +59,7 @@
     top: 0;
     max-height: calc(100vh - 70px);
     overflow-y: auto;
+    overflow-x: hidden;
     min-width: 0;
     padding-right: 16px;
     border-right: 1px solid var(--border);
@@ -67,7 +68,8 @@
   .cv-main {
     min-width: 0;
     padding-left: 20px;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: visible;
   }
 
   .cv-student-item {
@@ -180,21 +182,22 @@
 
 /* ===== Sidebar ===== */
 .sidebar {
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  background: var(--color-bg-elevated);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   max-height: 100vh;
   position: sticky;
   top: 0;
-  box-shadow: 2px 0 16px rgba(16, 24, 40, 0.03);
+  z-index: 10;
+  box-shadow: 4px 0 24px rgba(16, 24, 40, 0.02);
 }
 
 .sidebar-head {
-  padding: 18px 16px 12px;
-  border-bottom: 1px solid var(--border);
+  padding: 20px 16px 14px;
+  border-bottom: 1px solid var(--color-border);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
 }
 
@@ -204,51 +207,56 @@
 }
 
 .brand-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: linear-gradient(135deg, var(--color-primary), var(--color-purple));
   color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 800;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+  transition: transform var(--duration-fast);
+}
+
+.brand:hover .brand-icon {
+  transform: rotate(10deg) scale(1.05);
 }
 
 .brand-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .brand h1 {
-  font-size: 1.05rem;
-  font-weight: 750;
+  font-size: 0.95rem;
+  font-weight: 850;
   letter-spacing: -0.02em;
-  color: var(--text);
-  line-height: 1.2;
+  color: var(--color-text);
+  line-height: 1.15;
 }
 
 .brand p {
-  font-size: 0.75rem;
-  color: var(--muted);
-  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  margin-top: 1px;
 }
 
 .sidebar-toggle {
   display: none;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  width: 40px;
-  height: 40px;
+  background: var(--color-bg-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
   align-items: center;
   justify-content: center;
-  color: var(--text2);
-  font-size: 1.2rem;
+  color: var(--color-text-secondary);
+  font-size: 1.1rem;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -256,16 +264,60 @@
 .sidebar-body {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 12px 20px;
+  padding: 14px 12px 24px;
+}
+
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
 }
 
 .section-label {
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.68rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  margin: 4px 6px 10px;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: var(--space-2) 0 var(--space-2);
+  border-left: 2.5px solid var(--color-primary);
+  padding-left: 6px;
+  line-height: 1;
+}
+
+.sidebar-tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 150ms ease;
+  text-align: left;
+  margin-bottom: 2px;
+}
+
+.sidebar-tool-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-primary);
+  border-color: var(--color-border);
+  transform: translateX(3px);
+}
+
+.sidebar-tool-btn .tool-icon {
+  font-size: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--duration-fast);
+}
+
+.sidebar-tool-btn:hover .tool-icon {
+  transform: scale(1.12);
 }
 
 /* ===== Sidebar Collapsed (Icon-only mode) ===== */
@@ -447,35 +499,38 @@
   gap: 6px;
   margin: 8px 0 10px;
   max-height: min(42vh, 320px);
-  overflow-y: auto;
   padding-right: 2px;
 }
 
 .class-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 10px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  background: transparent;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
   cursor: pointer;
   text-align: left;
   width: 100%;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   font-family: inherit;
-  color: var(--text);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 6px;
 }
 
 .class-item:hover {
-  background: var(--surface2);
-  border-color: var(--border);
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .class-item.active {
-  background: var(--accent-soft);
-  border-color: var(--color-primary-soft-hover);
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.08);
+  background: linear-gradient(135deg, var(--color-primary-soft), var(--color-bg-elevated));
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
 }
 
 .class-dot {
@@ -483,26 +538,49 @@
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--accent);
+  background: var(--color-primary);
 }
 
 .class-info { flex: 1; min-width: 0; }
 
 .class-name {
-  font-weight: 650;
+  font-weight: 750;
   font-size: 0.92rem;
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 150ms ease;
 }
 
 .class-meta {
   font-size: 0.75rem;
-  color: var(--muted);
-  margin-top: 1px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
 }
 
-.class-item.active .class-name { color: var(--accent); }
+.class-item.active .class-name { color: var(--color-primary); }
+
+.class-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+  user-select: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: transform 200ms ease;
+}
+
+.class-item:hover .class-avatar {
+  transform: scale(1.06) rotate(3deg);
+}
 
 .class-actions {
   display: flex;

@@ -1,13 +1,23 @@
 import { StateManager } from '../StateManager'
 import { AuthManager } from '../../core/auth/AuthManager'
 import { NotificationManager } from '../../services/NotificationManager'
-import { resolveClassColumns, displayName, debounce } from '../../config/constants.ts'
-import { renderStudents, StudentFilter } from '../../views/StudentRenderer.ts'
-import { renderSingleStudentCard } from '../../views/cardsView.ts'
+import { resolveClassColumns, displayName, debounce, INFO_FIELD_DEFS, type InfoField } from '../../config/constants.ts'
+import { iconEditStr, iconSearchStr } from './components/gl-icons'
+import { createFocusTrap } from '../../utils/focusTrap'
+import { renderStudents, StudentFilter, filterStudents, applyFilters } from '../../views/StudentRenderer.ts'
+import type { ClassData, AppState } from '../../services/storage/StorageAdapter.types'
+import '../views/components/gl-student-card'
+import '../views/components/gl-student-row'
+import '../views/components/gl-student-list'
+import '../views/components/gl-class-toolbar'
+import '../views/components/gl-bulk-action-bar'
+import '../views/components/gl-student-detail'
 import { studentTBContext, studentTB, studentYearTB, classify } from '../../core/calc.ts'
 import { fmt } from '../../views/helpers.ts'
 import { setupSwipe, setupLongPress, setupItemSwipe, setupPullRefresh, nextView, prevView } from '../gestures.ts'
 import { validateScoreInputEl, focusNextScoreInput } from '../../utils/scoreInput.ts'
+import { ClassFilterController } from '../controllers/ClassFilterController'
+import { ClassBulkActions } from '../controllers/ClassBulkActions'
 
 export class ClassView {
   private container: HTMLElement | null = null
@@ -18,14 +28,41 @@ export class ClassView {
   private _skipNextRender = false
   private containerGestureCleanups: (() => void)[] = []
   private studentGestureCleanups: (() => void)[] = []
+  private _documentCleanups: (() => void)[] = []
+  private _containerCleanups: (() => void)[] = []
   private contextMenuSid: string | null = null
   private contextMenuBound = false
+
+  // Controllers
+  private filterController: ClassFilterController
+  private bulkActionsController: ClassBulkActions
 
   constructor(
     private stateManager: StateManager,
     private authManager: AuthManager,
     private notificationManager: NotificationManager
-  ) {}
+  ) {
+    this.filterController = new ClassFilterController(null, {
+      notificationManager: this.notificationManager,
+      getContainer: () => this.container,
+      getStudentFilter: () => this.studentFilter,
+      setStudentFilter: (f) => { this.studentFilter = f },
+      getSearchQuery: () => this.searchQuery,
+      setSearchQuery: (q) => { this.searchQuery = q },
+      updateFilterUI: () => this.updateFilterUI(),
+      rerenderStudents: () => this.rerenderStudents(),
+      renderScoreRangeFilters: () => this.renderScoreRangeFilters(),
+      renderColVisibilityPopover: () => this.renderColVisibilityPopover()
+    })
+
+    this.bulkActionsController = new ClassBulkActions(null, {
+      stateManager: this.stateManager,
+      notificationManager: this.notificationManager,
+      getContainer: () => this.container,
+      getActiveClassId: () => this.activeClassId,
+      rerenderStudents: () => this.rerenderStudents()
+    })
+  }
 
   render(container: HTMLElement, classId: string): void {
     this.container = container
@@ -38,87 +75,64 @@ export class ClassView {
 
     container.innerHTML = `
       <div class="class-view">
-        <div class="class-header">
-          <h2>${this.escapeHtml(cls.name)} ${cls.year ? `· ${this.escapeHtml(cls.year)}` : ''}${this.stateManager.isYearArchived(cls.year) ? ' · lưu trữ' : ''}</h2>
-          <div class="class-actions">
-            <button class="btn btn-secondary btn-sm" id="addStudentBtn" ${this.stateManager.isClassArchived(cls.id) ? 'disabled' : ''}>➕ Thêm HV</button>
-            <button class="btn btn-ghost btn-sm" id="classColumnsBtn">⚖️ Cột điểm</button>
-            <button class="btn btn-ghost btn-sm" id="classInviteBtn">📝 Phiếu PH</button>
-          </div>
-        </div>
+        <gl-class-toolbar
+          class-name="${this.escapeHtml(cls.name)}"
+          class-year="${this.escapeHtml(cls.year || '')}"
+          ${this.stateManager.isYearArchived(cls.year) ? 'is-archived' : ''}
+          ${this.stateManager.isClassArchived(cls.id) ? 'class-archived' : ''}
+        ></gl-class-toolbar>
 
         ${isDesktop ? `
         <div class="cv-side" id="cvStudentList">
-          <div class="cv-side-header">
-            Học viên · <span id="cvStudentCount">${cls.students.length}</span>
-          </div>
-          <div class="cv-side-search">
-            <input type="text" id="cvStudentFilter" placeholder="Tìm nhanh..." aria-label="Tìm học viên theo tên" />
-          </div>
-          <div id="cvStudentItems"></div>
+          <gl-student-list id="cvStudentListComp"></gl-student-list>
         </div>
         <div class="cv-main">
         ` : ''}
 
           <div class="toolbar" id="classToolbar">
-            <div class="m-seg term-switcher">
-              <button type="button" class="term-btn ${this.stateManager.getState().activeTerm === 'hk1' ? 'active' : ''}" data-term="hk1">HK1</button>
-              <button type="button" class="term-btn ${this.stateManager.getState().activeTerm === 'hk2' ? 'active' : ''}" data-term="hk2">HK2</button>
-              <button type="button" class="term-btn ${this.stateManager.getState().activeTerm === 'year' ? 'active' : ''}" data-term="year">Cả năm</button>
-            </div>
+            <gl-tabs id="termSwitcher" .tabs='${JSON.stringify([{id:"hk1",label:"HK1"},{id:"hk2",label:"HK2"},{id:"year",label:"Cả năm"}])}' activeTab="${this.stateManager.getState().activeTerm}"></gl-tabs>
 
-            <div class="m-seg-scroll view-switcher">
-              <button type="button" class="view-btn ${this.stateManager.getState().viewMode === 'cards' ? 'active' : ''}" data-view="cards">🃏 Thẻ</button>
-              <button type="button" class="view-btn ${this.stateManager.getState().viewMode === 'table' ? 'active' : ''}" data-view="table">📊 Bảng</button>
-              <button type="button" class="view-btn ${this.stateManager.getState().viewMode === 'rank' ? 'active' : ''}" data-view="rank">🏆 Xếp hạng</button>
-            </div>
+            <gl-tabs id="viewSwitcher" .tabs='${JSON.stringify([{id:"cards",label:"🃏 Thẻ"},{id:"table",label:"📊 Bảng"},{id:"rank",label:"🏆 Xếp hạng"}])}' activeTab="${this.stateManager.getState().viewMode}"></gl-tabs>
 
             <div class="m-search-bar toolbar">
-              <div class="search-wrap flex-1">
-                <input type="search" id="searchInput" class="input" placeholder="Tìm học viên..." aria-label="Tìm học viên" value="${this.escapeHtml(this.searchQuery)}" />
-              </div>
+              <gl-input type="search" id="searchInput" placeholder="Tìm học viên..." value="${this.escapeHtml(this.searchQuery)}"></gl-input>
             </div>
 
             <div class="filter-bar">
-              <select id="filterClassification" class="filter-select" aria-label="Lọc theo xếp loại">
-                <option value="all">Xếp loại: Tất cả</option>
-                <option value="rank-xs">XS (≥9)</option>
-                <option value="rank-g">Giỏi (8–9)</option>
-                <option value="rank-k">Khá (6.5–8)</option>
-                <option value="rank-tb">TB (5–6.5)</option>
-                <option value="rank-y">Yếu (&lt;5)</option>
-                <option value="rank-none">Chưa có TB</option>
-              </select>
-              <select id="filterCompletion" class="filter-select" aria-label="Lọc theo mức độ nhập điểm">
-                <option value="all">Điểm: Tất cả</option>
-                <option value="complete">Đủ điểm</option>
-                <option value="incomplete">Thiếu điểm</option>
-                <option value="none">Chưa có điểm</option>
-              </select>
+              <gl-select id="filterClassification" placeholder="Xếp loại: Tất cả" .options='${JSON.stringify([{value:"all",label:"Xếp loại: Tất cả"},{value:"rank-xs",label:"XS (≥9)"},{value:"rank-g",label:"Giỏi (8–9)"},{value:"rank-k",label:"Khá (6.5–8)"},{value:"rank-tb",label:"TB (5–6.5)"},{value:"rank-y",label:"Yếu (<5)"},{value:"rank-none",label:"Chưa có TB"}])}'></gl-select>
+              <gl-select id="filterCompletion" placeholder="Điểm: Tất cả" .options='${JSON.stringify([{value:"all",label:"Điểm: Tất cả"},{value:"complete",label:"Đủ điểm"},{value:"incomplete",label:"Thiếu điểm"},{value:"none",label:"Chưa có điểm"}])}'></gl-select>
+              <gl-button variant="ghost" size="sm" id="toggleScoreFilterBtn" title="Lọc theo điểm cột">🎯</gl-button>
+            <div style="position:relative;">
+              <gl-button variant="ghost" size="sm" id="colVisibilityBtn" title="Ẩn/hiện cột">👁️</gl-button>
+              <div id="colVisibilityPopover" class="popover hidden" style="position:absolute;top:100%;right:0;z-index:100;min-width:180px;max-height:300px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);display:none;"></div>
             </div>
+              <div class="preset-filters" style="display: flex; align-items: center; gap: 4px; margin-left: auto;">
+                <select id="filterPresetsSelect" class="input" style="width:auto; min-width:140px; font-size:0.75rem; padding:4px 8px; border-radius:var(--radius-sm); background:var(--color-bg); border:1px solid var(--color-border); color:var(--color-text);" aria-label="Bộ lọc mẫu"></select>
+                <gl-button variant="ghost" size="sm" id="btnSaveFilterPreset" title="Lưu bộ lọc mẫu">💾</gl-button>
+                <gl-button variant="ghost" size="sm" id="btnDelFilterPreset" title="Xóa bộ lọc mẫu">🗑️</gl-button>
+              </div>
+            </div>
+            <div id="scoreRangeFilters" class="score-range-filters hidden" style="display:none;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-md);border:1px solid var(--border);margin-top:6px;"></div>
+            <div id="filterChips" class="filter-chips" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;min-height:0;"></div>
           </div>
 
           <div class="m-stat-strip" id="classStats"></div>
+          <div id="classSizeHint" style="display:none;"></div>
           <div id="classChartContainer" style="display:none"></div>
           <div id="studentsContainer">
             <div class="skeleton-list px-4" id="studentSkeleton">
-              <div class="skeleton skeleton-table-row"><div class="skeleton skeleton-avatar"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-sm"></div><div class="skeleton skeleton-text-sm"></div><div class="skeleton skeleton-text-sm"></div></div>
-              <div class="skeleton skeleton-table-row"><div class="skeleton skeleton-avatar"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-sm"></div><div class="skeleton skeleton-text-sm"></div><div class="skeleton skeleton-text-sm"></div></div>
-              <div class="skeleton skeleton-table-row"><div class="skeleton skeleton-avatar"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-sm"></div><div class="skeleton skeleton-text-sm"></div><div class="skeleton skeleton-text-sm"></div></div>
-              <div class="skeleton skeleton-table-row"><div class="skeleton skeleton-avatar"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-sm"></div><div class="skeleton skeleton-text-sm"></div><div class="skeleton skeleton-text-sm"></div></div>
+              <gl-skeleton variant="table-row"></gl-skeleton>
+              <gl-skeleton variant="table-row"></gl-skeleton>
+              <gl-skeleton variant="table-row"></gl-skeleton>
+              <gl-skeleton variant="table-row"></gl-skeleton>
             </div>
           </div>
 
-          <div id="bulkActionBar">
-            <span class="bulk-count">Đã chọn 0 học viên</span>
-            <div class="bulk-actions">
-              <button class="btn btn-primary btn-sm" id="bulkEditBtn">✏️ Sửa điểm</button>
-              <button class="btn btn-ghost btn-sm" id="clearSelectionBtn">Bỏ chọn</button>
-            </div>
-          </div>
+          <gl-bulk-action-bar id="bulkActionBar"></gl-bulk-action-bar>
 
         ${isDesktop ? '</div>' : ''}
       </div>
+      <gl-student-detail id="studentDetailPanel"></gl-student-detail>
     `
 
     this.updateFilterUI()
@@ -135,63 +149,236 @@ export class ClassView {
   private bindEvents(): void {
     if (!this.container) return
 
+    // Cleanup previous listeners to prevent accumulation
+    this._documentCleanups.forEach(fn => fn())
+    this._documentCleanups = []
+    this._containerCleanups.forEach(fn => fn())
+    this._containerCleanups = []
+
     const container = this.container
 
-    container.querySelector('#addStudentBtn')?.addEventListener('click', () => this.openAddStudent())
-    container.querySelector('#classColumnsBtn')?.addEventListener('click', () => this.openColumnsModal())
-    container.querySelector('#classInviteBtn')?.addEventListener('click', () => this.openParentInvite())
+    // Bind sub-controllers
+    this.filterController.bind()
+    this.bulkActionsController.bind()
 
-    container.querySelectorAll('[data-term]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const term = (btn as HTMLElement).dataset.term as 'hk1' | 'hk2' | 'year'
-        this.stateManager.setActiveTerm(term)
-        const curMode = this.stateManager.getState().viewMode
-        if (term === 'year') {
-          this.stateManager.setViewMode('year')
-        } else if (curMode === 'year' || curMode === 'stats') {
-          this.stateManager.setViewMode('cards')
-        }
-        if (this.activeClassId) {
-          this.render(container, this.activeClassId)
-        }
-      })
+    container.querySelector('gl-class-toolbar')?.addEventListener('add-student', () => this.openAddStudent())
+    container.querySelector('gl-class-toolbar')?.addEventListener('columns', () => this.openColumnsModal())
+    container.querySelector('gl-class-toolbar')?.addEventListener('invite', () => this.openParentInvite())
+
+    const bulkBar = container.querySelector('gl-bulk-action-bar')
+    bulkBar?.addEventListener('bulk-edit', () => this.openBulkEdit())
+    bulkBar?.addEventListener('bulk-clear', () => this.clearSelection())
+
+    const detailPanel = container.querySelector('gl-student-detail')
+    detailPanel?.addEventListener('detail-edit', ((e: CustomEvent) => {
+      this.openEditStudent(e.detail.studentId)
+    }) as EventListener)
+    detailPanel?.addEventListener('detail-journal', ((e: CustomEvent) => {
+      const cls = this.stateManager.getClass(this.activeClassId!)
+      const student = cls?.students.find(s => s.id === e.detail.studentId)
+      if (student && cls) {
+        window.dispatchEvent(new CustomEvent('gl:open-journal', { detail: { student, classId: this.activeClassId!, className: cls.name } }))
+      }
+    }) as EventListener)
+
+    container.querySelector('#termSwitcher')?.addEventListener('gl-tab-change', (e: Event) => {
+      const term = (e as CustomEvent).detail.tabId as 'hk1' | 'hk2' | 'year'
+      this.stateManager.setActiveTerm(term)
+      const curMode = this.stateManager.getState().viewMode
+      if (term === 'year') {
+        this.stateManager.setViewMode('year')
+      } else if (curMode === 'year' || curMode === 'stats') {
+        this.stateManager.setViewMode('cards')
+      }
+      if (this.activeClassId) {
+        this.render(container, this.activeClassId)
+      }
     })
 
-    container.querySelectorAll('[data-view]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const mode = (btn as HTMLElement).dataset.view!
-        this.stateManager.setViewMode(mode as any)
-        container.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b === btn))
+    container.querySelector('#viewSwitcher')?.addEventListener('gl-tab-change', (e: Event) => {
+      const mode = (e as CustomEvent).detail.tabId
+      this.stateManager.setViewMode(mode as any)
+      this.rerenderStudents()
+    })
+
+    // Populate and bind Saved Presets
+    this.populateFilterPresetsSelect()
+    container.querySelector('#filterPresetsSelect')?.addEventListener('change', (e) => {
+      const name = (e.target as HTMLSelectElement).value
+      const presets = this.loadFilterPresets()
+      const preset = presets.find(p => p.name === name)
+      if (preset) {
+        this.studentFilter = { ...preset.filter }
+        this.searchQuery = preset.search || ''
+        this.updateFilterUI()
+        
+        const searchInput = this.container?.querySelector('#searchInput') as any
+        if (searchInput) searchInput.value = this.searchQuery
+
         this.rerenderStudents()
-      })
+      }
     })
 
-    container.querySelector('#filterClassification')?.addEventListener('change', (e) => {
-      const val = (e.target as HTMLSelectElement).value
+    container.querySelector('#btnSaveFilterPreset')?.addEventListener('click', () => {
+      const name = prompt('Đặt tên cho bộ lọc mẫu này:')
+      if (!name || !name.trim()) return
+      const presets = this.loadFilterPresets()
+      const existingIdx = presets.findIndex(p => p.name.toLowerCase() === name.trim().toLowerCase())
+      const newPreset = {
+        name: name.trim(),
+        filter: { ...this.studentFilter },
+        search: this.searchQuery
+      }
+      if (existingIdx >= 0) {
+        presets[existingIdx] = newPreset
+      } else {
+        presets.push(newPreset)
+      }
+      this.saveFilterPresets(presets)
+      this.populateFilterPresetsSelect()
+      
+      const select = this.container?.querySelector('#filterPresetsSelect') as HTMLSelectElement
+      if (select) select.value = name.trim()
+      
+      this.notificationManager.show(`Đã lưu bộ lọc "${name.trim()}"`, 'success')
+    })
+
+    container.querySelector('#btnDelFilterPreset')?.addEventListener('click', () => {
+      const select = this.container?.querySelector('#filterPresetsSelect') as HTMLSelectElement
+      if (!select || !select.value) return
+      const name = select.value
+      if (['Mặc định (Tất cả)', 'Học sinh yếu', 'Thiếu cột điểm'].includes(name)) {
+        this.notificationManager.show('Không thể xóa bộ lọc mẫu mặc định', 'warning')
+        return
+      }
+      if (!confirm(`Xóa bộ lọc mẫu "${name}"?`)) return
+      let presets = this.loadFilterPresets()
+      presets = presets.filter(p => p.name !== name)
+      this.saveFilterPresets(presets)
+      this.populateFilterPresetsSelect()
+      this.studentFilter = {}
+      this.searchQuery = ''
+      this.updateFilterUI()
+      const searchInput = this.container?.querySelector('#searchInput') as any
+      if (searchInput) searchInput.value = ''
+      this.rerenderStudents()
+      this.notificationManager.show(`Đã xóa bộ lọc mẫu "${name}"`, 'success')
+    })
+
+    container.querySelector('#filterClassification')?.addEventListener('gl-change', (e: Event) => {
+      const val = (e as CustomEvent).detail.value
       this.setFilter({ classification: val === 'all' ? undefined : val })
     })
 
-    container.querySelector('#filterCompletion')?.addEventListener('change', (e) => {
-      const val = (e.target as HTMLSelectElement).value
+    container.querySelector('#filterCompletion')?.addEventListener('gl-change', (e: Event) => {
+      const val = (e as CustomEvent).detail.value
       this.setFilter({ completion: val === 'all' ? undefined : val as any })
     })
 
-    const searchInput = container.querySelector('#searchInput') as HTMLInputElement
-    if (searchInput) {
-      searchInput.addEventListener('input', debounce((e: Event) => {
-        const target = e.target as HTMLInputElement
-        this.handleSearch(target.value)
-      }, 300))
+    container.querySelector('#toggleScoreFilterBtn')?.addEventListener('click', () => {
+      const panel = container.querySelector('#scoreRangeFilters') as HTMLElement
+      if (!panel) return
+      const visible = panel.style.display !== 'none'
+      panel.style.display = visible ? 'none' : 'block'
+      if (!visible) {
+        this.renderScoreRangeFilters()
+      } else {
+        this.studentFilter = { ...this.studentFilter, scoreRanges: undefined }
+        this.updateFilterUI()
+        this.rerenderStudents()
+      }
+    })
+
+    const onScoreRangeChange = (e: Event) => {
+      const input = (e.target as HTMLElement).closest<HTMLInputElement>('[data-score-range]')
+      if (!input) return
+      const colKey = input.dataset.col!
+      const rangeType = input.dataset.range! as 'min' | 'max'
+      const val = input.value.trim()
+
+      const ranges = { ...(this.studentFilter.scoreRanges || {}) }
+      if (!ranges[colKey]) ranges[colKey] = {}
+      if (val === '') {
+        delete ranges[colKey][rangeType]
+        if (!Object.keys(ranges[colKey]).length) delete ranges[colKey]
+      } else {
+        ranges[colKey][rangeType] = parseFloat(val)
+      }
+      this.studentFilter = { ...this.studentFilter, scoreRanges: Object.keys(ranges).length ? ranges : undefined }
+      this.updateFilterUI()
+      this.rerenderStudents()
     }
+    container.addEventListener('change', onScoreRangeChange)
+    this._containerCleanups.push(() => container.removeEventListener('change', onScoreRangeChange))
+
+    // Column visibility popover
+    container.querySelector('#colVisibilityBtn')?.addEventListener('click', () => {
+      const popover = container.querySelector('#colVisibilityPopover') as HTMLElement
+      if (!popover) return
+      const visible = popover.style.display !== 'none'
+      popover.style.display = visible ? 'none' : 'block'
+      if (!visible) this.renderColVisibilityPopover()
+    })
+    const hideColPopover = (e: MouseEvent) => {
+      const btn = container.querySelector('#colVisibilityBtn')
+      const popover = container.querySelector('#colVisibilityPopover') as HTMLElement
+      if (popover && btn && !btn.contains(e.target as Node) && !popover.contains(e.target as Node)) {
+        popover.style.display = 'none'
+      }
+    }
+    document.addEventListener('click', hideColPopover)
+    this._documentCleanups.push(() => document.removeEventListener('click', hideColPopover))
+
+    container.querySelector('#searchInput')?.addEventListener('gl-change', debounce((e: Event) => {
+      const target = e as CustomEvent
+      this.handleSearch(target.detail.value)
+    }, 300))
 
     const validateScoreDebounced = debounce((input: HTMLInputElement) => {
       validateScoreInputEl(input)
     }, 200)
 
     // Delegated click events
-    container.addEventListener('click', (e) => {
+    const onClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       
+      // Focus input when tapping se-cell
+      const seCell = target.closest('.se-cell')
+      if (seCell && !target.closest('input, button')) {
+        const input = seCell.querySelector<HTMLInputElement>('[data-score-input]')
+        if (input) {
+          e.preventDefault()
+          input.focus()
+          return
+        }
+      }
+
+      // Empty state action handlers
+      const emptyAddBtn = target.closest('#emptyAddStudentBtn')
+      if (emptyAddBtn) {
+        e.preventDefault()
+        this.openAddStudent()
+        return
+      }
+
+      const emptyClearBtn = target.closest('#emptyClearFiltersBtn')
+      if (emptyClearBtn) {
+        e.preventDefault()
+        this.studentFilter = {
+          classification: 'all',
+          completion: 'all'
+        }
+        this.searchQuery = ''
+        const filterClass = this.container?.querySelector('#filterClassification') as any
+        const filterComp = this.container?.querySelector('#filterCompletion') as any
+        const searchInput = this.container?.querySelector('#searchInput') as any
+        if (filterClass) filterClass.value = 'all'
+        if (filterComp) filterComp.value = 'all'
+        if (searchInput) searchInput.value = ''
+        this.rerenderStudents()
+        return
+      }
+
       const addBtn = target.closest('[data-add-score]')
       if (addBtn) {
         e.preventDefault()
@@ -244,6 +431,36 @@ export class ClassView {
         return
       }
 
+      const tdName = target.closest('.score-table tbody td.name-col')
+      if (tdName) {
+        e.preventDefault()
+        e.stopPropagation()
+        const tr = tdName.closest('tr')!
+        const sid = tr.getAttribute('data-id')!
+        this.toggleStudentRowExpansion(tr, sid)
+        return
+      }
+
+      const btnDetailJournal = target.closest('.btn-detail-journal')
+      if (btnDetailJournal) {
+        e.preventDefault()
+        const sid = btnDetailJournal.getAttribute('data-sid')!
+        const cls = this.stateManager.getClass(this.activeClassId!)
+        const student = cls?.students.find(s => s.id === sid)
+        if (student && cls) {
+          window.dispatchEvent(new CustomEvent('gl:open-journal', { detail: { student, classId: this.activeClassId!, className: cls.name } }))
+        }
+        return
+      }
+
+      const btnDetailEdit = target.closest('.btn-detail-edit')
+      if (btnDetailEdit) {
+        e.preventDefault()
+        const sid = btnDetailEdit.getAttribute('data-sid')!
+        this.openEditStudent(sid)
+        return
+      }
+
       const selectAll = target.closest('[data-select-all]')
       if (selectAll) {
         this.selectAllStudents()
@@ -257,24 +474,25 @@ export class ClassView {
         return
       }
 
-      const bulkEditBtn = target.closest('#bulkEditBtn')
-      if (bulkEditBtn) {
-        this.openBulkEdit()
-        return
-      }
 
-      const clearSelBtn = target.closest('#clearSelectionBtn')
-      if (clearSelBtn) {
-        this.clearSelection()
-        return
-      }
-    })
+    }
+    container.addEventListener('click', onClick)
+    this._containerCleanups.push(() => container.removeEventListener('click', onClick))
 
     // Keydown Enter + arrow navigation on score inputs (cards + table)
-    container.addEventListener('keydown', (e) => {
-      const key = (e as KeyboardEvent).key
+    const onKeydown = (e: KeyboardEvent) => {
+      let key = e.key
+      const alt = e.altKey
       const input = (e.target as HTMLElement).closest<HTMLInputElement>('[data-score-input], [data-table-score]')
       if (!input) return
+
+      // Handle Vim-like Alt + h/j/k/l navigation
+      if (alt) {
+        if (key === 'h') key = 'ArrowLeft'
+        else if (key === 'l') key = 'ArrowRight'
+        else if (key === 'j') key = 'ArrowDown'
+        else if (key === 'k') key = 'ArrowUp'
+      }
 
       if (key === 'Enter') {
         e.preventDefault()
@@ -311,20 +529,24 @@ export class ClassView {
           allInputs[nextIdx].select()
         }
       }
-    })
+    }
+    container.addEventListener('keydown', onKeydown)
+    this._containerCleanups.push(() => container.removeEventListener('keydown', onKeydown))
 
     // Change on table-view score inputs
-    container.addEventListener('change', (e) => {
+    const onTableScoreChange = (e: Event) => {
       const input = (e.target as HTMLElement).closest<HTMLInputElement>('[data-table-score]')
       if (!input) return
       const sid = input.getAttribute('data-sid')!
       const col = input.getAttribute('data-col')!
       this.commitScoreInput(input, sid, col)
-    })
+    }
+    container.addEventListener('change', onTableScoreChange)
+    this._containerCleanups.push(() => container.removeEventListener('change', onTableScoreChange))
 
     // Real-time score validation + note autosave
     let noteTimeout: ReturnType<typeof setTimeout>
-    container.addEventListener('input', (e) => {
+    const onInput = (e: Event) => {
       const scoreInput = (e.target as HTMLElement).closest<HTMLInputElement>('[data-score-input], [data-table-score]')
       if (scoreInput) {
         validateScoreDebounced(scoreInput)
@@ -337,11 +559,11 @@ export class ClassView {
       noteTimeout = setTimeout(() => {
         const sid = textarea.getAttribute('data-sid')!
         this._skipNextRender = true
-        // Safe notes update: skip state manager full render because _skipNextRender is true,
-        // and we don't trigger anything else since notes don't affect average score
         this.stateManager.updateStudent(this.activeClassId!, sid, { ghiChu: textarea.value })
       }, 600)
-    })
+    }
+    container.addEventListener('input', onInput)
+    this._containerCleanups.push(() => container.removeEventListener('input', onInput))
 
     // Mobile touch gestures (view switch + pull-to-refresh)
     this.cleanupContainerGestures()
@@ -357,9 +579,8 @@ export class ClassView {
               const next = nextView(mode)
               if (next !== mode) {
                 this.stateManager.setViewMode(next as any)
-                container.querySelectorAll('[data-view]').forEach(b => {
-                  b.classList.toggle('active', (b as HTMLElement).dataset.view === next)
-                })
+                const viewSwitcher = container.querySelector('#viewSwitcher') as any
+                if (viewSwitcher) viewSwitcher.activeTab = next
                 this.rerenderStudents()
               }
             },
@@ -368,9 +589,8 @@ export class ClassView {
               const prev = prevView(mode)
               if (prev !== mode) {
                 this.stateManager.setViewMode(prev as any)
-                container.querySelectorAll('[data-view]').forEach(b => {
-                  b.classList.toggle('active', (b as HTMLElement).dataset.view === prev)
-                })
+                const viewSwitcher = container.querySelector('#viewSwitcher') as any
+                if (viewSwitcher) viewSwitcher.activeTab = prev
                 this.rerenderStudents()
               }
             },
@@ -429,7 +649,7 @@ export class ClassView {
 
     if (!cls.students.length) {
       container.innerHTML = `<div class="dash-empty mt-4">
-        <div class="empty-icon">✏️</div>
+        <div class="empty-icon">${iconEditStr()}</div>
         <strong>Lớp chưa có học viên</strong>
         <p class="hint" style="margin-top:6px">Thêm học viên mới hoặc nhập điểm từ file CSV (xuất từ app).</p>
       </div>`
@@ -438,8 +658,31 @@ export class ClassView {
       return
     }
 
+    const isCardView = state.viewMode === 'cards' || (state.viewMode === 'year' && state.activeTerm !== 'year')
+    const isTableView = state.viewMode === 'table'
+    if (isCardView) {
+      this._renderCardsMode(container, cls, state)
+      this.renderClassStats()
+      this.renderFilterChips()
+      this.renderStudentList()
+      this.bindStudentGestures()
+      this.setupDragDrop()
+      return
+    }
+    if (isTableView) {
+      this._renderTableMode(container, cls, state)
+      this.renderClassStats()
+      this.renderFilterChips()
+      this.renderStudentList()
+      this.bindStudentGestures()
+      this.setupColumnResizers()
+      this.setupDragDrop()
+      return
+    }
+
     container.innerHTML = renderStudents(cls, state.activeTerm, state.viewMode as any, this.searchQuery, this.studentFilter, this.selectedStudents)
     this.renderClassStats()
+    this.renderFilterChips()
 
     // Restore selection state in DOM checkboxes
     container.querySelectorAll<HTMLInputElement>('.student-select').forEach(cb => {
@@ -448,12 +691,116 @@ export class ClassView {
 
     // Update desktop student list sidebar
     this.renderStudentList()
-    const countEl = this.container?.querySelector('#cvStudentCount')
-    if (countEl) countEl.textContent = String(cls.students.length)
 
     this.bindStudentGestures()
     this.setupColumnResizers()
     this.setupDragDrop()
+    this.applyColVisibility()
+  }
+
+  private _renderCardsMode(container: HTMLElement, cls: ClassData, state: AppState): void {
+    const actualTerm = state.activeTerm === 'year' ? 'hk1' : state.activeTerm
+    const cols = resolveClassColumns(cls)
+
+    let students = filterStudents(cls.students, this.searchQuery)
+    students = applyFilters(students, cls, state.activeTerm, this.studentFilter)
+
+    if (!students.length) {
+      const isFiltered = this.searchQuery || this.studentFilter.classification || this.studentFilter.completion || this.studentFilter.scoreRanges
+      if (isFiltered) {
+        container.innerHTML = `<div class="dash-empty mt-4 pt-10 pb-10 px-4" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:250px;text-align:center;">
+          <div class="empty-icon" style="margin-bottom:8px;">${iconSearchStr()}</div>
+          <strong style="font-size:1rem;color:var(--color-text);">Không có học viên phù hợp</strong>
+          <p class="hint mt-2" style="line-height:1.45;max-width:280px;margin:6px auto 0;">Thử điều chỉnh hoặc xóa bộ lọc hiện tại của bạn.</p>
+          <gl-button variant="ghost" size="sm" id="emptyClearFiltersBtn" style="margin-top:12px;">🧹 Xóa bộ lọc</gl-button>
+        </div>`
+        container.querySelector('#emptyClearFiltersBtn')?.addEventListener('click', () => this.clearAllFilters())
+      } else {
+        container.innerHTML = `<div class="dash-empty mt-4 pt-10 pb-10 px-4" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:250px;text-align:center;">
+          <div class="empty-icon" style="margin-bottom:8px;">${iconEditStr()}</div>
+          <strong style="font-size:1rem;color:var(--color-text);">Lớp chưa có học viên</strong>
+          <p class="hint mt-2" style="line-height:1.45;max-width:280px;margin:6px auto 0;">Thêm học viên mới để bắt đầu ghi điểm học kỳ.</p>
+        </div>`
+      }
+      return
+    }
+
+    const legendHtml = `<div class="se-legend" aria-hidden="true">
+      <span class="se-leg-stt">#</span>
+      <span class="se-leg-name">Học viên</span>
+      ${cols.map(c => `<span class="se-leg-col" title="${this.escapeHtml(c.label)} ×${cls.weights[c.key] || 1}">${this.escapeHtml(c.short)}<small>×${cls.weights[c.key] || 1}</small></span>`).join('')}
+      <span class="se-leg-tb">TB</span>
+    </div>`
+
+    container.innerHTML = `<div class="score-entry">${legendHtml}</div>`
+    const entry = container.querySelector('.score-entry')!
+
+    for (let i = 0; i < students.length; i++) {
+      const st = students[i]
+      const card = document.createElement('gl-student-card') as any
+      card.student = st
+      card.cols = cols
+      card.weights = cls.weights
+      card.term = actualTerm
+      card.index = i
+      card.totalCols = cols.length
+      card.selected = this.selectedStudents.has(st.id)
+      entry.appendChild(card)
+    }
+  }
+
+  private _renderTableMode(container: HTMLElement, cls: any, state: any): void {
+    const actualTerm = state.activeTerm === 'year' ? 'hk1' : state.activeTerm
+    const cols = resolveClassColumns(cls)
+
+    let students = filterStudents(cls.students, this.searchQuery)
+    students = applyFilters(students, cls, state.activeTerm, this.studentFilter)
+
+    if (!students.length) {
+      const isFiltered = this.searchQuery || this.studentFilter.classification || this.studentFilter.completion || this.studentFilter.scoreRanges
+      if (isFiltered) {
+        container.innerHTML = `<div class="dash-empty mt-4 pt-10 pb-10 px-4" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:250px;text-align:center;">
+          <div class="empty-icon" style="margin-bottom:8px;">${iconSearchStr()}</div>
+          <strong style="font-size:1rem;color:var(--color-text);">Không có học viên phù hợp</strong>
+          <p class="hint mt-2" style="line-height:1.45;max-width:280px;margin:6px auto 0;">Thử điều chỉnh hoặc xóa bộ lọc hiện tại của bạn.</p>
+          <gl-button variant="ghost" size="sm" id="emptyClearFiltersBtn" style="margin-top:12px;">🧹 Xóa bộ lọc</gl-button>
+        </div>`
+        container.querySelector('#emptyClearFiltersBtn')?.addEventListener('click', () => this.clearAllFilters())
+      } else {
+        container.innerHTML = `<div class="dash-empty mt-4 pt-10 pb-10 px-4" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:250px;text-align:center;">
+          <div class="empty-icon" style="margin-bottom:8px;">${iconEditStr()}</div>
+          <strong style="font-size:1rem;color:var(--color-text);">Lớp chưa có học viên</strong>
+          <p class="hint mt-2" style="line-height:1.45;max-width:280px;margin:6px auto 0;">Thêm học viên mới để bắt đầu ghi điểm học kỳ.</p>
+        </div>`
+      }
+      return
+    }
+
+    const headerCols = cols.map((c: any, ci: number) => {
+      const priorityClass = ci >= 4 ? 'col-hide-sm' : ci >= 2 ? 'col-hide-xs' : ''
+      return `<th scope="col" class="${priorityClass}" title="${c.label}×${cls.weights[c.key] || 1}">${c.short}<br><span>×${cls.weights[c.key] || 1}</span></th>`
+    }).join('')
+
+    container.innerHTML = `<div class="table-wrap">
+      <table class="score-table">
+        <thead><tr><th scope="col" class="sel-col col-hide-xs"><input type="checkbox" id="selectAllTable" data-select-all aria-label="Chọn tất cả" /></th><th scope="col">STT</th><th scope="col" class="name-col col-hide-xs">Họ đệm</th><th scope="col" class="name-col">Tên</th>${headerCols}<th scope="col">TB</th><th scope="col" class="col-hide-xs">Ghi chú</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="hint mt-2">Gõ điểm vào ô — Enter hoặc Tab để sang ô kế tiếp.</p>`
+
+    const tbody = container.querySelector('tbody')!
+    for (let i = 0; i < students.length; i++) {
+      const st = students[i]
+      const row = document.createElement('gl-student-row') as any
+      row.student = st
+      row.cols = cols
+      row.weights = cls.weights
+      row.term = actualTerm
+      row.index = i
+      row.selected = this.selectedStudents.has(st.id)
+      tbody.appendChild(row)
+    }
   }
 
   updateStudentDOM(studentId: string): void {
@@ -469,16 +816,28 @@ export class ClassView {
     const state = this.stateManager.getState()
     const cols = resolveClassColumns(cls)
     const term = state.activeTerm === 'year' ? 'hk1' : state.activeTerm
-    const selected = this.selectedStudents.has(studentId)
 
     if (state.viewMode === 'cards') {
-      const newHtml = renderSingleStudentCard(student, cls.students.indexOf(student), cols, cls.weights, term, cols.length, selected)
-      studentEl.outerHTML = newHtml
+      const card = studentEl.closest('gl-student-card') as any
+      if (card) {
+        card.student = student
+        card.cols = cols
+        card.weights = cls.weights
+        card.term = term
+        card.selected = this.selectedStudents.has(studentId)
+      } else {
+        this.rerenderStudents()
+      }
     } else if (state.viewMode === 'table') {
-      const tb = studentTB(student, cls.weights, term, cols)
-      const tbCell = studentEl.querySelector('.tb-cell')
-      if (tbCell) {
-        tbCell.textContent = fmt(tb)
+      const row = studentEl.closest('gl-student-row') as any
+      if (row) {
+        row.student = student
+        row.cols = cols
+        row.weights = cls.weights
+        row.term = term
+        row.selected = this.selectedStudents.has(studentId)
+      } else {
+        this.rerenderStudents()
       }
     } else {
       this.rerenderStudents()
@@ -531,12 +890,34 @@ export class ClassView {
     const avgTB = tbCount > 0 ? fmt(tbSum / tbCount) : '—'
     const completeness = totalScores > 0 ? Math.round((filledScores / totalScores) * 100) : 0
 
+    const hasFilter = this.searchQuery || this.studentFilter.classification || this.studentFilter.completion || this.studentFilter.scoreRanges
+    const filteredTotal = hasFilter ? `<span class="stat-value" style="font-size:0.8rem;">${this.countFilteredStudents()}/${students.length}</span>` : `<span class="stat-value">${students.length}</span>`
     statsEl.innerHTML = `
-      <div class="stat"><span class="stat-label">👥 HV</span><span class="stat-value">${students.length}</span></div>
+      <div class="stat"><span class="stat-label">👥 HV</span>${filteredTotal}</div>
       <div class="stat"><span class="stat-label">📊 TB</span><span class="stat-value">${avgTB}</span></div>
       <div class="stat"><span class="stat-label">✅ Đủ điểm</span><span class="stat-value">${complete}/${students.length}</span></div>
       <div class="stat"><span class="stat-label">📈 Đã nhập</span><span class="stat-value">${completeness}%</span></div>
     `
+
+    const hintEl = this.container?.querySelector('#classSizeHint') as HTMLElement
+    if (hintEl) {
+      if (students.length >= 80 && state.viewMode === 'cards') {
+        hintEl.style.display = ''
+        hintEl.innerHTML = `<div class="notice notice-info" style="margin-top:6px;font-size:0.8rem;display:flex;align-items:center;gap:8px;">
+          <span>📌 Lớp có <strong>${students.length} học viên</strong>. Chuyển sang chế độ <strong>Bảng</strong> để nhập nhanh hơn.</span>
+          <gl-button variant="ghost" size="sm" id="switchToTableViewBtn" style="font-size:0.75rem;white-space:nowrap;">📊 Chuyển</gl-button>
+        </div>`
+        hintEl.querySelector('#switchToTableViewBtn')?.addEventListener('click', () => {
+          this.stateManager.setViewMode('table')
+          const viewSwitcher = this.container?.querySelector('#viewSwitcher') as any
+          if (viewSwitcher) viewSwitcher.activeTab = 'table'
+          this.rerenderStudents()
+        })
+      } else {
+        hintEl.style.display = 'none'
+        hintEl.innerHTML = ''
+      }
+    }
   }
 
   // ------- Scrolled focus -------
@@ -551,20 +932,15 @@ export class ClassView {
     }
 
     // Also highlight in student list sidebar
-    const side = this.container.querySelector('#cvStudentItems')
-    if (side) {
-      side.querySelectorAll('.cv-student-item').forEach(el => el.classList.remove('active'))
-      const item = side.querySelector(`[data-cv-id="${studentId}"]`) as HTMLElement
-      if (item) {
-        item.classList.add('active')
-        item.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      }
+    const side = this.container?.querySelector('#cvStudentListComp') as any
+    if (side && side.setActiveId) {
+      side.setActiveId(studentId)
     }
   }
 
   private renderStudentList(): void {
-    const side = this.container?.querySelector('#cvStudentItems')
-    if (!side || !this.activeClassId) return
+    const list = this.container?.querySelector('#cvStudentListComp') as any
+    if (!list || !this.activeClassId) return
     const cls = this.stateManager.getClass(this.activeClassId)
     if (!cls) return
 
@@ -573,42 +949,27 @@ export class ClassView {
     const cols = resolveClassColumns(cls)
     const weights = cls.weights
 
-    side.innerHTML = cls.students.map(st => {
-      const tb = studentTB(st, weights, term, cols)
-      const disp = displayName(st)
-      return `<div class="cv-student-item" data-cv-id="${st.id}">
-        <span class="cv-student-name">${this.escapeHtml(disp)}</span>
-        <span class="cv-student-tb">${fmt(tb)}</span>
-      </div>`
-    }).join('')
+    list.students = cls.students
+    list.cols = cols
+    list.weights = weights
+    list.term = term
+    list.totalCount = cls.students.length
+    if (typeof list.setFilter === 'function') {
+      list.setFilter(this.searchQuery)
+    }
   }
 
   private bindStudentList(): void {
-    const side = this.container?.querySelector('#cvStudentItems')
-    if (!side) return
+    const list = this.container?.querySelector('#cvStudentListComp') as HTMLElement
+    if (!list) return
 
-    side.addEventListener('click', (e) => {
-      const item = (e.target as HTMLElement).closest('.cv-student-item') as HTMLElement
-      if (item) {
-        const id = item.dataset.cvId
-        if (id) {
-          side.querySelectorAll('.cv-student-item').forEach(el => el.classList.remove('active'))
-          item.classList.add('active')
-          this.scrollToStudent(id)
-        }
+    list.addEventListener('student-select', ((e: CustomEvent) => {
+      const { studentId } = e.detail
+      if (studentId) {
+        ;(list as any).setActiveId(studentId)
+        this.scrollToStudent(studentId)
       }
-    })
-
-    const filterInput = this.container?.querySelector('#cvStudentFilter') as HTMLInputElement
-    if (filterInput) {
-      filterInput.addEventListener('input', debounce(() => {
-        const q = filterInput.value.toLowerCase().trim()
-        side.querySelectorAll('.cv-student-item').forEach(el => {
-          const name = (el.querySelector('.cv-student-name') as HTMLElement)?.textContent?.toLowerCase() || ''
-          el.classList.toggle('hidden', !!q && !name.includes(q))
-        })
-      }, 300))
-    }
+    }) as EventListener)
   }
 
   // ------- Modals & Dialogs -------
@@ -620,9 +981,17 @@ export class ClassView {
 
   private async openAddStudent(): Promise<void> {
     if (!this.activeClassId) return
-    const { AddStudentModal } = await import('./modals/AddStudentModal')
-    const modal = new AddStudentModal(this.stateManager, this.authManager)
-    modal.open(this.activeClassId)
+    await import('./components/gl-add-student')
+    let el = document.getElementById('addStudentModal') as any
+    if (!el) {
+      el = document.createElement('gl-add-student')
+      el.id = 'addStudentModal'
+      el.stateManager = this.stateManager
+      el.notification = this.notificationManager
+      document.body.appendChild(el)
+    }
+    el.classId = this.activeClassId
+    el.open = true
   }
 
   private async openColumnsModal(): Promise<void> {
@@ -634,9 +1003,18 @@ export class ClassView {
 
   private async openParentInvite(): Promise<void> {
     if (!this.activeClassId) return
-    const { ParentInviteModal } = await import('./modals/ParentInviteModal')
-    const modal = new ParentInviteModal(this.stateManager, this.authManager, this.notificationManager)
-    modal.open(this.activeClassId)
+    await import('./components/gl-parent-invite')
+    let el = document.getElementById('parentInviteModal') as any
+    if (!el) {
+      el = document.createElement('gl-parent-invite')
+      el.id = 'parentInviteModal'
+      el.stateManager = this.stateManager
+      el.authManager = this.authManager
+      el.notification = this.notificationManager
+      document.body.appendChild(el)
+    }
+    el.classId = this.activeClassId
+    el.open = true
   }
 
   private async confirmDeleteStudent(studentId: string): Promise<void> {
@@ -728,16 +1106,9 @@ export class ClassView {
   }
 
   private updateBulkBar(): void {
-    const bar = this.container?.querySelector('#bulkActionBar') as HTMLElement
+    const bar = this.container?.querySelector('gl-bulk-action-bar') as any
     if (!bar) return
-    const count = this.selectedStudents.size
-    if (count > 0) {
-      bar.classList.add('visible')
-      const bc = bar.querySelector('.bulk-count')
-      if (bc) bc.textContent = `Đã chọn ${count} học viên`
-    } else {
-      bar.classList.remove('visible')
-    }
+    bar.count = this.selectedStudents.size
   }
 
   private async openBulkEdit(): Promise<void> {
@@ -763,14 +1134,196 @@ export class ClassView {
     this.rerenderStudents()
   }
 
+  private renderScoreRangeFilters(): void {
+    const panel = this.container?.querySelector('#scoreRangeFilters') as HTMLElement
+    if (!panel || !this.activeClassId) return
+    const cls = this.stateManager.getClass(this.activeClassId)
+    if (!cls) return
+    const cols = resolveClassColumns(cls)
+    const ranges = this.studentFilter.scoreRanges || {}
+
+    panel.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-size:0.75rem;font-weight:600;color:var(--muted);white-space:nowrap;">Lọc theo cột:</span>
+        ${cols.map(c => {
+          const r = ranges[c.key] || {}
+          return `<div style="display:flex;align-items:center;gap:4px;background:var(--surface);padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);font-size:0.75rem;">
+            <span style="font-weight:600;white-space:nowrap;">${this.escapeHtml(c.short)}</span>
+            <input type="number" data-score-range data-col="${c.key}" data-range="min" placeholder="Từ" value="${r.min ?? ''}" min="0" max="10" step="0.25" style="width:52px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-size:0.7rem;" />
+            <span style="color:var(--muted);">→</span>
+            <input type="number" data-score-range data-col="${c.key}" data-range="max" placeholder="Đến" value="${r.max ?? ''}" min="0" max="10" step="0.25" style="width:52px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-size:0.7rem;" />
+          </div>`
+        }).join('')}
+        <gl-button variant="ghost" size="sm" id="clearScoreRangesBtn" style="font-size:0.7rem;">✕ Xóa</gl-button>
+      </div>
+    `
+
+    panel.querySelector('#clearScoreRangesBtn')?.addEventListener('click', () => {
+      this.studentFilter = { ...this.studentFilter, scoreRanges: undefined }
+      this.updateFilterUI()
+      this.rerenderStudents()
+      this.renderScoreRangeFilters()
+    })
+  }
+
+  // ------- Column Visibility -------
+
+  private loadColVisibility(): Record<string, boolean> {
+    if (!this.activeClassId) return {}
+    try {
+      const data = localStorage.getItem(`col-vis:${this.activeClassId}`)
+      return data ? JSON.parse(data) : {}
+    } catch { return {} }
+  }
+
+  private saveColVisibility(vis: Record<string, boolean>): void {
+    if (!this.activeClassId) return
+    try { localStorage.setItem(`col-vis:${this.activeClassId}`, JSON.stringify(vis)) } catch {}
+  }
+
+  private renderColVisibilityPopover(): void {
+    const popover = this.container?.querySelector('#colVisibilityPopover') as HTMLElement
+    if (!popover || !this.activeClassId) return
+    const cls = this.stateManager.getClass(this.activeClassId)
+    if (!cls) return
+    const cols = resolveClassColumns(cls)
+    const vis = this.loadColVisibility()
+
+    popover.innerHTML = `
+      <div style="font-size:0.75rem;font-weight:700;color:var(--muted);padding:4px 6px 8px;border-bottom:1px solid var(--border);margin-bottom:6px;">Ẩn/Hiện cột điểm</div>
+      ${cols.map(c => {
+        const hidden = vis[c.key] === false
+        return `<label style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;cursor:pointer;font-size:0.8rem;transition:background 0.1s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+          <input type="checkbox" data-col-vis="${c.key}" ${hidden ? '' : 'checked'} style="accent-color:var(--color-primary);" />
+          <span>${this.escapeHtml(c.short)}</span>
+          <span style="margin-left:auto;color:var(--muted);font-size:0.7rem;">×${cls.weights[c.key] || 1}</span>
+        </label>`
+      }).join('')}
+      <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;gap:6px;">
+        <gl-button variant="ghost" size="sm" id="colVisShowAll" style="font-size:0.7rem;">Hiện tất cả</gl-button>
+        <gl-button variant="ghost" size="sm" id="colVisHideAll" style="font-size:0.7rem;">Ẩn tất cả</gl-button>
+      </div>
+    `
+
+    popover.querySelector('#colVisShowAll')?.addEventListener('click', () => {
+      this.saveColVisibility({})
+      this.applyColVisibility()
+      this.renderColVisibilityPopover()
+    })
+    popover.querySelector('#colVisHideAll')?.addEventListener('click', () => {
+      const allHidden: Record<string, boolean> = {}
+      cols.forEach(c => { allHidden[c.key] = false })
+      this.saveColVisibility(allHidden)
+      this.applyColVisibility()
+      this.renderColVisibilityPopover()
+    })
+    popover.querySelectorAll('[data-col-vis]').forEach(cb => {
+      cb.addEventListener('change', (e: Event) => {
+        const input = e.target as HTMLInputElement
+        const colKey = input.dataset.colVis!
+        const vis = this.loadColVisibility()
+        vis[colKey] = input.checked
+        this.saveColVisibility(vis)
+        this.applyColVisibility()
+      })
+    })
+  }
+
+  private applyColVisibility(): void {
+    if (!this.container || !this.activeClassId) return
+    const vis = this.loadColVisibility()
+    const table = this.container.querySelector('.score-table') as HTMLElement
+    if (!table) return
+
+    // Toggle on header cells
+    table.querySelectorAll('thead th').forEach(th => {
+      const colKey = (th as HTMLElement).querySelector('[data-table-score]')?.getAttribute('data-col')
+      if (!colKey) return
+      th.classList.toggle('col-hidden', vis[colKey] === false)
+    })
+    // Toggle on body cells (match by data-col on input)
+    table.querySelectorAll('tbody td').forEach(td => {
+      const input = (td as HTMLElement).querySelector<HTMLInputElement>('[data-table-score]')
+      if (!input) return
+      const colKey = input.dataset.col
+      if (!colKey) return
+      td.classList.toggle('col-hidden', vis[colKey] === false)
+    })
+  }
+
   private updateFilterUI(): void {
     const el = this.container
     if (!el) return
     const f = this.studentFilter
-    const selClass = el.querySelector<HTMLSelectElement>('#filterClassification')
+    const selClass = el.querySelector('#filterClassification') as any
     if (selClass) selClass.value = f.classification || 'all'
-    const selComp = el.querySelector<HTMLSelectElement>('#filterCompletion')
+    const selComp = el.querySelector('#filterCompletion') as any
     if (selComp) selComp.value = f.completion || 'all'
+    const panel = el.querySelector('#scoreRangeFilters') as HTMLElement
+    if (panel && f.scoreRanges) {
+      panel.style.display = 'block'
+      this.renderScoreRangeFilters()
+    }
+    this.renderFilterChips()
+  }
+
+  private renderFilterChips(): void {
+    const el = this.container?.querySelector('#filterChips') as HTMLElement
+    if (!el) return
+    const f = this.studentFilter
+    const chips: string[] = []
+
+    if (f.classification) {
+      const labels: Record<string, string> = { 'rank-xs': 'XS (≥9)', 'rank-g': 'Giỏi', 'rank-k': 'Khá', 'rank-tb': 'TB', 'rank-y': 'Yếu', 'rank-none': 'Chưa có TB' }
+      chips.push(`<span class="chip chip-filter" data-filter="classification">${labels[f.classification] || f.classification} <span class="chip-remove" data-filter="classification">✕</span></span>`)
+    }
+    if (f.completion) {
+      const labels: Record<string, string> = { complete: 'Đủ điểm', incomplete: 'Thiếu điểm', none: 'Chưa có điểm' }
+      chips.push(`<span class="chip chip-filter" data-filter="completion">${labels[f.completion]} <span class="chip-remove" data-filter="completion">✕</span></span>`)
+    }
+    if (f.scoreRanges) {
+      const ranges = Object.entries(f.scoreRanges)
+        .map(([k, r]) => `${k} ${r.min ?? '…'}→${r.max ?? '…'}`)
+        .join(', ')
+      chips.push(`<span class="chip chip-filter" data-filter="scoreRanges">🎯 ${ranges} <span class="chip-remove" data-filter="scoreRanges">✕</span></span>`)
+    }
+
+    el.innerHTML = chips.length
+      ? `<span style="font-size:0.7rem;color:var(--muted);white-space:nowrap;">Lọc:</span> ${chips.join(' ')}<gl-button variant="ghost" size="sm" id="clearAllFiltersBtn" style="font-size:0.7rem;padding:2px 6px;margin-left:2px;">🧹 Xóa hết</gl-button>`
+      : ''
+
+    el.querySelector('#clearAllFiltersBtn')?.addEventListener('click', () => this.clearAllFilters())
+    el.querySelectorAll('.chip-remove').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const filter = (e.currentTarget as HTMLElement).dataset.filter
+        if (filter === 'classification') this.setFilter({ classification: undefined })
+        else if (filter === 'completion') this.setFilter({ completion: undefined })
+        else if (filter === 'scoreRanges') {
+          this.studentFilter = { ...this.studentFilter, scoreRanges: undefined }
+          this.updateFilterUI()
+          this.rerenderStudents()
+        }
+      })
+    })
+  }
+
+  private clearAllFilters(): void {
+    this.studentFilter = {}
+    this.searchQuery = ''
+    const searchInput = this.container?.querySelector('#searchInput') as any
+    if (searchInput) searchInput.value = ''
+    this.updateFilterUI()
+    this.rerenderStudents()
+  }
+
+  private countFilteredStudents(): number {
+    if (!this.activeClassId) return 0
+    const cls = this.stateManager.getClass(this.activeClassId)
+    if (!cls) return 0
+    const state = this.stateManager.getState()
+    const searched = filterStudents(cls.students, this.searchQuery || undefined)
+    const filtered = applyFilters(searched, cls, state.activeTerm === 'year' ? 'hk1' : state.activeTerm, this.studentFilter)
+    return filtered.length
   }
 
   private handleSearch(query: string): void {
@@ -957,11 +1510,13 @@ export class ClassView {
       }
     })
 
-    document.addEventListener('click', (e) => {
+    const hideCtxMenu = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest('#gestureContextMenu')) {
         this.hideContextMenu()
       }
-    })
+    }
+    document.addEventListener('click', hideCtxMenu)
+    this._documentCleanups.push(() => document.removeEventListener('click', hideCtxMenu))
   }
 
   private showContextMenu(x: number, y: number, sid: string): void {
@@ -981,47 +1536,40 @@ export class ClassView {
       starBtn.textContent = st.starred ? '☆ Bỏ đánh dấu' : '⭐ Đánh dấu quan trọng'
     }
 
-    // Remove previous handler if exists
-    const oldHandler = (menu as any)._ctxHandler
-    if (oldHandler) {
-      menu.removeEventListener('keydown', oldHandler)
+    // Cleanup previous focus trap
+    const oldTrap = (menu as any)._ctxFocusTrap
+    if (oldTrap) {
+      oldTrap.destroy()
+      delete (menu as any)._ctxFocusTrap
     }
 
-    // Keyboard navigation for context menu
-    const items = menu.querySelectorAll<HTMLButtonElement>('button')
-    const handler = (ke: KeyboardEvent) => {
-      const current = document.activeElement as HTMLElement
-      let idx = Array.from(items).indexOf(current as HTMLButtonElement)
-      switch (ke.key) {
-        case 'ArrowDown':
-          ke.preventDefault()
-          idx = Math.min(idx + 1, items.length - 1)
-          items[idx]?.focus()
-          break
-        case 'ArrowUp':
-          ke.preventDefault()
-          idx = Math.max(idx - 1, 0)
-          items[idx]?.focus()
-          break
-        case 'Escape':
-          ke.preventDefault()
-          this.hideContextMenu()
-          break
+    // Focus trap + Escape to close
+    const trap = createFocusTrap(menu)
+    ;(menu as any)._ctxFocusTrap = trap
+
+    const escHandler = (ke: KeyboardEvent) => {
+      if (ke.key === 'Escape') {
+        ke.preventDefault()
+        this.hideContextMenu()
       }
     }
-    menu.addEventListener('keydown', handler)
-    ;(menu as any)._ctxHandler = handler
-    items[0]?.focus()
+    menu.addEventListener('keydown', escHandler)
+    ;(menu as any)._ctxEscHandler = escHandler
   }
 
   private hideContextMenu(): void {
     const menu = document.getElementById('gestureContextMenu')
     if (menu) {
       menu.classList.add('hidden')
-      const handler = (menu as any)._ctxHandler
-      if (handler) {
-        menu.removeEventListener('keydown', handler)
-        delete (menu as any)._ctxHandler
+      const trap = (menu as any)._ctxFocusTrap
+      if (trap) {
+        trap.destroy()
+        delete (menu as any)._ctxFocusTrap
+      }
+      const escHandler = (menu as any)._ctxEscHandler
+      if (escHandler) {
+        menu.removeEventListener('keydown', escHandler)
+        delete (menu as any)._ctxEscHandler
       }
     }
     this.contextMenuSid = null
@@ -1118,10 +1666,12 @@ export class ClassView {
 
       const colKey = thEl.querySelector('[data-table-score]')?.getAttribute('data-col')
       if (colKey && classId) {
-        const saved = localStorage.getItem(`col-width:${classId}:${colKey}`)
-        if (saved) {
-          thEl.style.width = saved + 'px'
-        }
+        try {
+          const saved = localStorage.getItem(`col-width:${classId}:${colKey}`)
+          if (saved) {
+            thEl.style.width = saved + 'px'
+          }
+        } catch {}
       }
 
       let startX = 0
@@ -1139,7 +1689,7 @@ export class ClassView {
           thEl.style.width = `${newWidth}px`
 
           if (colKey && classId) {
-            localStorage.setItem(`col-width:${classId}:${colKey}`, String(newWidth))
+            try { localStorage.setItem(`col-width:${classId}:${colKey}`, String(newWidth)) } catch {}
           }
         }
 
@@ -1228,6 +1778,171 @@ export class ClassView {
       cleanups.forEach(fn => fn())
       list.querySelectorAll<HTMLElement>('[data-id]').forEach(el => { el.draggable = false })
     })
+  }
+
+  private toggleStudentRowExpansion(tr: HTMLTableRowElement, _sid: string): void {
+    const row = tr.closest('gl-student-row') as any
+    if (row) {
+      row.toggleExpand()
+      tr.classList.toggle('is-expanded')
+    }
+  }
+
+
+
+  private async openEditStudent(studentId: string): Promise<void> {
+    const cls = this.stateManager.getClass(this.activeClassId!)
+    if (!cls) return
+    const student = cls.students.find(s => s.id === studentId)
+    if (!student) return
+
+    let modal = document.getElementById('editStudentModal') as any
+    if (modal) {
+      modal.remove()
+    }
+    
+    modal = document.createElement('gl-modal')
+    modal.id = 'editStudentModal'
+    modal.setAttribute('heading', 'Chỉnh sửa thông tin học viên')
+    modal.setAttribute('size', 'md')
+
+    const infoFieldsHtml = INFO_FIELD_DEFS.map(f => {
+      const id = `editInfo_${f.key}`
+      const val = (student as any)[f.key] || ''
+      if (f.type === 'select') {
+        const opts = (f.options || []).map(o =>
+          `<option value="${this.escapeHtml(o)}" ${o === val ? 'selected' : ''}>${o || '—'}</option>`
+        ).join('')
+        return `<div><label class="field-label" for="${id}">${f.label}</label><select id="${id}" class="input">${opts}</select></div>`
+      }
+      const inputmode = f.inputmode ? ` inputmode="${f.inputmode}"` : ''
+      const placeholder = f.placeholder ? ` placeholder="${this.escapeHtml(f.placeholder)}"` : ''
+      return `<div><label class="field-label" for="${id}">${f.label}</label><input id="${id}" class="input" type="${f.type}" value="${this.escapeHtml(val)}"${inputmode}${placeholder} autocomplete="off" /></div>`
+    }).join('')
+
+    modal.innerHTML = `
+      <form id="editForm" class="add-name-form" autocomplete="off" style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="name-fields" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="field-label" for="editTenThanh">Tên thánh</label>
+            <input id="editTenThanh" class="input" type="text" value="${this.escapeHtml(student.tenThanh || '')}" placeholder="VD: Anna" autocomplete="off" />
+          </div>
+          <div>
+            <label class="field-label" for="editHoDem">Họ và tên đệm</label>
+            <input id="editHoDem" class="input" type="text" value="${this.escapeHtml(student.hoDem || '')}" placeholder="VD: Nguyễn Ngọc Kim" autocomplete="off" />
+          </div>
+          <div>
+            <label class="field-label" for="editTen">Tên</label>
+            <input id="editTen" class="input" type="text" value="${this.escapeHtml(student.ten || student.name)}" placeholder="VD: Anh" required autocomplete="off" />
+          </div>
+        </div>
+        <div style="margin-top: 10px;">
+          <h4 style="margin: 0 0 10px; color: var(--color-primary); font-weight: 750;">Thông tin liên lạc & Khác</h4>
+          <div class="add-info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            ${infoFieldsHtml}
+          </div>
+        </div>
+      </form>
+      <div slot="footer" class="add-form-actions">
+        <gl-button variant="ghost" id="editStudentModalCancel">Hủy</gl-button>
+        <gl-button variant="primary" type="submit" form="editForm">Lưu thay đổi</gl-button>
+      </div>
+    `
+    document.body.appendChild(modal)
+    modal.open = true
+
+    modal.addEventListener('gl-close', () => {
+      modal.open = false
+      modal.remove()
+    })
+
+    modal.querySelector('#editStudentModalCancel')?.addEventListener('click', () => {
+      modal.open = false
+      modal.remove()
+    })
+
+    const form = modal.querySelector('#editForm') as HTMLFormElement
+    form?.addEventListener('submit', (e: Event) => {
+      e.preventDefault()
+      const holyNameInput = modal.querySelector('#editTenThanh') as HTMLInputElement
+      const lastNameInput = modal.querySelector('#editHoDem') as HTMLInputElement
+      const firstNameInput = modal.querySelector('#editTen') as HTMLInputElement
+
+      const holyName = holyNameInput.value.trim()
+      const lastName = lastNameInput.value.trim()
+      const firstName = firstNameInput.value.trim()
+
+      if (!firstName) return
+
+      const infoValues = Object.fromEntries(
+        INFO_FIELD_DEFS.map(f => {
+          const el = modal.querySelector(`#editInfo_${f.key}`) as HTMLInputElement | HTMLSelectElement
+          return [f.key, el?.value?.trim() || '']
+        })
+      ) as Record<InfoField, string>
+
+      this.stateManager.updateStudent(this.activeClassId!, studentId, {
+        tenThanh: holyName,
+        hoDem: lastName,
+        ten: firstName,
+        name: [holyName, lastName, firstName].filter(Boolean).join(' '),
+        maHV: infoValues.maHV,
+        ngaySinh: infoValues.ngaySinh,
+        gioiTinh: infoValues.gioiTinh,
+        tenPhuHuynh: infoValues.tenPhuHuynh,
+        sdPhuHuynh: infoValues.sdPhuHuynh,
+        diaChi: infoValues.diaChi,
+        email: infoValues.email
+      })
+
+      modal.open = false
+      modal.remove()
+      this.notificationManager.show('Đã cập nhật thông tin học viên', 'success')
+      this.rerenderStudents()
+    })
+  }
+
+  private loadFilterPresets(): Array<{ name: string, filter: StudentFilter, search: string }> {
+    try {
+      const data = localStorage.getItem('student-filter-presets')
+      if (data) return JSON.parse(data)
+    } catch {}
+    return [
+      { name: 'Mặc định (Tất cả)', filter: { classification: undefined, completion: undefined }, search: '' },
+      { name: 'Học sinh yếu', filter: { classification: 'rank-y', completion: undefined }, search: '' },
+      { name: 'Thiếu cột điểm', filter: { classification: undefined, completion: 'incomplete' }, search: '' }
+    ]
+  }
+
+  private saveFilterPresets(presets: any[]): void {
+    try {
+      localStorage.setItem('student-filter-presets', JSON.stringify(presets))
+    } catch {}
+  }
+
+  private populateFilterPresetsSelect(): void {
+    const select = this.container?.querySelector('#filterPresetsSelect') as HTMLSelectElement
+    if (!select) return
+    const presets = this.loadFilterPresets()
+    select.innerHTML = presets.map(p => `<option value="${this.escapeHtml(p.name)}">${this.escapeHtml(p.name)}</option>`).join('')
+  }
+
+  openStudentDetail(studentId: string): void {
+    if (!this.activeClassId) return
+    const cls = this.stateManager.getClass(this.activeClassId)
+    if (!cls) return
+    const student = cls.students.find(s => s.id === studentId)
+    if (!student) return
+    const state = this.stateManager.getState()
+    const cols = resolveClassColumns(cls)
+    const term = state.activeTerm === 'year' ? 'hk1' : state.activeTerm
+    const panel = this.container?.querySelector('gl-student-detail') as any
+    if (!panel) return
+    panel.student = student
+    panel.cols = cols
+    panel.weights = cls.weights
+    panel.term = term
+    panel.open = true
   }
 
   private escapeHtml(s: string): string {

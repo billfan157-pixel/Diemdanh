@@ -4,13 +4,11 @@ import { resolveClassColumns } from '../../../config/columns.ts'
 import { studentTBContext } from '../../../core/calc.ts'
 import { fmt } from '../../../views/helpers.ts'
 import { downloadTextFile } from '../../../features/parishReport.ts'
-import { createFocusTrap } from '../../../utils/focusTrap.ts'
 
 export class BulkExportModal {
   private stateManager: StateManager
   private notification: NotificationManager
   private element: HTMLElement | null = null
-  private _focusTrap: ReturnType<typeof createFocusTrap> | null = null
   private selectedClasses: Set<string> = new Set()
   private selectAll = true
 
@@ -26,68 +24,52 @@ export class BulkExportModal {
       this.selectedClasses = new Set(classes.map(c => c.id))
     }
     this.renderBody()
-    this.element?.classList.remove('hidden')
-    if (this.element) this._focusTrap = createFocusTrap(this.element)
+    const modal = this.element as any
+    if (modal) { modal.open = true }
   }
 
   close(): void {
-    this._focusTrap?.destroy()
-    this._focusTrap = null
-    this.element?.classList.add('hidden')
+    const modal = this.element as any
+    if (modal) { modal.open = false }
   }
 
   private ensureModal(): void {
     let modal = document.getElementById('bulkExportModal')
     if (!modal) {
-      modal = document.createElement('div')
+      modal = document.createElement('gl-modal')
       modal.id = 'bulkExportModal'
-      modal.className = 'modal-overlay hidden'
-      modal.setAttribute('role', 'dialog')
-      modal.setAttribute('aria-modal', 'true')
+      modal.setAttribute('heading', 'Xuất điểm nhiều lớp')
+      modal.setAttribute('subtitle', 'Chọn lớp và tuỳ chọn xuất CSV')
+      modal.setAttribute('size', 'md')
+
       modal.innerHTML = `
-        <div class="modal-panel max-w-lg overflow-y-auto" style="max-height:85vh">
-          <div class="modal-head">
-            <div>
-              <h3>Xuất điểm nhiều lớp</h3>
-              <p class="modal-sub">Chọn lớp và tuỳ chọn xuất CSV</p>
-            </div>
-            <button type="button" class="icon-btn modal-close" id="bulkExportClose" aria-label="Đóng">×</button>
-          </div>
-          <div class="modal-body">
-            <div class="d-flex gap-2 mb-3 flex-wrap items-center">
-              <label class="field-label mb-0" for="bulkExportTerm">Học kỳ</label>
-              <select id="bulkExportTerm" class="input" style="width:auto">
-                <option value="hk1">HK1</option>
-                <option value="hk2">HK2</option>
-                <option value="year" selected>Cả năm (TB cả năm)</option>
-              </select>
-              <label class="field-label mb-0 ml-2" for="bulkExportInfo">
-                <input type="checkbox" id="bulkExportInfo" checked /> Kèm thông tin HV
-              </label>
-              <label class="field-label mb-0 ml-2" for="bulkExportTB">
-                <input type="checkbox" id="bulkExportTB" checked /> Cột TB
-              </label>
-            </div>
-            <div class="d-flex gap-2 mb-2 items-center">
-              <button type="button" class="btn btn-ghost btn-sm" id="bulkExportSelectAll">Chọn tất cả</button>
-              <button type="button" class="btn btn-ghost btn-sm" id="bulkExportDeselectAll">Bỏ chọn</button>
-              <span class="hint ml-2" id="bulkExportCount"></span>
-            </div>
-            <div id="bulkExportList" class="class-checklist"></div>
-          </div>
-          <div class="modal-foot d-flex gap-2 justify-end">
-            <button type="button" class="btn btn-ghost" id="bulkExportCancel">Hủy</button>
-            <button type="button" class="btn btn-primary" id="bulkExportBtn">📥 Xuất CSV</button>
-          </div>
+        <div class="d-flex gap-2 mb-3 flex-wrap items-center">
+          <label class="field-label mb-0" for="bulkExportTerm">Học kỳ</label>
+          <select id="bulkExportTerm" class="input" style="width:auto">
+            <option value="hk1">HK1</option>
+            <option value="hk2">HK2</option>
+            <option value="year" selected>Cả năm (TB cả năm)</option>
+          </select>
+          <label class="field-label mb-0 ml-2" for="bulkExportInfo">
+            <input type="checkbox" id="bulkExportInfo" checked /> Kèm thông tin HV
+          </label>
+          <label class="field-label mb-0 ml-2" for="bulkExportTB">
+            <input type="checkbox" id="bulkExportTB" checked /> Cột TB
+          </label>
         </div>
+        <div class="d-flex gap-2 mb-2 items-center">
+          <gl-button variant="ghost" size="sm" id="bulkExportSelectAll">Chọn tất cả</gl-button>
+          <gl-button variant="ghost" size="sm" id="bulkExportDeselectAll">Bỏ chọn</gl-button>
+          <span class="hint ml-2" id="bulkExportCount"></span>
+        </div>
+        <div id="bulkExportList" class="class-checklist"></div>
+        <gl-button slot="footer" variant="ghost" id="bulkExportCancel">Hủy</gl-button>
+        <gl-button slot="footer" variant="primary" id="bulkExportBtn">📥 Xuất CSV</gl-button>
       `
       document.body.appendChild(modal)
 
-      modal.querySelector('#bulkExportClose')?.addEventListener('click', () => this.close())
+      modal.addEventListener('gl-close', () => this.close())
       modal.querySelector('#bulkExportCancel')?.addEventListener('click', () => this.close())
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) this.close()
-      })
       modal.querySelector('#bulkExportSelectAll')?.addEventListener('click', () => {
         const classes = this.stateManager.getVisibleClasses()
         this.selectedClasses = new Set(classes.map(c => c.id))

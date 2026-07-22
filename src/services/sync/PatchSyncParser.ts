@@ -37,6 +37,7 @@ export function parsePatchesToOps(oldState: AppState, newState: AppState, patche
               name: cls.name,
               year: cls.year,
               weights: cls.weights,
+              columns: cls.columns,
               rev: cls.rev || 1
             }
           })
@@ -314,6 +315,47 @@ export function parsePatchesToOps(oldState: AppState, newState: AppState, patche
                 id: entry.id
               })
             }
+          } else if (op === 'replace') {
+            const entry = newState.classes[classIdx]?.students[studentIdx]?.learningLog[logIdx]
+            if (entry) {
+              ops.push({
+                table: 'learning_logs',
+                action: 'update',
+                id: entry.id,
+                data: {
+                  id: entry.id,
+                  student_id: s.id,
+                  date: entry.date,
+                  type: entry.type,
+                  level: entry.level,
+                  text: entry.text,
+                  by_user_id: entry.byUserId,
+                  by_name: entry.byName,
+                  at: entry.at
+                }
+              })
+            }
+          }
+        } else if (path.length > 6) {
+          // Field level edit on a learning log entry e.g. ["classes", c, "students", s, "learningLog", i, "text"]
+          const entry = newState.classes[classIdx]?.students[studentIdx]?.learningLog[logIdx]
+          if (entry) {
+            ops.push({
+              table: 'learning_logs',
+              action: 'update',
+              id: entry.id,
+              data: {
+                id: entry.id,
+                student_id: s.id,
+                date: entry.date,
+                type: entry.type,
+                level: entry.level,
+                text: entry.text,
+                by_user_id: entry.byUserId,
+                by_name: entry.byName,
+                at: entry.at
+              }
+            })
           }
         }
       }
